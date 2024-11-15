@@ -1,0 +1,9 @@
+# gbz datafiles
+hprc-v1.1-mc-grch38.gbz
+hprc-v1.1-mc-grch38.gbz.db
+
+# python cache
+__pycache__
+
+# OSX
+*.DS_Store*

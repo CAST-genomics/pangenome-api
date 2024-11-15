@@ -1,7 +1,5 @@
-from fastapi import Depends, FastAPI, Header, HTTPException
-from typing_extensions import Annotated
+from fastapi import FastAPI
 import requests
-import sys
 from panct import gbz_utils
 from panct.logging import getLogger
 from panct.utils import Region
@@ -12,12 +10,33 @@ import os
 app = FastAPI()
 
 @app.get("/subgraph/")
-async def read_items(chrom: str, start: int, end: int, graphtype: str, genome: str, gene: bool):
+async def read_items(chrom: str, start: int, end: int, graphtype: str):
+    """
+    get the GFA format of queried region
+
+    Parameters
+    ----------
+    chrom : str
+        example: "chr5, chrX"
+    start : int
+    end: int
+    graphtype: str
+        MC (minigraph-cactus), or Minigraph
+    
+    Returns
+    -------
+    GFA file content : dict
+        GFA format of the specific region queried
+    """
+
     log = getLogger(name="complexity", level="INFO")
-    tempfile.tempdir = Path(__file__).parent.joinpath("data")
+    path_hg38_gbz = Path("hprc-v1.1-mc-grch38.gbz")
+    
+    tempfile.tempdir = Path(__file__).parent.joinpath(".")
     query_region = Region(chrom, start, end)
+
+    # create minigraph cactus GFA subgraph
     if graphtype == "MC":
-        path_hg38_gbz = Path("data/hprc-v1.1-mc-grch38.gbz")
         if not gbz_utils.check_gbzfile(path_hg38_gbz, log):
             gbz_utils.index_gbz(path_hg38_gbz)
         path_gfa = gbz_utils.extract_region_from_gbz(path_hg38_gbz,query_region,"GRCh38")
@@ -29,6 +48,8 @@ async def read_items(chrom: str, start: int, end: int, graphtype: str, genome: s
                 gfa[gfa_line[0]].append(gfa_line)
         os.remove(path_gfa)
         return gfa
+    
+    # minigraph subgraph function working in progress
     else:
         return "work in progress ..."
 
