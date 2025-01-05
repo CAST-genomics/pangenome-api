@@ -1,6 +1,8 @@
 # gbz datafiles
-hprc-v1.1-mc-grch38.gbz
-hprc-v1.1-mc-grch38.gbz.db
+*.gbz*
+*.gbz.db*
+*.gfa*
+*.gfaB*
 
 # python cache
 __pycache__

@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 import requests
-from panct import gbz_utils
+from panct import gbz_utils as gbz
 from panct.logging import getLogger
 from panct.utils import Region
 from pathlib import Path
 import tempfile
 import os
+import gfa_utils as gfa
 
 app = FastAPI()
 
@@ -30,28 +31,57 @@ async def read_items(chrom: str, start: int, end: int, graphtype: str):
     """
 
     log = getLogger(name="complexity", level="INFO")
-    path_hg38_gbz = Path("hprc-v1.1-mc-grch38.gbz")
     
     tempfile.tempdir = Path(__file__).parent.joinpath(".")
     query_region = Region(chrom, start, end)
 
     # create minigraph cactus GFA subgraph
-    if graphtype == "MC":
-        if not gbz_utils.check_gbzfile(path_hg38_gbz, log):
-            gbz_utils.index_gbz(path_hg38_gbz)
-        path_gfa = gbz_utils.extract_region_from_gbz(path_hg38_gbz,query_region,"GRCh38")
-        gfa = {"H":[], "S":[], "L":[], "J":[], "C":[], "W":[]}
-        with open(path_gfa, 'r') as gfa_file:
+    if graphtype == "MC" or graphtype == "mc":
+        
+        # set path to gbz reference file
+        mc_hg38_gbz = Path("hprc-v1.1-mc-grch38.gbz")
+        
+        # check gbz.db file and create subgraph
+        if not gbz.check_gbzfile(mc_hg38_gbz, log):
+            gbz.index_gbz(mc_hg38_gbz)
+        subgraph_gfa = gbz.extract_region_from_gbz(mc_hg38_gbz,query_region,"GRCh38")
+        
+        # output gfa subgraph
+        output_gfa = {"H":[], "S":[], "L":[], "J":[], "C":[], "W":[]}
+        with open(subgraph_gfa, 'r') as gfa_file:
             for line in gfa_file:
                 gfa_line = line.strip().split("\t")
                 gfa_line = [int(num) if num.isdigit() else str(num) for num in gfa_line]
-                gfa[gfa_line[0]].append(gfa_line)
-        os.remove(path_gfa)
-        return gfa
+                output_gfa[gfa_line[0]].append(gfa_line)
+        os.remove(subgraph_gfa)
+        return output_gfa
     
-    # minigraph subgraph function working in progress
+    # create minigraph GFA subgraph
+    if graphtype == "minigraph":
+        
+        # set path to minigraph gfa reference file
+        minigraph_hg38_gfa = Path("hprc-v1.0-minigraph-grch38.gfa")
+        
+        # check gbz.db file and create subgraph
+        gfa.check_gfabase_installed(log)
+        gfa.check_gfafile(minigraph_hg38_gfa, log)
+        
+        subgraph_gfa = gfa.extract_region_from_gfa(minigraph_hg38_gfa,query_region)
+        
+        output_gfa = {"H":[], "S":[], "L":[], "J":[], "C":[], "W":[]}
+        
+        with open(subgraph_gfa, 'r') as gfa_file:
+            for line in gfa_file:
+                gfa_line = line.strip().split("\t")
+                gfa_line = [int(num) if num.isdigit() else str(num) for num in gfa_line]
+                output_gfa[gfa_line[0]].append(gfa_line)
+        os.remove(subgraph_gfa)
+        
+        return output_gfa
+    
     else:
-        return "work in progress ..."
+        # return error message WIP
+        return
 
 
 @app.get("/geneannot/")
