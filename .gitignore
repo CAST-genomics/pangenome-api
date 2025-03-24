@@ -2,7 +2,9 @@
 *.gbz*
 *.gbz.db*
 *.gfa*
-*.gfaB*
+*.gfab*
+*.svg*
+*.log*
 
 # python cache
 __pycache__

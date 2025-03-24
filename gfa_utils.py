@@ -27,23 +27,24 @@ def extract_region_from_gfa(gfa_file: Path, region: Region) -> str:
     gfa_file : str
         Path to subgraph GFA file
     """
-    tmpfile = tempfile.NamedTemporaryFile(delete=False)
 
     cmd = [
         "gfabase",
         "sub",
         str(gfa_file) + "b",
-        "-o", tmpfile.name,
+        "-o", "subgraph.gfa",
         str(region.chrom) + ":" + str(region.start) + "-" + str(region.end),
         "--range",
         "--view",
+        "--cutpoints", "1",
+        "--guess-ranges"
     ]
     
     proc = subprocess.run(cmd, stdout=subprocess.PIPE)
     if proc.returncode != 0:
         return None
     else:
-        return tmpfile.name
+        return "subgraph.gfa"
 
 
 def check_gfabase_installed(log: logging.Logger):
@@ -61,7 +62,7 @@ def check_gfabase_installed(log: logging.Logger):
     return True
 
 
-def index_gfa(gfa_file: Path, gfab_file: Path):
+def index_gfa(gfa_file: Path, gfab_file: Path, log):
     """
     Index the GFA file
 
@@ -106,7 +107,7 @@ def check_gfafile(gfa_file: Path, log: logging.Logger):
         return False
     if not os.path.exists(str(gfa_file) + "b"):
         log.info(f"{gfa_file}b does not exist. Attempting to create")
-        if not index_gfa(gfa_file, Path(str(gfa_file) + "b")):
+        if not index_gfa(gfa_file, Path(str(gfa_file) + "b"), log):
             log.critical("Failed to create GFA index")
             return False
     return True
