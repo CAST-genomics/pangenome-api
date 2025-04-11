@@ -308,6 +308,10 @@ class PGGraph:
                         ln = int(valString)
                         if sequence in ["*", ""]:
                             seqlen = ln
+                        node_color = ""
+                        if tag == "gr":
+                            if valString[0:4] == "~chr":
+                                node_color = "orange"
                 # Check node orientation
                 # If not given, assume "+"
                 lastChar = nodeName[-1]
