@@ -11,7 +11,7 @@ from pathlib import Path
 from panct.utils import Region
 
 
-def extract_region_from_gfa(gfa_file: Path, region: Region) -> str:
+def extract_region_from_gfa(gfa_file: Path, region: Region, gfa_output: Path) -> str:
     """
     Extract GFA for a region from an indexed GFA file
 
@@ -21,10 +21,12 @@ def extract_region_from_gfa(gfa_file: Path, region: Region) -> str:
         Path to GFA file. Must be indexed
     region : Region
         Region to extract
+    filename: Path
+        name of the output gfa file
 
     Returns
     -------
-    gfa_file : str
+    gfa_file : Path
         Path to subgraph GFA file
     """
 
@@ -32,7 +34,7 @@ def extract_region_from_gfa(gfa_file: Path, region: Region) -> str:
         "gfabase",
         "sub",
         str(gfa_file) + "b",
-        "-o", "subgraph.gfa",
+        "-o", str(gfa_output),
         str(region.chrom) + ":" + str(region.start) + "-" + str(region.end),
         "--range",
         "--view",
@@ -44,7 +46,7 @@ def extract_region_from_gfa(gfa_file: Path, region: Region) -> str:
     if proc.returncode != 0:
         return None
     else:
-        return "subgraph.gfa"
+        return gfa_output
 
 
 def check_gfabase_installed(log: logging.Logger):

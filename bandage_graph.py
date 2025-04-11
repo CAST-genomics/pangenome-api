@@ -77,6 +77,7 @@ class PGEdge:
         self.overlap_type = None
         self.m_drawn = False
         self.m_graphics_item_edge = 0
+        self.m_color = ""
 
     def isDrawn(self):
         return self.m_drawn
@@ -130,7 +131,7 @@ class PGEdge:
         return self.m_graphics_item_edge
 
 class PGNode:
-    def __init__(self, nodeName, sequence, seqlen, settings):
+    def __init__(self, nodeName, sequence, seqlen, node_color, settings):
         self.nodeName = nodeName
         self.nodeSequence = sequence
         self.nodeLength = seqlen
@@ -140,6 +141,9 @@ class PGNode:
         self.m_ogdfNode = 0
         self.m_drawn = False
         self.m_graphics_item_node = 0
+        self.m_textx = 0
+        self.m_texty = 0
+        self.m_color = node_color
 
     def GetOgdfNode(self):
         return self.m_ogdfNode
@@ -261,7 +265,7 @@ class PGGraph:
         if reverseComplementName in self.pgnodes:
             return # no need to add
         reverseComplementNode = PGNode(reverseComplementName, reverseComplement(node.nodeSequence), \
-                           node.nodeLength, self.m_settings)
+                           node.nodeLength, node.m_color, self.m_settings)
         self.pgnodes[reverseComplementName] = reverseComplementNode
 
     def pointEachNodeToItsReverseComplement(self):
@@ -286,7 +290,6 @@ class PGGraph:
                 lineParts = line.strip().split("\t")
             else:
                 lineParts = line.decode('utf8').strip().split("\t")
-            
             # Lines that begin with "H" are header
             # We skip them for now. In future could parse
             # options from the header
@@ -301,6 +304,7 @@ class PGGraph:
                 sequence = lineParts[2]
                 # Parse tags
                 seqlen = len(sequence)
+                node_color = ""
                 for i in range(3, len(lineParts)):
                     tag = lineParts[i].split(":")[0]
                     valString = lineParts[i].split(":")[2]
@@ -308,18 +312,17 @@ class PGGraph:
                         ln = int(valString)
                         if sequence in ["*", ""]:
                             seqlen = ln
-                        node_color = ""
-                        if tag == "gr":
-                            if valString[0:4] == "~chr":
-                                node_color = "orange"
+                    if tag == "gr":
+                        if valString[0:4] == "~chr":
+                            node_color = "orange"
                 # Check node orientation
                 # If not given, assume "+"
                 lastChar = nodeName[-1]
                 if lastChar not in ["+", "-"]:
                     nodeName += "+"
-                
+                    
                 # Add to list of nodes
-                self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, self.m_settings)
+                self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_color, self.m_settings)
 
             # Lines beginning with "L" are link (edge) lines
             """
@@ -384,6 +387,7 @@ class PGGraph:
             firstEdgeOgdfNode = edge.startingNode.getReverseComplement().GetOgdfNode().GetFirst()
         else:
             return # Starting node or its reverse complement isn't in OGDF
+        # print(f"firstEdgeOgdfNode is {firstEdgeOgdfNode}")
 
         # Get second Ogdf node
         secondEdgeOgdfNode = 0
@@ -393,6 +397,7 @@ class PGGraph:
             secondEdgeOgdfNode = edge.endingNode.getReverseComplement().GetOgdfNode().GetLast()
         else:
             return # Ending node or its reverse complement isn't in OGDF
+        # print(f"secondEdgeOgdfNode is {secondEdgeOgdfNode}")
 
         # Skip if edge connects a single-segment node to itself
         drawnLength = edge.startingNode.GetDrawnNodeLength()
@@ -451,174 +456,3 @@ class PGGraph:
         #         print("%s, %s"%(self.m_graphAttributes.x(ogdf_node), \
         #             self.m_graphAttributes.y(ogdf_node)))
         #         print("hi")
-
-    def AddGraphicsItemsToScene(self, scene):
-        for nodename in self.pgnodes.keys():
-            node = self.pgnodes[nodename]
-            if node.isDrawn():
-                graphicsItemNode = GraphicsItemNode(node, self.m_graphAttributes)
-                node.SetGraphicsItemNode(graphicsItemNode)
-                #TODO double check setflag(), don't think we need it
-        for edgelist in self.pgedges.keys():
-            edge = self.pgedges[edgelist]
-            if edge.isDrawn():
-                graphicsItemEdge = GraphicsItemEdge(edge, self.m_settings)
-                edge.SetGraphicsItemEdge(graphicsItemEdge)
-                #TODO double check setflag(), don't think we need it
-                scene.addItem(graphicsItemEdge)
-        for nodename in self.pgnodes.keys():
-            node = self.pgnodes[nodename]
-            if node.hasGraphicsItem():
-                scene.addItem(node.GetGraphicsItemNode())
-
-
-class GraphicsItemNode(QGraphicsItem):
-    def __init__(self, node, m_graphAttributes, parent = None):
-        super().__init__(parent)
-        self.m_node = node
-        self.m_linePoints = []
-        self.m_path = None
-        self.m_width = averageNodeWidth
-        ogdfNode = self.m_node.GetOgdfNode()
-        if ogdfNode != 0:
-            m_ogdfnodes = ogdfNode.m_ogdfNodes
-            for i in range(0, len(m_ogdfnodes)):
-                xypoint = QPointF(m_graphAttributes.x(m_ogdfnodes[i]), m_graphAttributes.y(m_ogdfnodes[i]))
-                self.m_linePoints.append(xypoint)
-        else:
-            m_ogdfnodes = self.node.getReverseComplement().GetOgdfNode().m_ogdfNodes
-            for i in range(0, len(m_ogdfnodes)):
-                xypoint = QPointF(m_graphAttributes.x(m_ogdfnodes[i]), m_graphAttributes.y(m_ogdfnodes[i]))
-                self.m_linePoints.append(xypoint)
-                
-        self.RemakePath()
-        
-    def RemakePath(self):
-        path = QPainterPath()
-        if self.m_linePoints:
-            path.moveTo(self.m_linePoints[0])
-            for xypoints in self.m_linePoints[1:]:
-                path.lineTo(xypoints)
-        self.m_path = path
-        
-    def GetLast(self):
-        return self.m_linePoints[-1]
-    
-    def GetSecondLast(self):
-        return self.m_linePoints[-2]
-    
-    def GetFirst(self):
-        return self.m_linePoints[0]
-    
-    def GetSecond(self):
-        return self.m_linePoints[1]
-    
-    # if we do not consider depth, we probably do not need to use this
-    # def GetNodeWidth(self, depthRelativeToMeanDrawnDepth, depthPower, depthEffectOnWidth, averageNodeWidth):
-    #     if (depthRelativeToMeanDrawnDepth < 0.0):
-    #         depthRelativeToMeanDrawnDepth = 0.0
-    #     widthRelativeToAverage = (pow(depthRelativeToMeanDrawnDepth, depthPower) - 1.0) * depthEffectOnWidth + 1.0
-    #     return averageNodeWidth * widthRelativeToAverage
-    
-    # def setWidth(self):
-    #     m_width = self.GetNodeWidth()
-    
-    def shape(self):
-        stroker = QPainterPathStroker()
-        stroker.setWidth(self.m_width)
-        stroker.setCapStyle(Qt.FlatCap)
-        stroker.setJoinStyle(Qt.RoundJoin)
-        mainNodePath = stroker.createStroke(self.m_path)
-        
-        return mainNodePath
-        
-    
-    def boundingRect(self):
-        extraSize = selectionThickness / 2.0
-        bound = self.shape().boundingRect()
-        
-        bound.setTop(bound.top() - extraSize)
-        bound.setBottom(bound.bottom() + extraSize)
-        bound.setLeft(bound.left() - extraSize)
-        bound.setRight(bound.right() + extraSize)
-        
-        return bound
-  
-
-class GraphicsItemEdge(QGraphicsItem):
-    def __init__(self, edge, settings, parent = None):
-        super().__init__(parent)
-        self.m_edge = edge
-        self.m_settings = settings
-        self.m_startingLocation = None
-        self.m_beforeStartingLocation = None
-        self.m_endingLocation = None
-        self.m_afterEndingLocation = None
-        self.m_controlPoint1 = None
-        self.m_controlPoint2 = None
-        self.m_path = None
-        
-        self.CalculateAndSetPath()
-        
-    def extendLine(self, start: QPointF, end: QPointF, extensionLength: float):
-        extensionRatio = extensionLength / QLineF(start, end).length()
-        difference = end - start
-        difference *= extensionRatio
-        return end + difference
-        
-        
-    def CalculateAndSetPath(self):
-        self.SetControlPointLocations()
-        edgeDistance = QLineF(self.m_startingLocation, self.m_endingLocation).length()
-        extensionLength = self.m_settings["EDGELEN"]
-        if (extensionLength > edgeDistance / 2.0):
-            extensionLength = edgeDistance / 2.0
-        
-        self.m_controlPoint1 = self.extendLine(self.m_beforeStartingLocation, self.m_startingLocation, extensionLength)
-        self.m_controlPoint2 = self.extendLine(self.m_afterEndingLocation, self.m_endingLocation, extensionLength)
-        
-        #TODO edge is connecting a node to itself
-        #TODO single mode & edge connects a node to its reverse complement
-        
-        path = QPainterPath()
-        path.moveTo(self.m_startingLocation)
-        path.cubicTo(self.m_controlPoint1, self.m_controlPoint2, self.m_endingLocation)
-        
-        self.m_path = path
-
-
-    def SetControlPointLocations(self):
-        startingNode = self.m_edge.getStartingNode()
-        endingNode = self.m_edge.getEndingNode()
-        
-        if startingNode.hasGraphicsItem():
-            self.m_startingLocation = startingNode.GetGraphicsItemNode().GetLast()
-            self.m_beforeStartingLocation = startingNode.GetGraphicsItemNode().GetSecondLast()
-        elif startingNode.getReverseComplement().hasGraphicsItem():
-            self.m_startingLocation = startingNode.getReverseComplement().GetGraphicsItemNode().GetFirst()
-            self.m_beforeStartingLocation = startingNode.getReverseComplement().GetGraphicsItemNode().GetSecond()
-        
-        if endingNode.hasGraphicsItem():
-            self.m_endingLocation = endingNode.GetGraphicsItemNode().GetFirst()
-            self.m_afterEndingLocation = endingNode.GetGraphicsItemNode().GetSecond()
-        elif endingNode.getReverseComplement().hasGraphicsItem():
-            self.m_endingLocation = endingNode.getReverseComplement().GetGraphicsItemNode().GetLast()
-            self.m_afterEndingLocation = endingNode.getReverseComplement().GetGraphicsItemNode().GetSecondLast()
-        
-    def shape(self):
-        stroker = QPainterPathStroker()
-        stroker.setWidth(edgeWidth)
-        stroker.setCapStyle(Qt.RoundCap)
-        stroker.setJoinStyle(Qt.RoundJoin)
-        mainEdgePath = stroker.createStroke(self.m_path)
-        
-        return mainEdgePath
-
-# for node in testpg.pgnodes.values():
-#     if node.isDrawn():
-#         print(node.nodeName)
-#         print(node.GetOgdfNode())
-#         if node.inOgdf():
-#             for ogdf_node in node.GetOgdfNode().m_ogdfNodes:
-#                 print("%s, %s"%(testpg.m_graphAttributes.x(ogdf_node), \
-#                     testpg.m_graphAttributes.y(ogdf_node)))
