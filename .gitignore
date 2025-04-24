@@ -6,6 +6,9 @@
 *.svg*
 *.log*
 
+# debugging files
+size_track.txt
+
 # python cache
 __pycache__
 

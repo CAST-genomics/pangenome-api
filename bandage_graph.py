@@ -4,10 +4,6 @@ Classes for drawing the GFA as a graph
 
 # Standard imports
 import math
-from PyQt5.QtWidgets import QGraphicsScene, QGraphicsItem
-from PyQt5.QtCore import QPointF, QLineF, QSize, QRect, Qt
-from PyQt5.QtGui import QPainterPath, QPainter, QColor, QPainterPathStroker, QPen, QBrush
-from PyQt5.QtSvg import QSvgGenerator
 
 # OGDF
 from ogdf_python import *
@@ -21,7 +17,6 @@ selectionThickness = 1.0
 averageNodeWidth = 5.0
 # edgeWidth = FloatSetting(1.5, 0.1, 100);
 edgeWidth = 1.5
-edgeColor = QColor(0,0,0,180)
 
 def getLengthFromCigar(cigar):
     return 0 # TODO. not sure we need CIGAR?

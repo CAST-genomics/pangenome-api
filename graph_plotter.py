@@ -4,7 +4,6 @@ Classes for plotting the graph with plotly
 import bandage_graph
 import json
 import math
-import plotly.graph_objs as go
 import tempfile
 
 class GraphicsItemEdge:
