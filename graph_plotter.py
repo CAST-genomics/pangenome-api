@@ -4,8 +4,7 @@ Classes for plotting the graph with plotly
 import bandage_graph
 import json
 import math
-import plotly
-import plotly.graph_objs as go
+import tempfile
 
 class GraphicsItemEdge:
     def __init__(self, edge, settings):
@@ -27,7 +26,7 @@ class GraphicsItemEdge:
             self.m_startingLocation = starting_node.GetGraphicsItemNode().getLast()
             self.m_beforeStartingLocation = starting_node.GetGraphicsItemNode().getSecondLast()
         elif starting_node.getReverseComplement().hasGraphicsItem():
-            self.m_startingLocation = starting_node.getReverseComplement().GetGraphicsItemNode().getLast()
+            self.m_startingLocation = starting_node.getReverseComplement().GetGraphicsItemNode().getFirst()
             self.m_beforeStartingLocation = starting_node.getReverseComplement().GetGraphicsItemNode().getSecond()
         else: pass
 
@@ -77,11 +76,15 @@ class GraphicsItemEdge:
         path += " C %s %s %s %s %s %s"%(self.m_controlPoint1[0], self.m_controlPoint2[1],
             self.m_controlPoint2[0], self.m_controlPoint2[1],
             self.m_endingLocation[0], self.m_endingLocation[1])
+        
+        color = "red"
+        if starting_node.m_color != "" and ending_node.m_color != "":
+            color = "black"
          # Return the path shape
         shape = dict(
             type="path",
             path=path,
-            line_color="red",
+            line_color=color,
             line_width=2
         )
         return shape       
@@ -106,6 +109,8 @@ class GraphicsItemNode:
         path = "M %s %s"%(self.points[0][0], self.points[0][1])
         for i in range(1, len(self.points)):
             path = path + " L %s %s"%(self.points[i][0], self.points[i][1])
+        self.m_node.m_textx = (self.points[0][0] + self.points[-1][0])/2
+        self.m_node.m_texty = (self.points[0][1] + self.points[-1][1])/2
         # Return the path shape
         shape = dict(
             type="path",
@@ -153,28 +158,34 @@ class GraphPlotter:
     
     def BuildSvg(self):
         self.BuildGraphicsItems()
-        svgFile = open("subgraph.svg", "w")
-        svgFile.write("<svg width=\"100%%\" height=\"100%%\" viewBox=\"0 0 %s %s\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\">\n"%(self.max_x*1.1, self.max_y*1.1))
-        for node in self.m_pggraph.pgnodes.values():
-            if node.isDrawn():
-                shape = node.GetGraphicsItemNode().GetShape()
-                if shape is not None:
-                    svgFile.write(f"\t<path id=\"{shape['id']}\" d=\"{shape['path']}\" fill=\"none\" stroke=\"{shape['line_color']}\" stroke-width=\"{shape['line_width']}\"/>\n")
-        for edge in self.m_pggraph.pgedges.values():
-            if edge.isDrawn():
-                shape = edge.GetGraphicsItemEdge().GetShape()
-                if shape is not None:
-                    svgFile.write(f"\t<path d=\"{shape['path']}\" fill=\"none\" stroke=\"{shape['line_color']}\" stroke-width=\"{shape['line_width']}\"/>\n")
-        svgFile.write("</svg>")
-
-def image():
-    # TODO: some "MINNODELENGTH" would throw an error
-    setting = {"EXACT_OVERLAP": True, "DEBUG_SMALL_GRAPHS": False, "MINNODELENGTH": 1.0, "NODESEGLEN": 20, "EDGELEN": 5, "NODELENPERMB":1000}
-    pggraph = bandage_graph.PGGraph("no_cutpoint.gfa", setting)
-    pggraph.BuildOGDFGraph()
-    pggraph.LayoutGraph()
-    graphPlotter = GraphPlotter(pggraph, setting)
-    graphPlotter.BuildSvg()
+        with tempfile.NamedTemporaryFile(mode='w', delete=False) as svgFile:
+            svgFile.write("<svg width=\"100%%\" height=\"100%%\" viewBox=\"0 0 %s %s\" xmlns=\"http://www.w3.org/2000/svg\" preserveAspectRatio=\"xMidYMid meet\">\n"%(self.max_x*1.1, self.max_y*1.1))
+            for node in self.m_pggraph.pgnodes.values():
+                if node.isDrawn():
+                    shape = node.GetGraphicsItemNode().GetShape()
+                    if node.m_color != "":
+                        color = node.m_color
+                    else: 
+                        color = "MediumPurple"
+                    if shape is not None:
+                        svgFile.write(f"\t<path class=\"{shape['id']}\" id=\"{shape['id']}\" d=\"{shape['path']}\" fill=\"none\" stroke=\"{color}\" stroke-width=\"{shape['line_width']}\"/>\n")
+                        if self.m_settings["NAMELABEL"]:
+                            svgFile.write(f"\t<text class=\"{shape['id']}\" font-size=\"16\" fill=\"black\">\n")
+                            svgFile.write(f"\t\t<textPath class=\"{shape['id']}\" href=\"#{shape['id']}\" startOffset=\"50%\" text-anchor=\"middle\">{shape['id'][0:-1]}</textPath>")
+                            svgFile.write("\t</text>")
+                        svgFile.write("\t<foreignObject style=\"visibility: hidden;\">")
+                        svgFile.write("\t\t<node-details>")
+                        svgFile.write(f"\t\t\t<p>name: {shape['id']}</p>")
+                        svgFile.write(f"\t\t\t<p>length: {node.nodeLength}</p>")
+                        svgFile.write("\t\t</node-details>")
+                        svgFile.write("\t</foreignObject>")
+            for edge in self.m_pggraph.pgedges.values():
+                if edge.isDrawn():
+                    shape = edge.GetGraphicsItemEdge().GetShape()
+                    if shape is not None:
+                        svgFile.write(f"\t<path d=\"{shape['path']}\" fill=\"none\" stroke=\"{shape['line_color']}\" stroke-width=\"{shape['line_width']}\"/>\n")
+            svgFile.write("</svg>")
+        return svgFile.name
     
     # def GetGraphJSON(self):
     #     # TODO - this is just a list of SVG paths
