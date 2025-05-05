@@ -186,14 +186,6 @@ class GraphPlotter:
                         svgFile.write(f"\t<path d=\"{shape['path']}\" fill=\"none\" stroke=\"{shape['line_color']}\" stroke-width=\"{shape['line_width']}\"/>\n")
             svgFile.write("</svg>")
         return svgFile.name
-
-def image():
-    setting = {"EXACT_OVERLAP": True, "DEBUG_SMALL_GRAPHS": False, "MINNODELENGTH": 1.0, "NODESEGLEN": 20, "EDGELEN": 5, "NODELENPERMB":1000}
-    pggraph = bandage_graph.PGGraph("no_cutpoint.gfa", setting)
-    pggraph.BuildOGDFGraph()
-    pggraph.LayoutGraph()
-    graphPlotter = GraphPlotter(pggraph, setting)
-    graphPlotter.BuildSvg()
     
     # def GetGraphJSON(self):
     #     # TODO - this is just a list of SVG paths

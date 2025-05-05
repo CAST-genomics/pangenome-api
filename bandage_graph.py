@@ -64,7 +64,7 @@ class OgdfNode:
             return self.m_ogdfNodes[0]
 
 class PGEdge:
-    def __init__(self, node1, node2):
+    def __init__(self, node1, node2, color):
         self.startingNode = node1
         self.endingNode = node2
         self.reverse_complement = None
@@ -72,7 +72,7 @@ class PGEdge:
         self.overlap_type = None
         self.m_drawn = False
         self.m_graphics_item_edge = 0
-        self.m_color = ""
+        self.m_color = color
 
     def isDrawn(self):
         return self.m_drawn
@@ -214,7 +214,7 @@ class PGGraph:
         self.m_graphAttributes = ogdf.GraphAttributes(self.m_ogdfGraph, \
             ogdf.GraphAttributes.all)
         
-    def createEdge(self, node1name, node2name, overlap, overlapType):
+    def createEdge(self, node1name, node2name, overlap, overlapType, color):
         node1Opposite = getOppositeNodeName(node1name)
         node2Opposite = getOppositeNodeName(node2name)
 
@@ -236,11 +236,11 @@ class PGGraph:
 
         isOwnPair = (node1 == negNode2 and node2 == negNode1)
 
-        forwardEdge = PGEdge(node1, node2)
+        forwardEdge = PGEdge(node1, node2, color)
         if isOwnPair:
             backwardEdge = forwardEdge
         else:
-            backwardEdge = PGEdge(negNode2, negNode1)
+            backwardEdge = PGEdge(negNode2, negNode1, color)
         forwardEdge.setReverseComplement(backwardEdge)
         backwardEdge.setReverseComplement(forwardEdge)
         forwardEdge.setOverlap(overlap)
@@ -279,6 +279,7 @@ class PGGraph:
         edgeStartingNodeNames = []
         edgeEndingNodeNames = []
         edgeOverlaps = []
+        edge_colors = []
         gfafile = open(self.gfadata, "r")
         for line in gfafile:
             if type(line)==str:
@@ -333,6 +334,12 @@ class PGGraph:
                 endingNode = lineParts[3] + lineParts[4]
                 edgeStartingNodeNames.append(startingNode)
                 edgeEndingNodeNames.append(endingNode)
+                # TODO change this m_color to color code instead of specific color
+                # TODO check if all the nodes are "+"
+                if self.pgnodes[startingNode[0:-1]+"+"].m_color == "orange" and self.pgnodes[endingNode[0:-1]+"+"].m_color == "orange":
+                    edge_colors.append("black")
+                else:
+                    edge_colors.append("red")
                 # Part 5 has CIGAR for overlap
                 cigar = lineParts[5]
                 if cigar == "*":
@@ -350,7 +357,7 @@ class PGGraph:
         for i in range(len(edgeStartingNodeNames)):
             self.createEdge(edgeStartingNodeNames[i], \
                     edgeEndingNodeNames[i], \
-                    edgeOverlaps[i], self.m_settings["EXACT_OVERLAP"])
+                    edgeOverlaps[i], self.m_settings["EXACT_OVERLAP"], edge_colors[i])
 
         if len(self.pgnodes.keys()) == 0:
             return False, "ERROR: No nodes in graph"

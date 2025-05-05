@@ -1,9 +1,12 @@
+import sys
+sys.path.append('/home/ec2-user/lab')
+from panCT.panct.data import Region
+from panCT.panct.logging import getLogger
+
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 import requests
 import gbz_utils as gbz
-from panct.logging import getLogger
-from panct.data import Region
 from pathlib import Path
 import tempfile
 import os
@@ -132,14 +135,14 @@ async def read_items(chrom: str, start: int, end: int, graphtype: str):
     # create minigraph cactus GFA subgraph
     if graphtype == "MC" or graphtype == "mc":
         gfa_output = Path(f"./cache/mc/subgraph_{chrom}_{str(start)}_{str(end)}.gfa")
-        if not gfa_output.exist():
-            SubgraphMC(query_region, log, mc_hg38_gbz)
+        if not gfa_output.exists():
+            SubgraphMC(query_region, gfa_output, log, mc_hg38_gbz)
     
     # create minigraph GFA subgraph
     elif graphtype == "minigraph":
         gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}.gfa")
-        if not gfa_output.exist():
-            SubgraphMini(query_region, log, minigraph_hg38_gfa)
+        if not gfa_output.exists():
+            SubgraphMini(query_region, gfa_output, log, minigraph_hg38_gfa)
     
     else:
         # return error message WIP
@@ -184,7 +187,6 @@ async def read_items(settings: Settings):
     query_region = Region(settings.chr_input, settings.start_loc_input, settings.end_loc_input)
 
     # create minigraph cactus GFA subgraph
-    #TODO change the structure as minigraph, WIP, can not be used yet
     if settings.graph_type == "MC" or settings.graph_type == "mc":
         gfa_output = Path(f"./cache/mc/subgraph_{settings.chr_input}_{str(settings.start_loc_input)}_{str(settings.end_loc_input)}.gfa")
         if not gfa_output.exists():
@@ -201,6 +203,7 @@ async def read_items(settings: Settings):
     print(settings_dict)
     print(gfa_output)
     pggraph = bandage_graph.PGGraph(str(gfa_output), settings_dict)
+    print(str(gfa_output))
     pggraph.BuildOGDFGraph()
     pggraph.LayoutGraph()
     graphPlotter = graph_plotter.GraphPlotter(pggraph, settings_dict)
@@ -209,6 +212,7 @@ async def read_items(settings: Settings):
     with open(svgFile, "r") as file:
         content = file.read()
     os.remove(svgFile)
+    print(content)
     
     return {"svg": content}
 
