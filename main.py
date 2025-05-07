@@ -3,8 +3,8 @@ sys.path.append('/home/ec2-user/lab')
 from panCT.panct.data import Region
 from panCT.panct.logging import getLogger
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, Query
+from fastapi.responses import JSONResponse
 import requests
 import gbz_utils as gbz
 from pathlib import Path
@@ -16,6 +16,7 @@ import bandage_graph
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import tempfile
+import json
 
 class Settings(BaseModel):
     chr_input: str
@@ -62,48 +63,6 @@ def SubgraphMini(query_region, gfa_output, log, reference_gfa):
     subgraph_gfa = gfa.extract_region_from_gfa(reference_gfa,query_region,gfa_output)
     if subgraph_gfa is None:
         log.error("Subset GFA is None")
-
-# @app.get("/subgraph/gfa/")
-# async def read_items(chrom: str, start: int, end: int, graphtype: str):
-#     """
-#     get the GFA format of queried region
-
-#     Parameters
-#     ----------
-#     chrom : str
-#         example: "chr5, chrX"
-#     start : int
-#     end: int
-#     graphtype: str
-#         MC (minigraph-cactus), or Minigraph
-    
-#     Returns
-#     -------
-#     GFA file content : dict
-#         GFA format of the specific region queried
-#     """
-
-#     log = getLogger(name="complexity", level="INFO")
-    
-#     tempfile.tempdir = Path(__file__).parent.joinpath(".")
-#     query_region = Region(chrom, start, end)
-
-#     # create minigraph cactus GFA subgraph
-#     if graphtype == "MC" or graphtype == "mc":
-#         subgraph_gfa = SubgraphMC(query_region, log, mc_hg38_gbz)
-    
-#     # create minigraph GFA subgraph
-#     elif graphtype == "minigraph":
-#         subgraph_gfa = SubgraphMini(query_region, log, minigraph_hg38_gfa)
-    
-#     else:
-#         # TODO: return error message
-#         return
-
-#     with open(subgraph_gfa, 'r') as gfa_file:
-#         output_gfa = gfa_file.read()
-#         os.remove(subgraph_gfa)
-#         return output_gfa
 
 # for debugging only - this page will output parsed gfa content in dictionary 
 # TODO update the the filename when calling gfa related
@@ -163,25 +122,112 @@ async def read_items(chrom: str, start: int, end: int, graphtype: str):
 
     return output_gfa
 
+@app.get("/json")
+async def read_items(    
+    chrom: str = Query(..., description='Chromosome, e.g. `"chr5, chrX"`'),
+    start: int = Query(..., description="Start coordinate"),
+    end: int = Query(..., description="End coordinate"),
+    graphtype: str = Query(..., description='Graph type: `"MC"` (minigraph-cactus) or `"Minigraph"`'),
+    exact_overlap: bool = Query(True),
+    debug_small_graphs: bool = Query(..., description="If true, every node's length is set to the number of basepairs"),
+    minnodelen: float = Query(5, description="Minimum node length to draw.\nIf the drawn node length is smaller than this, it defaults to minnodelen."),
+    nodeseglen: float = Query(20, description="Node length for each OGDF node"),
+    edgelen: float = Query(5, description="Length of edges between nodes"),
+    nodelenpermb: float = Query(1000, description="Formula:\n`drawnNodeLength = nodelenpermb * node_length_in_bp / 1,000,000`")
+):
+    """
+    ## Parameters
+
+    - `chrom`: str — Chromosome(s) to query. Example: `"chr5, chrX"`
+    - `start`: int — Start coordinate (1-based)
+    - `end`: int — End coordinate (inclusive)
+    - `graphtype`: str — `"MC"` (minigraph-cactus) or `"Minigraph"`
+    - `exact_overlap`: bool
+    - `debug_small_graphs`: bool — If true, each node's length = number of basepairs
+    - `minnodelen`: float — Minimum node length to draw
+    - `nodeseglen`: float — Node length for every OGDF node
+    - `edgelen`: float — Edge length between nodes
+    - `nodelenpermb`: float — Drawn node length scaling factor
+
+    ## Returns
+
+    - **GFA file content**: `dict`  
+      GFA format of the specific region queried.
+    """
+    log = getLogger(name="complexity", level="INFO")
+    
+    query_region = Region(chrom, start, end)
+
+    # create minigraph cactus GFA subgraph
+    if graphtype == "MC" or graphtype == "mc":
+        gfa_output = Path(f"./cache/mc/subgraph_{chrom}_{str(start)}_{str(end)}.gfa")
+        if not gfa_output.exists():
+            SubgraphMC(query_region, gfa_output, log, mc_hg38_gbz)
+    # create minigraph GFA subgraph
+    elif graphtype == "minigraph":
+        gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}.gfa")
+        if not gfa_output.exists():
+            SubgraphMini(query_region, gfa_output, log, minigraph_hg38_gfa)
+    else:
+        log.error(f"Invalid graph tyle {graphtype}(valid graph types: \"minigraph\" or \"MC\")")
+        return
+    settings = {
+        "EXACT_OVERLAP": exact_overlap,
+        "DEBUG_SMALL_GRAPHS": debug_small_graphs,
+        "MINNODELENGTH": minnodelen,
+        "NODESEGLEN": nodeseglen,
+        "EDGELEN": edgelen,
+        "NODELENPERMB": nodelenpermb
+    }
+    
+    pggraph = bandage_graph.PGGraph(str(gfa_output), settings)
+    pggraph.BuildOGDFGraph()
+    pggraph.LayoutGraph()
+    
+    data = {
+    "locus": "chr12:21023100-21023150",
+    "node": {},
+    "edge": [],
+    "sequence": {}
+    }
+
+    sequence = {}
+    node = {}
+    edges = []
+
+    for pgnodes in pggraph.pgnodes.values():
+        if pgnodes.isDrawn():
+            node_info = {}
+            node_info["name"] = pgnodes.nodeName
+            node_info["length"] = pgnodes.nodeLength
+            node_info["assembly"] = pgnodes.m_assembly
+            sequence[pgnodes.nodeName] = pgnodes.nodeSequence
+            odgf_coordinates = []
+            for ogdf_node in pgnodes.GetOgdfNode().m_ogdfNodes:
+                coordinates = {"x": pggraph.m_graphAttributes.x(ogdf_node), "y": pggraph.m_graphAttributes.y(ogdf_node)}
+                odgf_coordinates.append(coordinates)
+            node_info["ogdf_coordinates"] = odgf_coordinates
+            node[pgnodes.nodeName] = node_info
+
+    for node_pairs in pggraph.pgedges.keys():
+        if pggraph.pgedges[node_pairs].isDrawn():
+            edge = {}
+            edge["starting_node"] = node_pairs[0].nodeName
+            edge["ending_node"] = node_pairs[1].nodeName
+            edges.append(edge)
+        
+
+    data["sequence"] = sequence
+    data["node"] = node
+    data["edge"] = edges
+        
+    with open("small_chr12_21023100_21023150.JSON", "w") as output:
+        json.dump(data, output, indent=4)
+    return JSONResponse(content=data)
+
+
 @app.post("/subgraph/svg/")
 async def read_items(settings: Settings):
-    """
-    get the GFA format of queried region
-
-    Parameters
-    ----------
-    chrom : str
-        example: "chr5, chrX"
-    start : int
-    end: int
-    graphtype: str
-        MC (minigraph-cactus), or Minigraph
-    
-    Returns
-    -------
-    GFA file content : dict
-        GFA format of the specific region queried
-    """
     log = getLogger(name="complexity", level="INFO")
     
     query_region = Region(settings.chr_input, settings.start_loc_input, settings.end_loc_input)
@@ -200,10 +246,7 @@ async def read_items(settings: Settings):
         log.error(f"Invalid graph tyle {settings.graph_type}(valid graph types: \"minigraph\" or \"MC\")")
         return
     settings_dict = settings.model_dump()
-    print(settings_dict)
-    print(gfa_output)
     pggraph = bandage_graph.PGGraph(str(gfa_output), settings_dict)
-    print(str(gfa_output))
     pggraph.BuildOGDFGraph()
     pggraph.LayoutGraph()
     graphPlotter = graph_plotter.GraphPlotter(pggraph, settings_dict)
@@ -212,7 +255,6 @@ async def read_items(settings: Settings):
     with open(svgFile, "r") as file:
         content = file.read()
     os.remove(svgFile)
-    print(content)
     
     return {"svg": content}
 

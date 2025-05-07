@@ -53,7 +53,7 @@
                     <label for="nodeseglen">Node Segment Length:</label>
                     <input type="number" id="nodeseglen" value="20" min="1" max="1000">
                     <label for="edgelen">Edge Length:</label>
-                    <input type="number" id="edgelen" value="5" min="0.1" max="100">
+                    <input type="number" id="edgelen" value="5" min="0.1" max="100" step="0.1">
                     <label for="nodelenpermb">Node Length per Megabase:</label>
                     <input type="number" id="nodelenpermb" value="1000" min="1000" max="1000000">
                 </fieldset>
@@ -120,7 +120,7 @@
                 };
 
                 console.log(settings);
-                fetch(`http://3.145.184.140:8080/subgraph/svg/`, {
+                fetch(`https://3.145.184.140:8443/subgraph/svg/`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',

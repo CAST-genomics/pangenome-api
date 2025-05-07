@@ -5,6 +5,9 @@
 *.gfab*
 *.svg*
 *.log*
+*.pem*
+*.cnf*
+*.JSON*
 
 # debugging files
 size_track.txt
