@@ -69,7 +69,6 @@ class PGEdge:
         self.endingNode = node2
         self.reverse_complement = None
         self.overlap = None
-        self.overlap_type = None
         self.m_drawn = False
         self.m_graphics_item_edge = 0
 
@@ -114,9 +113,6 @@ class PGEdge:
 
     def setOverlap(self, overlap):
         self.overlap = overlap
-
-    def setOverlapType(self, otype):
-        self.overlap_type = otype
 
     def SetGraphicsItemEdge(self, graphics_item_edge):
         self.m_graphics_item_edge = graphics_item_edge
@@ -213,7 +209,7 @@ class PGGraph:
         self.m_graphAttributes = ogdf.GraphAttributes(self.m_ogdfGraph, \
             ogdf.GraphAttributes.all)
         
-    def createEdge(self, node1name, node2name, overlap, overlapType):
+    def createEdge(self, node1name, node2name, overlap):
         node1Opposite = getOppositeNodeName(node1name)
         node2Opposite = getOppositeNodeName(node2name)
 
@@ -244,8 +240,6 @@ class PGGraph:
         backwardEdge.setReverseComplement(forwardEdge)
         forwardEdge.setOverlap(overlap)
         backwardEdge.setOverlap(overlap)
-        forwardEdge.setOverlapType(overlapType)
-        backwardEdge.setOverlapType(overlapType)
         self.pgedges[(forwardEdge.getStartingNode(), forwardEdge.getEndingNode())] = forwardEdge
         if not isOwnPair:
             self.pgedges[(backwardEdge.getStartingNode(), backwardEdge.getEndingNode())] = backwardEdge
@@ -352,7 +346,7 @@ class PGGraph:
         for i in range(len(edgeStartingNodeNames)):
             self.createEdge(edgeStartingNodeNames[i], \
                     edgeEndingNodeNames[i], \
-                    edgeOverlaps[i], self.m_settings["EXACT_OVERLAP"])
+                    edgeOverlaps[i])
 
         if len(self.pgnodes.keys()) == 0:
             return False, "ERROR: No nodes in graph"

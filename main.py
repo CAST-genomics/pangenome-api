@@ -23,7 +23,6 @@ class Settings(BaseModel):
     start_loc_input: int
     end_loc_input: int
     graph_type: str
-    EXACT_OVERLAP: bool
     DEBUG_SMALL_GRAPHS: bool
     MINNODELENGTH: float
     NODESEGLEN: float
@@ -128,7 +127,6 @@ async def read_items(
     start: int = Query(..., description="Start coordinate"),
     end: int = Query(..., description="End coordinate"),
     graphtype: str = Query(..., description='Graph type: `"MC"` (minigraph-cactus) or `"Minigraph"`'),
-    exact_overlap: bool = Query(True),
     debug_small_graphs: bool = Query(..., description="If true, every node's length is set to the number of basepairs"),
     minnodelen: float = Query(5, description="Minimum node length to draw.\nIf the drawn node length is smaller than this, it defaults to minnodelen."),
     nodeseglen: float = Query(20, description="Node length for each OGDF node"),
@@ -142,7 +140,6 @@ async def read_items(
     - `start`: int — Start coordinate (1-based)
     - `end`: int — End coordinate (inclusive)
     - `graphtype`: str — `"MC"` (minigraph-cactus) or `"Minigraph"`
-    - `exact_overlap`: bool
     - `debug_small_graphs`: bool — If true, each node's length = number of basepairs
     - `minnodelen`: float — Minimum node length to draw
     - `nodeseglen`: float — Node length for every OGDF node
@@ -172,7 +169,6 @@ async def read_items(
         log.error(f"Invalid graph tyle {graphtype}(valid graph types: \"minigraph\" or \"MC\")")
         return
     settings = {
-        "EXACT_OVERLAP": exact_overlap,
         "DEBUG_SMALL_GRAPHS": debug_small_graphs,
         "MINNODELENGTH": minnodelen,
         "NODESEGLEN": nodeseglen,
@@ -220,9 +216,7 @@ async def read_items(
     data["sequence"] = sequence
     data["node"] = node
     data["edge"] = edges
-        
-    with open("small_chr12_21023100_21023150.JSON", "w") as output:
-        json.dump(data, output, indent=4)
+    
     return JSONResponse(content=data)
 
 
