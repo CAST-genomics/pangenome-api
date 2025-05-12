@@ -64,15 +64,13 @@ class OgdfNode:
             return self.m_ogdfNodes[0]
 
 class PGEdge:
-    def __init__(self, node1, node2, color):
+    def __init__(self, node1, node2):
         self.startingNode = node1
         self.endingNode = node2
         self.reverse_complement = None
         self.overlap = None
-        self.overlap_type = None
         self.m_drawn = False
         self.m_graphics_item_edge = 0
-        self.m_color = color
 
     def isDrawn(self):
         return self.m_drawn
@@ -116,9 +114,6 @@ class PGEdge:
     def setOverlap(self, overlap):
         self.overlap = overlap
 
-    def setOverlapType(self, otype):
-        self.overlap_type = otype
-
     def SetGraphicsItemEdge(self, graphics_item_edge):
         self.m_graphics_item_edge = graphics_item_edge
         
@@ -126,7 +121,7 @@ class PGEdge:
         return self.m_graphics_item_edge
 
 class PGNode:
-    def __init__(self, nodeName, sequence, seqlen, node_color, settings):
+    def __init__(self, nodeName, sequence, seqlen, assembly, range, settings):
         self.nodeName = nodeName
         self.nodeSequence = sequence
         self.nodeLength = seqlen
@@ -138,7 +133,8 @@ class PGNode:
         self.m_graphics_item_node = 0
         self.m_textx = 0
         self.m_texty = 0
-        self.m_color = node_color
+        self.m_assembly = assembly
+        self.m_range = range
 
     def GetOgdfNode(self):
         return self.m_ogdfNode
@@ -214,7 +210,7 @@ class PGGraph:
         self.m_graphAttributes = ogdf.GraphAttributes(self.m_ogdfGraph, \
             ogdf.GraphAttributes.all)
         
-    def createEdge(self, node1name, node2name, overlap, overlapType, color):
+    def createEdge(self, node1name, node2name, overlap):
         node1Opposite = getOppositeNodeName(node1name)
         node2Opposite = getOppositeNodeName(node2name)
 
@@ -236,17 +232,15 @@ class PGGraph:
 
         isOwnPair = (node1 == negNode2 and node2 == negNode1)
 
-        forwardEdge = PGEdge(node1, node2, color)
+        forwardEdge = PGEdge(node1, node2)
         if isOwnPair:
             backwardEdge = forwardEdge
         else:
-            backwardEdge = PGEdge(negNode2, negNode1, color)
+            backwardEdge = PGEdge(negNode2, negNode1)
         forwardEdge.setReverseComplement(backwardEdge)
         backwardEdge.setReverseComplement(forwardEdge)
         forwardEdge.setOverlap(overlap)
         backwardEdge.setOverlap(overlap)
-        forwardEdge.setOverlapType(overlapType)
-        backwardEdge.setOverlapType(overlapType)
         self.pgedges[(forwardEdge.getStartingNode(), forwardEdge.getEndingNode())] = forwardEdge
         if not isOwnPair:
             self.pgedges[(backwardEdge.getStartingNode(), backwardEdge.getEndingNode())] = backwardEdge
@@ -260,7 +254,7 @@ class PGGraph:
         if reverseComplementName in self.pgnodes:
             return # no need to add
         reverseComplementNode = PGNode(reverseComplementName, reverseComplement(node.nodeSequence), \
-                           node.nodeLength, node.m_color, self.m_settings)
+                           node.nodeLength, node.m_assembly, node.m_range, self.m_settings)
         self.pgnodes[reverseComplementName] = reverseComplementNode
 
     def pointEachNodeToItsReverseComplement(self):
@@ -279,7 +273,6 @@ class PGGraph:
         edgeStartingNodeNames = []
         edgeEndingNodeNames = []
         edgeOverlaps = []
-        edge_colors = []
         gfafile = open(self.gfadata, "r")
         for line in gfafile:
             if type(line)==str:
@@ -300,7 +293,8 @@ class PGGraph:
                 sequence = lineParts[2]
                 # Parse tags
                 seqlen = len(sequence)
-                node_color = ""
+                node_assembly = ""
+                node_range = ""
                 for i in range(3, len(lineParts)):
                     tag = lineParts[i].split(":")[0]
                     valString = lineParts[i].split(":")[2]
@@ -308,9 +302,13 @@ class PGGraph:
                         ln = int(valString)
                         if sequence in ["*", ""]:
                             seqlen = ln
-                    if tag == "gr":
-                        if valString[0:4] == "~chr":
-                            node_color = "orange"
+                    if tag == "SN":
+                        if valString[0:3] == "chr":
+                            node_assembly = "GRCh38"
+                        else:
+                            node_assembly = valString
+                    if node_assembly == "GRCh38" and tag == "gr":
+                        node_range = valString[1:]+":"+lineParts[i].split(":")[3]
                 # Check node orientation
                 # If not given, assume "+"
                 lastChar = nodeName[-1]
@@ -318,7 +316,7 @@ class PGGraph:
                     nodeName += "+"
                     
                 # Add to list of nodes
-                self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_color, self.m_settings)
+                self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_assembly, node_range, self.m_settings)
 
             # Lines beginning with "L" are link (edge) lines
             """
@@ -334,12 +332,7 @@ class PGGraph:
                 endingNode = lineParts[3] + lineParts[4]
                 edgeStartingNodeNames.append(startingNode)
                 edgeEndingNodeNames.append(endingNode)
-                # TODO change this m_color to color code instead of specific color
-                # TODO check if all the nodes are "+"
-                if self.pgnodes[startingNode[0:-1]+"+"].m_color == "orange" and self.pgnodes[endingNode[0:-1]+"+"].m_color == "orange":
-                    edge_colors.append("black")
-                else:
-                    edge_colors.append("red")
+
                 # Part 5 has CIGAR for overlap
                 cigar = lineParts[5]
                 if cigar == "*":
@@ -357,7 +350,7 @@ class PGGraph:
         for i in range(len(edgeStartingNodeNames)):
             self.createEdge(edgeStartingNodeNames[i], \
                     edgeEndingNodeNames[i], \
-                    edgeOverlaps[i], self.m_settings["EXACT_OVERLAP"], edge_colors[i])
+                    edgeOverlaps[i])
 
         if len(self.pgnodes.keys()) == 0:
             return False, "ERROR: No nodes in graph"

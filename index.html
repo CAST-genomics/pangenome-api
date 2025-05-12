@@ -30,13 +30,6 @@
             </section>
             <br>
             <section id="settings">
-                <fieldset hidden>
-                    <legend>exact-overlap:</legend>
-                    <label for="exact-overlap-true">Yes</label>
-                    <input type="radio" id="exact-overlap-true" name="exact-overlap" value="1" checked>
-                    <label for="exact-overlap-false">No</label>
-                    <input type="radio" id="exact-overlap-false" name="exact-overlap" value="0">
-                </fieldset>
 
                 <fieldset hidden>
                     <legend>debug small graphs:</legend>
@@ -53,7 +46,7 @@
                     <label for="nodeseglen">Node Segment Length:</label>
                     <input type="number" id="nodeseglen" value="20" min="1" max="1000">
                     <label for="edgelen">Edge Length:</label>
-                    <input type="number" id="edgelen" value="5" min="0.1" max="100">
+                    <input type="number" id="edgelen" value="5" min="0.1" max="100" step="0.1">
                     <label for="nodelenpermb">Node Length per Megabase:</label>
                     <input type="number" id="nodelenpermb" value="1000" min="1000" max="1000000">
                 </fieldset>
@@ -77,8 +70,6 @@
                 let endlocInput = parseInt(document.getElementById("end-loc").value);
                 let debugSmallGraphRadios = document.getElementsByName("debug-small-graphs");
                 let debugSmallGraph;
-                let exactOverlapRadios = document.getElementsByName("exact-overlap");
-                let exactOverlap;
                 let minNodeLength = parseFloat(document.getElementById("minnodelength").value);
                 let nodeSegLen = parseFloat(document.getElementById("nodeseglen").value);
                 let edgeLen = parseFloat(document.getElementById("edgelen").value);
@@ -93,12 +84,6 @@
                     debugSmallGraph = false;
                 };
 
-                if (exactOverlapRadios[0].checked) {
-                    exactOverlap = true;
-                } else {
-                    exactOverlap = false;
-                };
-
                 if (nameLabelCheckbox.checked) {
                     nameLabel = true;
                 } else {
@@ -110,7 +95,6 @@
                     start_loc_input: startlocInput,
                     end_loc_input: endlocInput,
                     graph_type: graphType,
-                    EXACT_OVERLAP: true, 
                     DEBUG_SMALL_GRAPHS: false, 
                     MINNODELENGTH: minNodeLength, 
                     NODESEGLEN: nodeSegLen, 
@@ -120,7 +104,7 @@
                 };
 
                 console.log(settings);
-                fetch(`http://3.145.184.140:8080/subgraph/svg/`, {
+                fetch(`https://3.145.184.140:8440/subgraph/svg/`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',

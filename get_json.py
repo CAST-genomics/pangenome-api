@@ -1,4 +1,3 @@
-import graph_plotter
 import bandage_graph
 import json
 
@@ -19,7 +18,6 @@ gfa_output = "cache/minigraph/subgraph_chr12_21023100_21023150.gfa"
 pggraph = bandage_graph.PGGraph(str(gfa_output), settings_dict)
 pggraph.BuildOGDFGraph()
 pggraph.LayoutGraph()
-graphPlotter = graph_plotter.GraphPlotter(pggraph, settings_dict)
 
 data = {
     "locus": "chr12:21023100-21023150",
