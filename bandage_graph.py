@@ -121,7 +121,7 @@ class PGEdge:
         return self.m_graphics_item_edge
 
 class PGNode:
-    def __init__(self, nodeName, sequence, seqlen, assembly, settings):
+    def __init__(self, nodeName, sequence, seqlen, assembly, range, settings):
         self.nodeName = nodeName
         self.nodeSequence = sequence
         self.nodeLength = seqlen
@@ -134,6 +134,7 @@ class PGNode:
         self.m_textx = 0
         self.m_texty = 0
         self.m_assembly = assembly
+        self.m_range = range
 
     def GetOgdfNode(self):
         return self.m_ogdfNode
@@ -253,7 +254,7 @@ class PGGraph:
         if reverseComplementName in self.pgnodes:
             return # no need to add
         reverseComplementNode = PGNode(reverseComplementName, reverseComplement(node.nodeSequence), \
-                           node.nodeLength, node.m_assembly, self.m_settings)
+                           node.nodeLength, node.m_assembly, node.m_range, self.m_settings)
         self.pgnodes[reverseComplementName] = reverseComplementNode
 
     def pointEachNodeToItsReverseComplement(self):
@@ -293,6 +294,7 @@ class PGGraph:
                 # Parse tags
                 seqlen = len(sequence)
                 node_assembly = ""
+                node_range = ""
                 for i in range(3, len(lineParts)):
                     tag = lineParts[i].split(":")[0]
                     valString = lineParts[i].split(":")[2]
@@ -305,6 +307,8 @@ class PGGraph:
                             node_assembly = "GRCh38"
                         else:
                             node_assembly = valString
+                    if node_assembly == "GRCh38" and tag == "gr":
+                        node_range = valString[1:]+":"+lineParts[i].split(":")[3]
                 # Check node orientation
                 # If not given, assume "+"
                 lastChar = nodeName[-1]
@@ -312,7 +316,7 @@ class PGGraph:
                     nodeName += "+"
                     
                 # Add to list of nodes
-                self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_assembly, self.m_settings)
+                self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_assembly, node_range, self.m_settings)
 
             # Lines beginning with "L" are link (edge) lines
             """

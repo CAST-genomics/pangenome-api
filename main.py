@@ -197,6 +197,7 @@ async def read_items(
             node_info["name"] = pgnodes.nodeName
             node_info["length"] = pgnodes.nodeLength
             node_info["assembly"] = pgnodes.m_assembly
+            node_info["range"] = pgnodes.m_range
             sequence[pgnodes.nodeName] = pgnodes.nodeSequence
             odgf_coordinates = []
             for ogdf_node in pgnodes.GetOgdfNode().m_ogdfNodes:
