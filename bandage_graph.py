@@ -4,6 +4,7 @@ Classes for drawing the GFA as a graph
 
 # Standard imports
 import math
+import gzip
 
 # OGDF
 from ogdf_python import *
@@ -84,7 +85,7 @@ class PGEdge:
             (self.endingNode.isDrawn() or self.endingNode.getReverseComplement().isDrawn())
         if not drawEdge:
             return False
-        return self.isPositiveEdge()
+        return True
 
     def isPositiveEdge(self):
         if self.startingNode.isPositiveNode() and \
@@ -197,6 +198,17 @@ class PGNode:
 
     def hasGraphicsItem(self):
         return self.m_graphics_item_node != 0
+    
+    def getNodeAssemblies(self):
+        # if self.m_settings["GRAPHTYPE"] == "mc" or self.m_settings["GRAPHTYPE"] == "MC":
+        #     walks = gzip.open("/data/hprc-v1.1-mc-grch38.walk.gz", "rt")
+        #     for line in walks:
+        #         walk_list = line.strip().split("\t")
+        #         if walk_list[0] == self.nodeName[0:-1]:
+        #             for i in range(1, len(walk_list)):
+        #                 self.m_assembly.append(walk_list[i])
+        #             break
+        print(self.m_assembly)
 
 class PGGraph:
     def __init__(self, gfadata, settings):
@@ -242,12 +254,12 @@ class PGGraph:
         forwardEdge.setOverlap(overlap)
         backwardEdge.setOverlap(overlap)
         self.pgedges[(forwardEdge.getStartingNode(), forwardEdge.getEndingNode())] = forwardEdge
-        if not isOwnPair:
-            self.pgedges[(backwardEdge.getStartingNode(), backwardEdge.getEndingNode())] = backwardEdge
+        # if not isOwnPair:
+        #     self.pgedges[(backwardEdge.getStartingNode(), backwardEdge.getEndingNode())] = backwardEdge
         node1.addEdge(forwardEdge)
         node2.addEdge(forwardEdge)
-        negNode1.addEdge(backwardEdge)
-        negNode2.addEdge(backwardEdge)
+        # negNode1.addEdge(backwardEdge)
+        # negNode2.addEdge(backwardEdge)
 
     def makeReverseComplementNodeIfNecessary(self, node):
         reverseComplementName = getOppositeNodeName(node.nodeName)
@@ -264,7 +276,7 @@ class PGGraph:
                 negativeNode = self.pgnodes[getOppositeNodeName(node)]
                 positiveNode.setReverseComplement(negativeNode)
                 negativeNode.setReverseComplement(positiveNode)
-
+        
     def LoadGraphFromGFA(self):
         """
         Based on https://github.com/rrwick/Bandage/blob/main/graph/assemblygraph.cpp#L564
@@ -293,7 +305,7 @@ class PGGraph:
                 sequence = lineParts[2]
                 # Parse tags
                 seqlen = len(sequence)
-                node_assembly = ""
+                node_assembly = []
                 node_range = ""
                 for i in range(3, len(lineParts)):
                     tag = lineParts[i].split(":")[0]
@@ -304,10 +316,10 @@ class PGGraph:
                             seqlen = ln
                     if tag == "SN":
                         if valString[0:3] == "chr":
-                            node_assembly = "GRCh38"
+                            node_assembly.append("GRCh38")
                         else:
-                            node_assembly = valString
-                    if node_assembly == "GRCh38" and tag == "gr":
+                            node_assembly.append(valString)
+                    if node_assembly == ["GRCh38"] and tag == "gr":
                         node_range = valString[1:]+":"+lineParts[i].split(":")[3]
                 # Check node orientation
                 # If not given, assume "+"
@@ -317,6 +329,7 @@ class PGGraph:
                     
                 # Add to list of nodes
                 self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_assembly, node_range, self.m_settings)
+                self.pgnodes[nodeName].getNodeAssemblies()
 
             # Lines beginning with "L" are link (edge) lines
             """

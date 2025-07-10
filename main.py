@@ -40,12 +40,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-mc_hg38_gbz = Path("/data/hprc-v1.1-mc-grch38.gbz")
-minigraph_hg38_gfa = Path("/data/hprc-v1.0-minigraph-grch38.gfa")
+mc_hg38_gbz_v1 = Path("/data/hprc-v1.1-mc-grch38.gbz")
+mc_hg38_gbz_v2 = Path("/data/hprc-v2.0-mc-grch38.gbz")
+minigraph_hg38_gfa_v1 = Path("/data/hprc-v1.0-minigraph-grch38.gfa")
+minigraph_hg38_gfa_v2 = Path("/data/hprc-v2.0-minigraph-grch38.gfa")
 
 #TODO add gfa_output
 def SubgraphMC(query_region, gfa_output, log, reference_gbz):
-    
     # check gbz.db file and create subgraph
     if not gbz.check_gbzfile(reference_gbz, log):
         gbz.index_gbz(reference_gbz)
@@ -54,7 +55,6 @@ def SubgraphMC(query_region, gfa_output, log, reference_gbz):
         log.error("Subset GFA is None")
 
 def SubgraphMini(query_region, gfa_output, log, reference_gfa):
-    
     # check gbz.db file and create subgraph
     gfa.check_gfabase_installed(log)
     gfa.check_gfafile(reference_gfa, log)
@@ -63,70 +63,71 @@ def SubgraphMini(query_region, gfa_output, log, reference_gfa):
     if subgraph_gfa is None:
         log.error("Subset GFA is None")
 
-# for debugging only - this page will output parsed gfa content in dictionary 
-# TODO update the the filename when calling gfa related
-@app.get("/subgraph/gfa/debug/")
-async def read_items(chrom: str, start: int, end: int, graphtype: str):
-    """
-    get the GFA format of queried region
+# # for debugging only - this page will output parsed gfa content in dictionary 
+# # TODO update the the filename when calling gfa related
+# @app.get("/subgraph/gfa/debug/")
+# async def read_items(chrom: str, start: int, end: int, graphtype: str):
+#     """
+#     get the GFA format of queried region
 
-    Parameters
-    ----------
-    chrom : str
-        example: "chr5, chrX"
-    start : int
-    end: int
-    graphtype: str
-        MC (minigraph-cactus), or Minigraph
+#     Parameters
+#     ----------
+#     chrom : str
+#         example: "chr5, chrX"
+#     start : int
+#     end: int
+#     graphtype: str
+#         MC (minigraph-cactus), or Minigraph
     
-    Returns
-    -------
-    GFA file content : dict
-        GFA format of the specific region queried
-    """
+#     Returns
+#     -------
+#     GFA file content : dict
+#         GFA format of the specific region queried
+#     """
 
-    log = getLogger(name="complexity", level="INFO")
+#     log = getLogger(name="complexity", level="INFO")
     
-    tempfile.tempdir = Path(__file__).parent.joinpath(".")
-    query_region = Region(chrom, start, end)
+#     tempfile.tempdir = Path(__file__).parent.joinpath(".")
+#     query_region = Region(chrom, start, end)
 
-    # create minigraph cactus GFA subgraph
-    if graphtype == "MC" or graphtype == "mc":
-        gfa_output = Path(f"./cache/mc/subgraph_{chrom}_{str(start)}_{str(end)}.gfa")
-        if not gfa_output.exists():
-            SubgraphMC(query_region, gfa_output, log, mc_hg38_gbz)
+#     # create minigraph cactus GFA subgraph
+#     if graphtype == "MC" or graphtype == "mc":
+#         gfa_output = Path(f"./cache/mc/subgraph_{chrom}_{str(start)}_{str(end)}.gfa")
+#         if not gfa_output.exists():
+#             SubgraphMC(query_region, gfa_output, log, mc_hg38_gbz)
     
-    # create minigraph GFA subgraph
-    elif graphtype == "minigraph":
-        gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}.gfa")
-        if not gfa_output.exists():
-            SubgraphMini(query_region, gfa_output, log, minigraph_hg38_gfa)
+#     # create minigraph GFA subgraph
+#     elif graphtype == "minigraph":
+#         gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}.gfa")
+#         if not gfa_output.exists():
+#             SubgraphMini(query_region, gfa_output, log, minigraph_hg38_gfa)
     
-    else:
-        # return error message WIP
-        return
+#     else:
+#         # return error message WIP
+#         return
     
-    output_gfa = {"H":[], "S":[], "L":[], "J":[], "C":[], "W":[]}
-    with open(gfa_output, 'r') as gfa_file:
-        for line in gfa_file:
-            gfa_line = line.strip().split("\t")
-            gfa_line = [int(num) if num.isdigit() else str(num) for num in gfa_line]
-            output_gfa[gfa_line[0]].append(gfa_line)
+#     output_gfa = {"H":[], "S":[], "L":[], "J":[], "C":[], "W":[]}
+#     with open(gfa_output, 'r') as gfa_file:
+#         for line in gfa_file:
+#             gfa_line = line.strip().split("\t")
+#             gfa_line = [int(num) if num.isdigit() else str(num) for num in gfa_line]
+#             output_gfa[gfa_line[0]].append(gfa_line)
     
-    # keep track of file size
-    with open("size_track.txt", "a") as size_tracking:
-        size_tracking.write(f"file name: {str(gfa_output)}, file size: {os.path.getsize(gfa_output)/(1024*1024)}")
+#     # keep track of file size
+#     with open("size_track.txt", "a") as size_tracking:
+#         size_tracking.write(f"file name: {str(gfa_output)}, file size: {os.path.getsize(gfa_output)/(1024*1024)}")
     
-    # TODO remove gfa_output if the size is too big
+#     # TODO remove gfa_output if the size is too big
 
-    return output_gfa
+#     return output_gfa
 
 @app.get("/json")
 async def read_items(    
     chrom: str = Query(..., description='Chromosome, e.g. `"chr5, chrX"`'),
     start: int = Query(..., description="Start coordinate"),
     end: int = Query(..., description="End coordinate"),
-    graphtype: str = Query(..., description='Graph type: `"MC"` (minigraph-cactus) or `"Minigraph"`'),
+    graphtype: str = Query(..., description='Graph type: `"mc"` (minigraph-cactus) or `"minigraph"`'),
+    version: str = Query("v2", description='pangenome release version: `"v1"` or `"v2"``'),
     debug_small_graphs: bool = Query(..., description="If true, every node's length is set to the number of basepairs"),
     minnodelen: float = Query(5, description="Minimum node length to draw.\nIf the drawn node length is smaller than this, it defaults to minnodelen."),
     nodeseglen: float = Query(20, description="Node length for each OGDF node"),
@@ -139,7 +140,8 @@ async def read_items(
     - `chrom`: str — Chromosome(s) to query. Example: `"chr5, chrX"`
     - `start`: int — Start coordinate (1-based)
     - `end`: int — End coordinate (inclusive)
-    - `graphtype`: str — `"MC"` (minigraph-cactus) or `"Minigraph"`
+    - `graphtype`: str — `"mc"` (minigraph-cactus) or `"minigraph"`
+    - `version`: str - `"v1"` or `"v2"`
     - `debug_small_graphs`: bool — If true, each node's length = number of basepairs
     - `minnodelen`: float — Minimum node length to draw
     - `nodeseglen`: float — Node length for every OGDF node
@@ -157,18 +159,33 @@ async def read_items(
 
     # create minigraph cactus GFA subgraph
     if graphtype == "MC" or graphtype == "mc":
-        gfa_output = Path(f"./cache/mc/subgraph_{chrom}_{str(start)}_{str(end)}.gfa")
-        if not gfa_output.exists():
-            SubgraphMC(query_region, gfa_output, log, mc_hg38_gbz)
+        if version == "v1":
+            gfa_output = Path(f"./cache/mc/subgraph_{chrom}_{str(start)}_{str(end)}_v1.gfa")
+            if not gfa_output.exists():
+                SubgraphMC(query_region, gfa_output, log, mc_hg38_gbz_v1)
+        elif version == "v2":
+            gfa_output = Path(f"./cache/mc/subgraph_{chrom}_{str(start)}_{str(end)}_v2.gfa")
+            if not gfa_output.exists():
+                SubgraphMC(query_region, gfa_output, log, mc_hg38_gbz_v2)
+        else:
+            log.error(f"Invalid graph version {version}(valid versions: \"v1\" or \"v2\")")     
     # create minigraph GFA subgraph
-    elif graphtype == "minigraph":
-        gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}.gfa")
-        if not gfa_output.exists():
-            SubgraphMini(query_region, gfa_output, log, minigraph_hg38_gfa)
+    elif graphtype == "minigraph" or graphtype == "Minigraph":
+        if version == "v1":
+            gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v1.gfa")
+            if not gfa_output.exists():
+                SubgraphMini(query_region, gfa_output, log, minigraph_hg38_gfa_v1)
+        elif version == "v2":
+            gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v2.gfa")
+            if not gfa_output.exists():
+                SubgraphMini(query_region, gfa_output, log, minigraph_hg38_gfa_v2)
+        else:
+            log.error(f"Invalid graph version {version}(valid versions: \"v1\" or \"v2\")")  
     else:
         log.error(f"Invalid graph tyle {graphtype}(valid graph types: \"minigraph\" or \"MC\")")
         return
     settings = {
+        "GRAPHTYPE": graphtype,
         "DEBUG_SMALL_GRAPHS": debug_small_graphs,
         "MINNODELENGTH": minnodelen,
         "NODESEGLEN": nodeseglen,
@@ -181,7 +198,7 @@ async def read_items(
     pggraph.LayoutGraph()
     
     data = {
-    "locus": "chr12:21023100-21023150",
+    "locus": f"{chrom}:{str(start)}-{str(end)}",
     "node": {},
     "edge": [],
     "sequence": {}
@@ -221,51 +238,51 @@ async def read_items(
     return JSONResponse(content=data)
 
 
-@app.post("/subgraph/svg/")
-async def read_items(settings: Settings):
-    log = getLogger(name="complexity", level="INFO")
+# @app.post("/subgraph/svg/")
+# async def read_items(settings: Settings):
+#     log = getLogger(name="complexity", level="INFO")
     
-    query_region = Region(settings.chr_input, settings.start_loc_input, settings.end_loc_input)
+#     query_region = Region(settings.chr_input, settings.start_loc_input, settings.end_loc_input)
 
-    # create minigraph cactus GFA subgraph
-    if settings.graph_type == "MC" or settings.graph_type == "mc":
-        gfa_output = Path(f"./cache/mc/subgraph_{settings.chr_input}_{str(settings.start_loc_input)}_{str(settings.end_loc_input)}.gfa")
-        if not gfa_output.exists():
-            SubgraphMC(query_region, gfa_output, log, mc_hg38_gbz)
-    # create minigraph GFA subgraph
-    elif settings.graph_type == "minigraph":
-        gfa_output = Path(f"./cache/minigraph/subgraph_{settings.chr_input}_{str(settings.start_loc_input)}_{str(settings.end_loc_input)}.gfa")
-        if not gfa_output.exists():
-            SubgraphMini(query_region, gfa_output, log, minigraph_hg38_gfa)
-    else:
-        log.error(f"Invalid graph tyle {settings.graph_type}(valid graph types: \"minigraph\" or \"MC\")")
-        return
-    settings_dict = settings.model_dump()
-    pggraph = bandage_graph.PGGraph(str(gfa_output), settings_dict)
-    pggraph.BuildOGDFGraph()
-    pggraph.LayoutGraph()
-    graphPlotter = graph_plotter.GraphPlotter(pggraph, settings_dict)
-    svgFile = graphPlotter.BuildSvg()
+#     # create minigraph cactus GFA subgraph
+#     if settings.graph_type == "MC" or settings.graph_type == "mc":
+#         gfa_output = Path(f"./cache/mc/subgraph_{settings.chr_input}_{str(settings.start_loc_input)}_{str(settings.end_loc_input)}.gfa")
+#         if not gfa_output.exists():
+#             SubgraphMC(query_region, gfa_output, log, mc_hg38_gbz)
+#     # create minigraph GFA subgraph
+#     elif settings.graph_type == "minigraph":
+#         gfa_output = Path(f"./cache/minigraph/subgraph_{settings.chr_input}_{str(settings.start_loc_input)}_{str(settings.end_loc_input)}.gfa")
+#         if not gfa_output.exists():
+#             SubgraphMini(query_region, gfa_output, log, minigraph_hg38_gfa)
+#     else:
+#         log.error(f"Invalid graph tyle {settings.graph_type}(valid graph types: \"minigraph\" or \"MC\")")
+#         return
+#     settings_dict = settings.model_dump()
+#     pggraph = bandage_graph.PGGraph(str(gfa_output), settings_dict)
+#     pggraph.BuildOGDFGraph()
+#     pggraph.LayoutGraph()
+#     graphPlotter = graph_plotter.GraphPlotter(pggraph, settings_dict)
+#     svgFile = graphPlotter.BuildSvg()
     
-    with open(svgFile, "r") as file:
-        content = file.read()
-    os.remove(svgFile)
+#     with open(svgFile, "r") as file:
+#         content = file.read()
+#     os.remove(svgFile)
     
-    return {"svg": content}
+#     return {"svg": content}
 
-@app.get("/geneannot/")
-async def get_gene_annot(genome: str, chromosome: str, start: int, end: int):
-    # start-end can't do too large, need to choose a cap
-    api_url = f"https://api.genome.ucsc.edu/getData/track?genome={genome};track=knownGene;chrom={chromosome};start={start};end={end}"
-    url_dict = requests.get(api_url).json()
-    all_genes = url_dict["knownGene"]
-    gene_list = {}
-    for gene in all_genes:
-        gene_info = {}
-        gene_info["chromosome"] = gene["chrom"]
-        gene_info["start"] = gene["chromStart"]
-        gene_info["end"] = gene["chromEnd"]
-        gene_info["tag"] = gene["tag"]
-        gene_name = gene["name"]
-        gene_list[gene_name] = gene_info
-    return gene_list
+# @app.get("/geneannot/")
+# async def get_gene_annot(genome: str, chromosome: str, start: int, end: int):
+#     # start-end can't do too large, need to choose a cap
+#     api_url = f"https://api.genome.ucsc.edu/getData/track?genome={genome};track=knownGene;chrom={chromosome};start={start};end={end}"
+#     url_dict = requests.get(api_url).json()
+#     all_genes = url_dict["knownGene"]
+#     gene_list = {}
+#     for gene in all_genes:
+#         gene_info = {}
+#         gene_info["chromosome"] = gene["chrom"]
+#         gene_info["start"] = gene["chromStart"]
+#         gene_info["end"] = gene["chromEnd"]
+#         gene_info["tag"] = gene["tag"]
+#         gene_name = gene["name"]
+#         gene_list[gene_name] = gene_info
+#     return gene_list
