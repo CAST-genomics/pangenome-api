@@ -208,7 +208,8 @@ class PGNode:
         #             for i in range(1, len(walk_list)):
         #                 self.m_assembly.append(walk_list[i])
         #             break
-        print(self.m_assembly)
+        # print(self.m_assembly)
+        return
 
 class PGGraph:
     def __init__(self, gfadata, settings):
@@ -317,6 +318,10 @@ class PGGraph:
                     if tag == "SN":
                         if valString[0:3] == "chr":
                             node_assembly.append("GRCh38")
+                        if "#" in valString:
+                            for pansn_assembly in valString.split(","):
+                                assembly, haplo, seq_id = pansn_assembly.split("#")
+                                node_assembly.append({"assembly_name": assembly, "haplotype": haplo, "sequence_id": seq_id})
                         else:
                             node_assembly.append(valString)
                     if node_assembly == ["GRCh38"] and tag == "gr":
@@ -329,7 +334,7 @@ class PGGraph:
                     
                 # Add to list of nodes
                 self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_assembly, node_range, self.m_settings)
-                self.pgnodes[nodeName].getNodeAssemblies()
+                # self.pgnodes[nodeName].getNodeAssemblies()
 
             # Lines beginning with "L" are link (edge) lines
             """
