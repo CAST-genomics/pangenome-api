@@ -14,10 +14,3 @@ __pycache__
 
 # OSX
 *.DS_Store*
-
-# old files
-browser.py
-fmmmtest.py
-dummytest.py
-graph_plotter.py
-get_json.py

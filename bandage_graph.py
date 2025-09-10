@@ -6,6 +6,11 @@ Classes for drawing the GFA as a graph
 import math
 import gzip
 import json
+import subprocess
+
+data_path = subprocess.check_output(
+    ["git", "config", "--get", "data.path"], text=True
+).strip()
 
 # OGDF
 from ogdf_python import *
@@ -19,10 +24,10 @@ selectionThickness = 1.0
 averageNodeWidth = 5.0
 # edgeWidth = FloatSetting(1.5, 0.1, 100);
 edgeWidth = 1.5
-assembly_metadata_v1 = "/data/hprc_assembly_metadata_v1.0.json"
-assembly_metadata_v2 = "/data/hprc_assembly_metadata_v2.0.json"
-assembly_metadata_grouped_v1 = "/data/hprc_assembly_grouping_v1.0.json"
-assembly_metadata_grouped_v2 = "/data/hprc_assembly_grouping_v2.0.json"
+assembly_metadata_v1 = f"{data_path}/hprc_assembly_metadata_v1.0.json"
+assembly_metadata_v2 = f"{data_path}/hprc_assembly_metadata_v2.0.json"
+assembly_metadata_grouped_v1 = f"{data_path}/hprc_assembly_grouping_v1.0.json"
+assembly_metadata_grouped_v2 = f"{data_path}/hprc_assembly_grouping_v2.0.json"
 
 def getLengthFromCigar(cigar):
     return 0 # TODO. not sure we need CIGAR?
@@ -264,7 +269,7 @@ class PGNode:
     
     def getNodeAssemblies(self):
         # if self.m_settings["GRAPHTYPE"] == "mc" or self.m_settings["GRAPHTYPE"] == "MC":
-        #     walks = gzip.open("/data/hprc-v1.1-mc-grch38.walk.gz", "rt")
+        #     walks = gzip.open(f"{data_path}/hprc-v1.1-mc-grch38.walk.gz", "rt")
         #     for line in walks:
         #         walk_list = line.strip().split("\t")
         #         if walk_list[0] == self.nodeName[0:-1]:

@@ -1,5 +1,11 @@
-original_v2 = open("/data/hprc-v2.0-mc-grch38.sv.gfa", "r")
-updated_v2 = open("/data/hprc-v2.0-minigraph-grch38.gfa", "w")
+import subprocess
+
+data_path = subprocess.check_output(
+    ["git", "config", "--get", "data.path"], text=True
+).strip()
+
+original_v2 = open(f"{data_path}/hprc-v2.0-mc-grch38.sv.gfa", "r")
+updated_v2 = open(f"{data_path}/hprc-v2.0-minigraph-grch38.gfa", "w")
 
 for line in original_v2:
     if "SN:Z:GRCh38#0#" in line:
