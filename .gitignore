@@ -9,11 +9,15 @@
 *.cnf*
 *.JSON*
 
-# debugging files
-size_track.txt
-
 # python cache
 __pycache__
 
 # OSX
 *.DS_Store*
+
+# old files
+browser.py
+fmmmtest.py
+dummytest.py
+graph_plotter.py
+get_json.py

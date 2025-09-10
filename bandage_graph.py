@@ -5,6 +5,7 @@ Classes for drawing the GFA as a graph
 # Standard imports
 import math
 import gzip
+import json
 
 # OGDF
 from ogdf_python import *
@@ -18,6 +19,10 @@ selectionThickness = 1.0
 averageNodeWidth = 5.0
 # edgeWidth = FloatSetting(1.5, 0.1, 100);
 edgeWidth = 1.5
+assembly_metadata_v1 = "/data/hprc_assembly_metadata_v1.0.json"
+assembly_metadata_v2 = "/data/hprc_assembly_metadata_v2.0.json"
+assembly_metadata_grouped_v1 = "/data/hprc_assembly_grouping_v1.0.json"
+assembly_metadata_grouped_v2 = "/data/hprc_assembly_grouping_v2.0.json"
 
 def getLengthFromCigar(cigar):
     return 0 # TODO. not sure we need CIGAR?
@@ -135,6 +140,7 @@ class PGNode:
         self.m_textx = 0
         self.m_texty = 0
         self.m_assembly = assembly
+        self.m_assembly_metadata = self.createAssemblyMetadata()
         self.m_range = range
 
     def GetOgdfNode(self):
@@ -198,6 +204,63 @@ class PGNode:
 
     def hasGraphicsItem(self):
         return self.m_graphics_item_node != 0
+    
+    def createAssemblyMetadata(self):
+        """
+        create m_assembly_metadata based on assembly list
+        m_assembly_metadata = {
+            count:{
+                sex:{},
+                superpopulation:{},
+                population:{}
+            },
+            frequency:{
+                sex:{},
+                superpopulation:{},
+                population:{}
+            }
+        }
+        """
+        if self.m_settings["VERSION"] == "v1":
+            with open(assembly_metadata_v1, "r") as f:
+                hprc_assembly_metadata = json.load(f)
+            with open(assembly_metadata_grouped_v1, "r") as f:
+                hprc_assembly_grouped = json.load(f)
+        elif self.m_settings["VERSION"] == "v2":
+            with open(assembly_metadata_v2, "r") as f:
+                hprc_assembly_metadata = json.load(f)
+            with open(assembly_metadata_grouped_v2, "r") as f:
+                hprc_assembly_grouped = json.load(f)
+        else:
+            raise ValueError(f"invalid setting version value: {self.m_settings['VERSION']}")
+        
+        node_assembly_metadata = {}
+        count = {"sex":{}, "superpopulation":{}, "population":{}}
+        frequency = {"sex":{}, "superpopulation":{}, "population":{}}
+        for category in hprc_assembly_grouped["count"]:
+            for group in hprc_assembly_grouped["count"][category]:
+                count[category][group] = 0
+                frequency[category][group] = 0.0
+
+        for assembly in self.m_assembly:
+            assembly_name = assembly["assembly_name"]
+            if assembly_name == "GRCh38" or assembly_name == "CHM13":
+                continue
+            assembly_sex = hprc_assembly_metadata[assembly_name]["sex"]
+            assembly_population = hprc_assembly_metadata[assembly_name]["population"]
+            assembly_superpopulation = hprc_assembly_metadata[assembly_name]["superpopulation"]
+            count["sex"][assembly_sex] += 1
+            count["population"][assembly_population] += 1
+            count["superpopulation"][assembly_superpopulation] += 1
+        
+        for category in count:
+            for group in count[category]:
+                frequency[category][group] = count[category][group]/(hprc_assembly_grouped["count"][category][group]*2)
+
+        node_assembly_metadata["count"] = count
+        node_assembly_metadata["frequency"] = frequency
+        
+        return node_assembly_metadata
     
     def getNodeAssemblies(self):
         # if self.m_settings["GRAPHTYPE"] == "mc" or self.m_settings["GRAPHTYPE"] == "MC":
@@ -316,14 +379,13 @@ class PGGraph:
                         if sequence in ["*", ""]:
                             seqlen = ln
                     if tag == "SN":
-                        if valString[0:3] == "chr":
-                            node_assembly.append("GRCh38")
                         if "#" in valString:
                             for pansn_assembly in valString.split(","):
                                 assembly, haplo, seq_id = pansn_assembly.split("#")
                                 node_assembly.append({"assembly_name": assembly, "haplotype": haplo, "sequence_id": seq_id})
                         else:
-                            node_assembly.append(valString)
+                            #TODO check if there's better way for this
+                            raise ValueError(f"Invalid SN tag format: {valString}")
                     if node_assembly == ["GRCh38"] and tag == "gr":
                         node_range = valString[1:]+":"+lineParts[i].split(":")[3]
                 # Check node orientation
@@ -458,14 +520,16 @@ class PGGraph:
         fmmm = ogdf.FMMMLayout()
         fmmm.call(self.m_graphAttributes, self.m_edgeArray)
 
-        #### For debugging - show how to access the node coordinates ####
-        
-        # for node in self.pgnodes.values():
-        #     # if node.isDrawn():
-        #     print(node.nodeName)
-        #     print(node.GetOgdfNode())
-        #     # if node.inOgdf():
-        #     for ogdf_node in node.GetOgdfNode().m_ogdfNodes:
-        #         print("%s, %s"%(self.m_graphAttributes.x(ogdf_node), \
-        #             self.m_graphAttributes.y(ogdf_node)))
-        #         print("hi")
+"""
+### For debugging - show how to access the node coordinates ####
+
+for node in self.pgnodes.values():
+    # if node.isDrawn():
+    print(node.nodeName)
+    print(node.GetOgdfNode())
+    # if node.inOgdf():
+    for ogdf_node in node.GetOgdfNode().m_ogdfNodes:
+        print("%s, %s"%(self.m_graphAttributes.x(ogdf_node), \
+            self.m_graphAttributes.y(ogdf_node)))
+        print("hi")
+"""

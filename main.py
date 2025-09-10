@@ -5,13 +5,10 @@ from panCT.panct.logging import getLogger
 
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
-import requests
 import gbz_utils as gbz
 from pathlib import Path
-import tempfile
 import os
 import gfa_utils as gfa
-import graph_plotter
 import bandage_graph
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -162,6 +159,10 @@ def SubgraphMini(query_region, gfa_preprocessed, gfa_postprocessed, reference_gf
                     assembly_list[0] = f"GRCh38#0#{assembly_list[0]}"
                 else:
                     print(f"original assembly is {assembly_list[0]}")
+            else:
+                if "." in assembly_list[0].split("#")[0]:
+                    parts = assembly_list[0].split("#")
+                    assembly_list[0] = parts[0].split(".")[0] + "#" + parts[1] + "#" + parts[2]
             for mapping_line in minigraph_walks.fetch(" ", node_id-1, node_id):
                 splitted_mapping_line = mapping_line.strip().split("\t")
                 for i in range(1, len(splitted_mapping_line)):
@@ -258,6 +259,7 @@ async def read_items(
         return
     settings = {
         "GRAPHTYPE": graphtype,
+        "VERSION": version,
         "DEBUG_SMALL_GRAPHS": debug_small_graphs,
         "MINNODELENGTH": minnodelen,
         "NODESEGLEN": nodeseglen,
@@ -286,6 +288,7 @@ async def read_items(
             node_info["name"] = pgnodes.nodeName
             node_info["length"] = pgnodes.nodeLength
             node_info["assembly"] = pgnodes.m_assembly
+            node_info["assembly_metadata"] = pgnodes.m_assembly_metadata
             node_info["range"] = pgnodes.m_range
             sequence[pgnodes.nodeName] = pgnodes.nodeSequence
             odgf_coordinates = []
