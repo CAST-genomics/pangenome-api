@@ -1,5 +1,14 @@
+import subprocess
+
+tool_path = subprocess.check_output(
+    ["git", "config", "--get", "tools.path"], text=True
+).strip()
+data_path = subprocess.check_output(
+    ["git", "config", "--get", "data.path"], text=True
+).strip()
+
 import sys
-sys.path.append('/home/ec2-user/lab')
+sys.path.append(tool_path)
 from panCT.panct.data import Region
 from panCT.panct.logging import getLogger
 
@@ -38,14 +47,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-mc_hg38_gbz_v1 = Path("/data/hprc-v1.1-mc-grch38.gbz")
-mc_hg38_gbz_v2 = Path("/data/hprc-v2.0-mc-grch38.gbz")
-minigraph_hg38_gfa_v1 = Path("/data/hprc-v1.0-minigraph-grch38.gfa")
-minigraph_hg38_gfa_v2 = Path("/data/hprc-v2.0-minigraph-grch38.gfa")
-mc_mapped_walks_v1 = pysam.TabixFile("/data/hprc-v1.1-mc-grch38-mapped-flattened.walk.gz")
+mc_hg38_gbz_v1 = Path(f"{data_path}/hprc-v1.1-mc-grch38.gbz")
+mc_hg38_gbz_v2 = Path(f"{data_path}/hprc-v2.0-mc-grch38.gbz")
+minigraph_hg38_gfa_v1 = Path(f"{data_path}/hprc-v1.0-minigraph-grch38.gfa")
+minigraph_hg38_gfa_v2 = Path(f"{data_path}/hprc-v2.0-minigraph-grch38.gfa")
+mc_mapped_walks_v1 = pysam.TabixFile(f"{data_path}/hprc-v1.1-mc-grch38-mapped-flattened.walk.gz")
 mc_mapped_walks_v2 = None
-minigraph_walks_v1 = pysam.TabixFile("/data/hprc_v1.0_minigraph_filtered_with_id.walk.gz")
-minigraph_walks_v2 = pysam.TabixFile("/data/hprc_v2.0_minigraph_filtered_with_id.walk.gz")
+minigraph_walks_v1 = pysam.TabixFile(f"{data_path}/hprc_v1.0_minigraph_filtered_with_id.walk.gz")
+minigraph_walks_v2 = pysam.TabixFile(f"{data_path}/hprc_v2.0_minigraph_filtered_with_id.walk.gz")
 
 #TODO check if all chopped node id finds a mapped unchopped node id
 def SubgraphMC(query_region, gfa_preprocessed, gfa_postprocessed, reference_gbz, mc_mapped_walks, log):

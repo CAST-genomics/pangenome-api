@@ -8,9 +8,13 @@ from shutil import which
 import subprocess
 import tempfile
 from pathlib import Path
-
 import sys
-sys.path.append('/home/ec2-user/lab')
+
+tool_path = subprocess.check_output(
+    ["git", "config", "--get", "tools.path"], text=True
+).strip()
+
+sys.path.append(tool_path)
 from panCT.panct.data import Region
 
 
