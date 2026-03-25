@@ -4,9 +4,11 @@ Classes for drawing the GFA as a graph
 
 # Standard imports
 import math
-import gzip
 import json
 import subprocess
+import pysam
+import statistics
+import numpy as np
 
 data_path = subprocess.check_output(
     ["git", "config", "--get", "data.path"], text=True
@@ -132,7 +134,9 @@ class PGEdge:
         return self.m_graphics_item_edge
 
 class PGNode:
-    def __init__(self, nodeName, sequence, seqlen, assembly, range, settings):
+    # self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_assembly, node_pclai, node_range, self.m_settings)
+    # self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_np_assembly, node_dup_assembly, node_default_coord, self.m_settings)
+    def __init__(self, nodeName, sequence, seqlen, nd_assembly, dup_assembly, default_node_range, settings):
         self.nodeName = nodeName
         self.nodeSequence = sequence
         self.nodeLength = seqlen
@@ -144,10 +148,53 @@ class PGNode:
         self.m_graphics_item_node = 0
         self.m_textx = 0
         self.m_texty = 0
-        self.m_assembly = assembly
+        self.m_nd_assembly = nd_assembly
+        self.m_dup_assembly = dup_assembly
+        self.m_assembly = self.getAssemblyList()
         self.m_assembly_metadata = self.createAssemblyMetadata()
-        self.m_range = range
+        self.m_range = default_node_range
+        # self.m_ref_start = int((node_range.split(":")[1].split("-")[0]).replace(",", ""))
+        # self.m_ref_end = int((node_range.split(":")[1].split("-")[1]).replace(",", ""))
+        # self.m_ref_chrom = node_range.split(":")[0]
+        # self.m_average_rgb = 0
 
+    # archived function: get pclai directly from bed files without preadding them into the walks files.
+    # def GetPclaiCoords(self):
+    #     if "#" in self.m_ref_chrom:
+    #         return None
+    #     else:
+    #         pclai_tabix_file = pysam.TabixFile("/home/ec2-user/lab/pca/tabix_fit_pclai_all_samples_all_chr.sorted.bed.gz")
+    #         pclai_coords = {}
+    #         rgb = []
+    #         for pclai_assembly in pclai_ref:
+    #             x_coords = []
+    #             y_coords = []
+    #             r = []
+    #             g = []
+    #             b = []
+    #             for line in pclai_tabix_file.fetch(f"{pclai_assembly}:{self.m_ref_chrom}", self.m_ref_start, self.m_ref_end):
+    #                 parts = line.strip().split("\t")
+    #                 x_coords.append(float(parts[3]))
+    #                 y_coords.append(float(parts[4]))
+    #                 r.append(int(parts[5].split(",")[0]))
+    #                 g.append(int(parts[5].split(",")[1]))
+    #                 b.append(int(parts[5].split(",")[2]))
+    #             if len(x_coords) == 0:
+    #                 pclai_coords[f"{pclai_assembly.split(':')[0]}#{pclai_assembly.split(':')[1]}"] = {
+    #                     "coordinates": [],
+    #                     "RGB": []
+    #                 }
+    #             else:
+    #                 pclai_coords[f"{pclai_assembly.split(':')[0]}#{pclai_assembly.split(':')[1]}"] = {
+    #                     "coordinates": [statistics.median(x_coords), statistics.median(y_coords)],
+    #                     "RGB": [statistics.median(r), statistics.median(g), statistics.median(b)]
+    #                 }
+    #                 rgb.append((statistics.median(r), statistics.median(g), statistics.median(b)))
+    #         if len(rgb)>0:
+    #             print("yes")
+    #             self.m_average_rgb = np.mean(rgb, axis=0).tolist()
+    #         return pclai_coords
+                
     def GetOgdfNode(self):
         return self.m_ogdfNode
 
@@ -210,6 +257,22 @@ class PGNode:
     def hasGraphicsItem(self):
         return self.m_graphics_item_node != 0
     
+    # collect a list of assembly name form both the duplicated and non-duplicated assembly list
+    def getAssemblyList(self):
+        assembly_lst = []
+        for nd_entry in self.m_nd_assembly:
+            assembly = nd_entry["assembly_name"]
+            if assembly not in assembly_lst:
+                assembly_lst.append(assembly)
+                
+        for dup_entry in self.m_dup_assembly:
+            assembly = dup_entry["assembly_name"]
+            if assembly not in assembly_lst:
+                assembly_lst.append(assembly)
+
+        return assembly_lst
+    
+    
     def createAssemblyMetadata(self):
         """
         create m_assembly_metadata based on assembly list
@@ -247,8 +310,7 @@ class PGNode:
                 count[category][group] = 0
                 frequency[category][group] = 0.0
 
-        for assembly in self.m_assembly:
-            assembly_name = assembly["assembly_name"]
+        for assembly_name in self.m_assembly:
             if assembly_name == "GRCh38" or assembly_name == "CHM13":
                 continue
             assembly_sex = hprc_assembly_metadata[assembly_name]["sex"]
@@ -285,6 +347,7 @@ class PGGraph:
         self.m_settings = settings
         self.pgnodes = {} # nodename->node
         self.pgedges = {} # (node1, node2)->edge
+        self.pgassemblies = {} # {assembly: {min_start, max_end, contig1_name:[contig1_lenof_node,contig1_numof_node], contig2_name:[min_start, max_end, contig2_lenof_node,contig2_numof_node]}]}
         self.load_success, self.load_msg = self.LoadGraphFromGFA()
         self.m_ogdfGraph = ogdf.Graph()
         self.m_edgeArray = ogdf.EdgeArray["double"](self.m_ogdfGraph)
@@ -335,7 +398,7 @@ class PGGraph:
         if reverseComplementName in self.pgnodes:
             return # no need to add
         reverseComplementNode = PGNode(reverseComplementName, reverseComplement(node.nodeSequence), \
-                           node.nodeLength, node.m_assembly, node.m_range, self.m_settings)
+                           node.nodeLength, node.m_nd_assembly, node.m_dup_assembly, node.m_range, self.m_settings)
         self.pgnodes[reverseComplementName] = reverseComplementNode
 
     def pointEachNodeToItsReverseComplement(self):
@@ -374,25 +437,142 @@ class PGGraph:
                 sequence = lineParts[2]
                 # Parse tags
                 seqlen = len(sequence)
-                node_assembly = []
-                node_range = ""
+                node_nd_assembly = []
+                node_dup_assembly = []
+                node_default_coord = ""
                 for i in range(3, len(lineParts)):
                     tag = lineParts[i].split(":")[0]
-                    valString = lineParts[i].split(":")[2]
+                    valString = lineParts[i][5:]
+                    
+                    # TODO: understand why sequence can be * or ""
                     if tag == "LN":
                         ln = int(valString)
                         if sequence in ["*", ""]:
                             seqlen = ln
-                    if tag == "SN":
-                        if "#" in valString:
-                            for pansn_assembly in valString.split(","):
-                                assembly, haplo, seq_id = pansn_assembly.split("#")
-                                node_assembly.append({"assembly_name": assembly, "haplotype": haplo, "sequence_id": seq_id})
-                        else:
-                            #TODO check if there's better way for this
-                            raise ValueError(f"Invalid SN tag format: {valString}")
-                    if node_assembly == ["GRCh38"] and tag == "gr":
-                        node_range = valString[1:]+":"+lineParts[i].split(":")[3]
+                    
+                    # GRCh38#0#chr1:356372-362698	HG00544#2#CM089383.1|+:>:17162-23470|.:.:.:.:.:.:.:.
+                    elif tag == "na":
+                        for non_dup_assembly_info in valString.split(","):
+                            assembly_contig_name, coord_info, pclai = non_dup_assembly_info.split("|")
+                            assembly, haplo, seq_id = assembly_contig_name.split("#")
+                            path_strand, node_strand, coord =coord_info.split(":")
+                            start_str, end_str = coord.split("-")
+                            start = int(start_str)
+                            end = int(end_str)
+                            
+                            #TODO delete this part after fixing the bug in walks file
+                            ###########
+                            if start == end and seqlen > 1:
+                                end = start + seqlen
+                            ###########
+                            
+                            # add pclai into list. For cases that one nodes spans two or more windows, we will have multiple pclai entries
+                            # per node. We use this script to append each pclai entry into pclai list
+                            pclai_lst = []
+                            for pclai_part in pclai.split(";"):
+                                pclaix, pclaiy, pclair, pclaig, pclaib, pclai_start, pclai_end, pclai_percentage = pclai_part.split(":")
+                                # if the node doesn't have any pclai information available, we keep the pclai list empty
+                                if pclaix == ".":
+                                    continue
+                                single_pclai = {
+                                    "coordinates": [float(pclaix), float(pclaiy)],
+                                    "RGB": [float(pclair), float(pclaig), float(pclaib)],
+                                    "start": int(pclai_start),
+                                    "end": int(pclai_end),
+                                    "percentage": float(pclai_percentage)
+                                }
+                                pclai_lst.append(single_pclai)
+                                
+                            # add assembly information to node_nd_assembly, which will be added into the json_file --> node --> assembly_list
+                            node_nd_assembly.append({
+                                "assembly_name": assembly,
+                                "haplotype": haplo, 
+                                "metadata": [
+                                    {
+                                        "sequence_id": seq_id,
+                                        "path_strand": path_strand,
+                                        "node_strand": node_strand,
+                                        "start": start,
+                                        "end": end,
+                                        "pclai": pclai_lst,
+                                        "take": "yes"
+                                    }
+                                ]
+                            })
+                            
+                            # udpate pggraph.pgassemblies, which will be used to determine the range of the node, and whether a duplicated node will be taken or not
+                            # self.pgassemblies = {assembly: {contig1_name:[min_start, max_end, contig1_lenof_node,contig1_numof_node], contig2_name:[min_start, max_end, contig2_lenof_node,contig2_numof_node]}]}
+                            
+                            # if this assembly was not already recorded in pggraph.pgassemblies, we add it in
+                            if f"{assembly}#{haplo}" not in self.pgassemblies:
+                                self.pgassemblies[f"{assembly}#{haplo}"] = {seq_id: [start, end, seqlen, 1]}
+                            
+                            # if this assembly is already recorded in pggraph.pgassemblies, we will update the minimum start locus, maximum end locus, and contig info accordingly
+                            else:
+                                if seq_id in self.pgassemblies[f"{assembly}#{haplo}"]:
+                                    self.pgassemblies[f"{assembly}#{haplo}"][seq_id][2] += seqlen
+                                    self.pgassemblies[f"{assembly}#{haplo}"][seq_id][3] += 1
+                                    
+                                    if start < self.pgassemblies[f"{assembly}#{haplo}"][seq_id][0]:
+                                        self.pgassemblies[f"{assembly}#{haplo}"][seq_id][0] = start
+                                    if end > self.pgassemblies[f"{assembly}#{haplo}"][seq_id][1]:
+                                        self.pgassemblies[f"{assembly}#{haplo}"][seq_id][1] = end
+                                else:
+                                    self.pgassemblies[f"{assembly}#{haplo}"][seq_id] = [start, end, seqlen, 1]
+                                
+                    
+                    # GRCh38#0#chr1:356372-362698	HG03521#2|JBIREG010000046.1$+:>:1218553-1228497$.:.:.:.:.:.:.:.|JBIREG010000050.1$+:>:108575287-108585205$.:.:.:.:.:.:.:.
+                    elif tag == "da":
+                        # we only consider when we have duplicated coordinates. If we do not, the duplicated assembly list will be an empty dict
+                        if valString != ".":
+                            for dup_assembly_info in valString.split(","):
+                                dup_assembly_info_parts = dup_assembly_info.split("|")
+                                assembly, haplo = dup_assembly_info_parts[0].split("#")
+                                duplicated_coords = dup_assembly_info_parts[1:]
+                                metadata = []
+                                
+                                for duplicated_coord in duplicated_coords:
+                                    seq_id, coord_info, pclai = duplicated_coord.split("$")
+                                    path_strand, node_strand, coord =coord_info.split(":")
+                                    # add pclai into list. For cases that one nodes spans two or more windows, we will have multiple pclai entries
+                                    # per node. We use this script to append each pclai entry into pclai list
+                                    pclai_lst = []
+                                    for pclai_part in pclai.split(";"):
+                                        pclaix, pclaiy, pclair, pclaig, pclaib, pclai_start, pclai_end, pclai_percentage = pclai_part.split(":")
+                                        # if the node doesn't have any pclai information available, we keep the pclai list empty
+                                        if pclaix == ".":
+                                            continue
+                                        single_pclai = {
+                                            "coordinates": [float(pclaix), float(pclaiy)],
+                                            "RGB": [float(pclair), float(pclaig), float(pclaib)],
+                                            "start": int(pclai_start),
+                                            "end": int(pclai_end),
+                                            "percentage": float(pclai_percentage)
+                                        }
+                                        pclai_lst.append(single_pclai)
+                                    
+                                    metadata_entry = {
+                                        "sequence_id": seq_id,
+                                        "path_strand": path_strand,
+                                        "node_strand": node_strand,
+                                        "start": int(coord.split("-")[0]),
+                                        "end": int(coord.split("-")[1]),
+                                        "pclai": pclai_lst,
+                                        "take": "no"
+                                    }
+                                    
+                                    metadata.append(metadata_entry)
+                                    
+                                node_dup_assembly.append({
+                                    "assembly_name": assembly,
+                                    "haplotype": haplo, 
+                                    "metadata": metadata
+                                })
+                                
+                    elif tag == "SN":
+                        node_default_coord = valString
+                        
+                
                 # Check node orientation
                 # If not given, assume "+"
                 lastChar = nodeName[-1]
@@ -400,7 +580,8 @@ class PGGraph:
                     nodeName += "+"
                     
                 # Add to list of nodes
-                self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_assembly, node_range, self.m_settings)
+                # self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_assembly, node_pclai, node_range, self.m_settings)
+                self.pgnodes[nodeName] = PGNode(nodeName, sequence, seqlen, node_nd_assembly, node_dup_assembly, node_default_coord, self.m_settings)
                 # self.pgnodes[nodeName].getNodeAssemblies()
 
             # Lines beginning with "L" are link (edge) lines
