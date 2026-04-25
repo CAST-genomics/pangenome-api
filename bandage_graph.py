@@ -459,6 +459,8 @@ class PGGraph:
                             start_str, end_str = coord.split("-")
                             start = int(start_str)
                             end = int(end_str)
+                            print(f"line is {line}")
+                            print(f"start is {start}, end is {end}, coord is {coord}, coord_info is {coord_info}")
                             
                             #TODO delete this part after fixing the bug in walks file
                             ###########
