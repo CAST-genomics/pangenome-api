@@ -57,14 +57,13 @@ minigraph_hg38_gfa_v2 = Path(f"{data_path}/hprc-v2.0-minigraph-grch38.gfa")
 mc_mapped_walks_v1 = pysam.TabixFile(f"{data_path}/hprc-v1.1-mc-grch38-mapped-flattened.walk.gz")
 mc_mapped_walks_v2 = None
 minigraph_walks_v1 = pysam.TabixFile(f"{data_path}/hprc_v1.0_minigraph_filtered_with_id.walk.gz")
-minigraph_walks_v2 = pysam.TabixFile(f"{data_path}/hprc_v2.0_minigraph.sorted.pclai.walk.gz")
 
 # walks updated in 4/22/2026 with features:
 #   1. filled missing nodes
 #   2. pclai for both hg38 and asm coordinates
 #   3. discarded median approach, used impainting methods on euclidean distance
-minigraph_walks_v2_updated = pysam.TabixFile(f"{data_path}/hprc_v2.0_minigraph.sorted.pclai.walk.gz")
-minigraph_walks_outdated_v2 = pysam.TabixFile(f"{data_path}/hprc_v2.0_minigraph_filtered_with_id_with_hg38_with_pca.sorted.walk.gz")
+#   4. with assembly coordinates
+minigraph_walks_v2_updated = pysam.TabixFile(f"{data_path}/v1_1_hprc_v2.0_minigraph.sorted.pclai.walk.gz")
 
 #TODO check if all chopped node id finds a mapped unchopped node id
 def SubgraphMC(query_region, gfa_preprocessed, gfa_postprocessed, reference_gbz, mc_mapped_walks, log):
@@ -173,39 +172,14 @@ def SubgraphMini(query_region, gfa_preprocessed, gfa_postprocessed, reference_gf
             # default_coord = ""
             # non_duplicated_assembly_coord = ""
             # duplicated_assembly_coord = "."
-            
-            if pca == "assembly":
-                # updated to new walks format: 
-                # .	48	GRCh38#0#chr1:356372-362698	HG00544#2#CM089383.1|+:>:17162-23470|.:.:.:.:.:.:.:.,
-                for mapping_line in minigraph_walks.fetch(".", node_id-1, node_id):
-                    mapping_parts = mapping_line.strip().split("\t")
-                    default_coord = mapping_parts[2]
-                    non_duplicated_assembly_coord = mapping_parts[3]
-                    duplicated_assembly_coord = mapping_parts[4]
-            else:
-                # TODO we noticed that there's certain node not existed in the walks file. Need to check back on
-                # how this walks file was generated and udpate on it.
-                for mapping_line in minigraph_walks_outdated_v2.fetch(" ", node_id-1, node_id):
-                    mapping_parts = mapping_line.strip().split("\t")
-                    default_coord = mapping_parts[1]
-                    assembly_list = mapping_parts[2].split(",")
-                    pclai_list = mapping_parts[3].split(",")
-                    pclai_dict = {}
-                    non_duplicated_assembly_coord = ""
-                    for pclai_entry in pclai_list:
-                        if pclai_entry == ".":
-                            continue
-                        assembly_id, x_coord, y_coord, r, g, b = pclai_entry.split(":")
-                        pclai_dict[assembly_id] = f"{x_coord}:{y_coord}:{r}:{g}:{b}:0:0:1"
-                    for assembly_contig_id in assembly_list:
-                        assembly, haplo, seq_id = assembly_contig_id.split("#")
-                        assembly_id = f"{assembly}#{haplo}"
-                        if assembly_id in pclai_dict:
-                            non_duplicated_assembly_coord += f",{assembly_contig_id}|.:.:0-0|{pclai_dict[assembly_id]}"
-                        else:
-                            non_duplicated_assembly_coord += f",{assembly_contig_id}|.:.:0-0|.:.:.:.:.:.:.:."
-                    non_duplicated_assembly_coord = non_duplicated_assembly_coord[1:]    
-                    duplicated_assembly_coord = "."
+
+            # updated to new walks format: 
+            # .	48	GRCh38#0#chr1:356372-362698	HG00544#2#CM089383.1|+:>:17162-23470|hg38:.:.:.:.:.:.|asm:.:.:.:.:.:., ...
+            for mapping_line in minigraph_walks.fetch(".", node_id-1, node_id):
+                mapping_parts = mapping_line.strip().split("\t")
+                default_coord = mapping_parts[2]
+                non_duplicated_assembly_coord = mapping_parts[3]
+                duplicated_assembly_coord = mapping_parts[4]
                     
             splitted_line[4] = f"SN:Z:{default_coord}"
             splitted_line[5] = (f"na:Z:{non_duplicated_assembly_coord}") # Non-duplicated Assembly list
@@ -371,7 +345,7 @@ async def read_items(
     end: int = Query(..., description="End coordinate"),
     graphtype: str = Query(..., description='Graph type: `"mc"` (minigraph-cactus) or `"minigraph"`'),
     version: str = Query("v2", description='pangenome release version: `"v1"` or `"v2"`'),
-    api: str = Query("v1", description = 'api release version: `"v1"`(without coordinates) or `"v2"`(with coordinates)'),
+    api: str = Query("v1", description = 'api release version: `"v1"`(without coordinates), `"v2"`(with coordinates), or `"v3"`(with coordinates and both api coords)'),
     pca: str = Query("hg38", description = 'coordinate system for pclai: `"hg38"`(based on hg38 coordinates) or `"assembly"`(based on coordinates of each assembly)'),
     debug_small_graphs: bool = Query(..., description="If true, every node's length is set to the number of basepairs"),
     minnodelen: float = Query(5, description="Minimum node length to draw.\nIf the drawn node length is smaller than this, it defaults to minnodelen."),
@@ -429,18 +403,11 @@ async def read_items(
                 SubgraphMini(query_region, preprocess_gfa_output, gfa_output, minigraph_hg38_gfa_v1, minigraph_walks_v1, log)
                 os.remove(preprocess_gfa_output)
         elif version == "v2":
-            if pca == "assembly":
-                gfa_output = Path(f"./cache/minigraph/pca_assembly_coord/subgraph_{chrom}_{str(start)}_{str(end)}_v2.gfa")
-                if not gfa_output.exists():
-                    preprocess_gfa_output = Path(f"./cache/minigraph/pca_assembly_coord/subgraph_{chrom}_{str(start)}_{str(end)}_v2_pre.gfa")
-                    SubgraphMini(query_region, preprocess_gfa_output, gfa_output, minigraph_hg38_gfa_v2, minigraph_walks_v2, pca, log)
-                    os.remove(preprocess_gfa_output)
-            else:
-                gfa_output = Path(f"./cache/minigraph/pca_hg38_coord/subgraph_{chrom}_{str(start)}_{str(end)}_v2.gfa")
-                if not gfa_output.exists():
-                    preprocess_gfa_output = Path(f"./cache/minigraph/pca_hg38_coord/subgraph_{chrom}_{str(start)}_{str(end)}_v2_pre.gfa")
-                    SubgraphMini(query_region, preprocess_gfa_output, gfa_output, minigraph_hg38_gfa_v2, minigraph_walks_v2, pca, log)
-                    os.remove(preprocess_gfa_output)
+            gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v2.gfa")
+            if not gfa_output.exists():
+                preprocess_gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v2_pre.gfa")
+                SubgraphMini(query_region, preprocess_gfa_output, gfa_output, minigraph_hg38_gfa_v2, minigraph_walks_v2_updated, pca, log)
+                os.remove(preprocess_gfa_output)
         else:
             log.error(f"Invalid graph version {version}(valid versions: \"v1\" or \"v2\")")  
     else:
@@ -464,7 +431,7 @@ async def read_items(
     assembly_range = adjustAssemblyRangeList(pggraph.pgassemblies) # {assembly_id1: {"sequence_id": seq_id, "region": 1000-2000}, assembly_id2: ...}
     # TODO adjust take in non duplicated coordinates if it's not from the right contig. Can look into real cases before this adjustment
     
-    if api == "v2":
+    if api in ["v2", "v3"]:
         data = {
             "queried_locus": f"GRCh38#0#{chrom}:{str(start)}-{str(end)}",
             "actual_locus": f"GRCh38#0#{assembly_range['GRCh38#0']['sequence_id']}:{assembly_range['GRCh38#0']['region']}",

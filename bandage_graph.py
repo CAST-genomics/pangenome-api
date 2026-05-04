@@ -30,6 +30,7 @@ assembly_metadata_v1 = f"{data_path}/hprc_assembly_metadata_v1.0.json"
 assembly_metadata_v2 = f"{data_path}/hprc_assembly_metadata_v2.0.json"
 assembly_metadata_grouped_v1 = f"{data_path}/hprc_assembly_grouping_v1.0.json"
 assembly_metadata_grouped_v2 = f"{data_path}/hprc_assembly_grouping_v2.0.json"
+pclai_coord_naming_conventions = {"hg38": "GRCh38", "asm": "assembly"}
 
 def getLengthFromCigar(cigar):
     return 0 # TODO. not sure we need CIGAR?
@@ -262,13 +263,13 @@ class PGNode:
         assembly_lst = []
         for nd_entry in self.m_nd_assembly:
             assembly = nd_entry["assembly_name"]
-            if assembly not in assembly_lst:
-                assembly_lst.append(assembly)
+            # if assembly not in assembly_lst:
+            assembly_lst.append(assembly)
                 
         for dup_entry in self.m_dup_assembly:
             assembly = dup_entry["assembly_name"]
-            if assembly not in assembly_lst:
-                assembly_lst.append(assembly)
+            # if assembly not in assembly_lst:
+            assembly_lst.append(assembly)
 
         return assembly_lst
     
@@ -453,54 +454,98 @@ class PGGraph:
                     # GRCh38#0#chr1:356372-362698	HG00544#2#CM089383.1|+:>:17162-23470|.:.:.:.:.:.:.:.
                     elif tag == "na":
                         for non_dup_assembly_info in valString.split(","):
-                            assembly_contig_name, coord_info, pclai = non_dup_assembly_info.split("|")
+                            assembly_contig_name, coord_info, pclai_hg38, pclai_asm = non_dup_assembly_info.split("|")
+                            
+                            # process contig ids
                             assembly, haplo, seq_id = assembly_contig_name.split("#")
+                            
+                            # process assembly coordinates
                             path_strand, node_strand, coord =coord_info.split(":")
                             start_str, end_str = coord.split("-")
                             start = int(start_str)
                             end = int(end_str)
-                            print(f"line is {line}")
-                            print(f"start is {start}, end is {end}, coord is {coord}, coord_info is {coord_info}")
                             
-                            #TODO delete this part after fixing the bug in walks file
-                            ###########
-                            if start == end and seqlen > 1:
-                                end = start + seqlen
-                            ###########
-                            
-                            # add pclai into list. For cases that one nodes spans two or more windows, we will have multiple pclai entries
-                            # per node. We use this script to append each pclai entry into pclai list
-                            pclai_lst = []
-                            for pclai_part in pclai.split(";"):
-                                pclaix, pclaiy, pclair, pclaig, pclaib, pclai_start, pclai_end, pclai_percentage = pclai_part.split(":")
-                                # if the node doesn't have any pclai information available, we keep the pclai list empty
-                                if pclaix == ".":
+                            # process pclais
+                            assign_pclai = {"hg38": {}, "asm": {}}
+                            for pclai in [pclai_hg38, pclai_asm]:
+                                pclai_coord, pclai_x, pclai_y, pclai_r, pclai_g, pclai_b, pclai_score = pclai.split(":")
+                                if pclai_x == ".":
                                     continue
-                                single_pclai = {
-                                    "coordinates": [float(pclaix), float(pclaiy)],
-                                    "RGB": [float(pclair), float(pclaig), float(pclaib)],
-                                    "start": int(pclai_start),
-                                    "end": int(pclai_end),
-                                    "percentage": float(pclai_percentage)
-                                }
-                                pclai_lst.append(single_pclai)
-                                
-                            # add assembly information to node_nd_assembly, which will be added into the json_file --> node --> assembly_list
-                            node_nd_assembly.append({
-                                "assembly_name": assembly,
-                                "haplotype": haplo, 
-                                "metadata": [
-                                    {
-                                        "sequence_id": seq_id,
-                                        "path_strand": path_strand,
-                                        "node_strand": node_strand,
+                                if self.m_settings["API"] == "v3":
+                                    assign_pclai[pclai_coord] = {
+                                        "pclai_coord_system": pclai_coord_naming_conventions[pclai_coord],
+                                        "coordinates": [float(pclai_x), float(pclai_y)],
+                                        "RGB": [float(pclai_r), float(pclai_g), float(pclai_b)],
+                                        "confidence_score": pclai_score
+                                    }
+                                else:
+                                    assign_pclai[pclai_coord] = {
+                                        "coordinates": [float(pclai_x), float(pclai_y)],
+                                        "RGB": [float(pclai_r), float(pclai_g), float(pclai_b)],
                                         "start": start,
                                         "end": end,
-                                        "pclai": pclai_lst,
-                                        "take": "yes"
-                                    }
-                                ]
-                            })
+                                        "percentage": 1.0
+                                    }   
+                                                     
+                            #TODO delete this part after fixing the bug in walks file
+                            ###########
+                            if start == end and seqlen > 0:
+                                end = start + seqlen
+                            ###########
+                                
+                            # add assembly information to node_nd_assembly, which will be added into the json_file --> node --> assembly_list
+                            if self.m_settings["PCLAI"] == "assembly" and self.m_settings["API"] != "v3":
+                                node_nd_assembly.append({
+                                    "assembly_name": assembly,
+                                    "haplotype": haplo, 
+                                    "metadata": [
+                                        {
+                                            "sequence_id": seq_id,
+                                            "path_strand": path_strand,
+                                            "node_strand": node_strand,
+                                            "start": start,
+                                            "end": end,
+                                            "pclai": [] if assign_pclai["asm"] == {} else [assign_pclai["asm"]],
+                                            "take": "yes"
+                                        }
+                                    ]
+                                })
+                            
+                            elif self.m_settings["PCLAI"] == "hg38" and self.m_settings["API"] != "v3":
+                                node_nd_assembly.append({
+                                    "assembly_name": assembly,
+                                    "haplotype": haplo, 
+                                    "metadata": [
+                                        {
+                                            "sequence_id": seq_id,
+                                            "path_strand": path_strand,
+                                            "node_strand": node_strand,
+                                            "start": start,
+                                            "end": end,
+                                            "pclai": [] if assign_pclai["hg38"] == {} else [assign_pclai["hg38"]],
+                                            "take": "yes"
+                                        }
+                                    ]
+                                })
+                            
+                            else:
+                                node_nd_assembly.append({
+                                    "assembly_name": assembly,
+                                    "haplotype": haplo, 
+                                    "metadata": [
+                                        {
+                                            "sequence_id": seq_id,
+                                            "path_strand": path_strand,
+                                            "node_strand": node_strand,
+                                            "start": start,
+                                            "end": end,
+                                            "pclai_hg38":  assign_pclai["hg38"],
+                                            "pclai_asm": assign_pclai["asm"],
+                                            "take": "yes"
+                                        }
+                                    ]
+                                })                                                        
+                            
                             
                             # udpate pggraph.pgassemblies, which will be used to determine the range of the node, and whether a duplicated node will be taken or not
                             # self.pgassemblies = {assembly: {contig1_name:[min_start, max_end, contig1_lenof_node,contig1_numof_node], contig2_name:[min_start, max_end, contig2_lenof_node,contig2_numof_node]}]}
@@ -523,7 +568,7 @@ class PGGraph:
                                     self.pgassemblies[f"{assembly}#{haplo}"][seq_id] = [start, end, seqlen, 1]
                                 
                     
-                    # GRCh38#0#chr1:356372-362698	HG03521#2|JBIREG010000046.1$+:>:1218553-1228497$.:.:.:.:.:.:.:.|JBIREG010000050.1$+:>:108575287-108585205$.:.:.:.:.:.:.:.
+                    # GRCh38#0#chr1:356372-362698	HG03521#2|JBIREG010000046.1$+:>:1218553-1228497$hg38:.:.:.:.:.:.$asm:.:.:.:.:.:.|JBIREG010000050.1$+:>:108575287-108585205$.:.:.:.:.:.:.:.
                     elif tag == "da":
                         # we only consider when we have duplicated coordinates. If we do not, the duplicated assembly list will be an empty dict
                         if valString != ".":
@@ -534,34 +579,73 @@ class PGGraph:
                                 metadata = []
                                 
                                 for duplicated_coord in duplicated_coords:
-                                    seq_id, coord_info, pclai = duplicated_coord.split("$")
+                                    seq_id, coord_info, pclai_hg38, pclai_asm = duplicated_coord.split("$")
                                     path_strand, node_strand, coord =coord_info.split(":")
-                                    # add pclai into list. For cases that one nodes spans two or more windows, we will have multiple pclai entries
-                                    # per node. We use this script to append each pclai entry into pclai list
-                                    pclai_lst = []
-                                    for pclai_part in pclai.split(";"):
-                                        pclaix, pclaiy, pclair, pclaig, pclaib, pclai_start, pclai_end, pclai_percentage = pclai_part.split(":")
-                                        # if the node doesn't have any pclai information available, we keep the pclai list empty
-                                        if pclaix == ".":
+                                    start_str, end_str = coord.split("-")
+                                    start = int(start_str)
+                                    end = int(end_str)
+
+                                    assign_pclai = {"hg38": {}, "asm": {}}
+                                    for pclai in [pclai_hg38, pclai_asm]:
+                                        pclai_coord, pclai_x, pclai_y, pclai_r, pclai_g, pclai_b, pclai_score = pclai.split(":")
+                                        if pclai_x == ".":
                                             continue
-                                        single_pclai = {
-                                            "coordinates": [float(pclaix), float(pclaiy)],
-                                            "RGB": [float(pclair), float(pclaig), float(pclaib)],
-                                            "start": int(pclai_start),
-                                            "end": int(pclai_end),
-                                            "percentage": float(pclai_percentage)
+                                        if self.m_settings["API"] == "v3":
+                                            assign_pclai[pclai_coord] = {
+                                                "pclai_coord_system": pclai_coord_naming_conventions[pclai_coord],
+                                                "coordinates": [float(pclai_x), float(pclai_y)],
+                                                "RGB": [float(pclai_r), float(pclai_g), float(pclai_b)],
+                                                "confidence_score": pclai_score
+                                            }
+                                        else:
+                                            assign_pclai[pclai_coord] = {
+                                                "coordinates": [float(pclai_x), float(pclai_y)],
+                                                "RGB": [float(pclai_r), float(pclai_g), float(pclai_b)],
+                                                "start": start,
+                                                "end": end,
+                                                "percentage": 1.0
+                                            }       
+                                                            
+                                    #TODO delete this part after fixing the bug in walks file
+                                    ###########
+                                    if start == end and seqlen > 0:
+                                        end = start + seqlen
+                                    ###########
+                                        
+                                    # add assembly information to node_nd_assembly, which will be added into the json_file --> node --> assembly_list
+                                    if self.m_settings["PCLAI"] == "assembly" and self.m_settings["API"] != "v3":
+                                        metadata_entry = {
+                                            "sequence_id": seq_id,
+                                            "path_strand": path_strand,
+                                            "node_strand": node_strand,
+                                            "start": start,
+                                            "end": end,
+                                            "pclai": [] if assign_pclai["asm"] == {} else [assign_pclai["asm"]],
+                                            "take": "no"
                                         }
-                                        pclai_lst.append(single_pclai)
                                     
-                                    metadata_entry = {
-                                        "sequence_id": seq_id,
-                                        "path_strand": path_strand,
-                                        "node_strand": node_strand,
-                                        "start": int(coord.split("-")[0]),
-                                        "end": int(coord.split("-")[1]),
-                                        "pclai": pclai_lst,
-                                        "take": "no"
-                                    }
+                                    elif self.m_settings["PCLAI"] == "hg38" and self.m_settings["API"] != "v3":
+                                        metadata_entry = {
+                                            "sequence_id": seq_id,
+                                            "path_strand": path_strand,
+                                            "node_strand": node_strand,
+                                            "start": start,
+                                            "end": end,
+                                            "pclai": [] if assign_pclai["hg38"] == {} else [assign_pclai["hg38"]],
+                                            "take": "no"
+                                        } 
+                                    
+                                    else:
+                                        metadata_entry = {
+                                            "sequence_id": seq_id,
+                                            "path_strand": path_strand,
+                                            "node_strand": node_strand,
+                                            "start": start,
+                                            "end": end,
+                                            "pclai_hg38": assign_pclai["hg38"],
+                                            "pclai_asm": assign_pclai["asm"],
+                                            "take": "no"
+                                        }
                                     
                                     metadata.append(metadata_entry)
                                     
