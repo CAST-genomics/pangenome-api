@@ -1,4 +1,9 @@
+from contextlib import asynccontextmanager
+import logging
+import signal
 import subprocess
+import ssl
+import traceback
 
 tool_path = subprocess.check_output(
     ["git", "config", "--get", "tools.path"], text=True
@@ -25,6 +30,26 @@ import tempfile
 import json
 import pysam
 
+logging.basicConfig(level=logging.INFO)
+api_log = logging.getLogger("app")
+
+def log_signal(signum, frame):
+    api_log.error("Received signal %s in pid=%s", signum, os.getpid())
+    api_log.error("".join(traceback.format_stack(frame)))
+
+for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+    signal.signal(sig, log_signal)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    api_log.info("startup pid=%s", os.getpid())
+    try:
+        yield
+    finally:
+        api_log.error("lifespan shutdown reached pid=%s", os.getpid())
+
+app = FastAPI(lifespan=lifespan)
+
 class Settings(BaseModel):
     chr_input: str
     start_loc_input: int
@@ -37,7 +62,8 @@ class Settings(BaseModel):
     NODELENPERMB: float
     NAMELABEL: bool
 
-app = FastAPI()
+ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+ssl_context.load_cert_chain('/home/xbu/pgapi_cert/pangenome-api_ucsd_edu.pem', keyfile='/home/xbu/pgapi_cert/pangenome-api_ucsd_edu.key')
 
 app.add_middleware(
     CORSMiddleware,
@@ -201,8 +227,8 @@ async def read_items(
     start: int = Query(..., description="Start coordinate"),
     end: int = Query(..., description="End coordinate"),
     graphtype: str = Query(..., description='Graph type: `"mc"` (minigraph-cactus) or `"minigraph"`'),
-    version: str = Query("v1", description='pangenome release version: `"v1"` or `"v2"`'),
-    debug_small_graphs: bool = Query(..., description="If true, every node's length is set to the number of basepairs"),
+    version: str = Query(..., description='pangenome release version: `"v1"` or `"v2"`'),
+    debug_small_graphs: bool = Query(False, description="If true, every node's length is set to the number of basepairs"),
     minnodelen: float = Query(5, description="Minimum node length to draw.\nIf the drawn node length is smaller than this, it defaults to minnodelen."),
     nodeseglen: float = Query(20, description="Node length for each OGDF node"),
     edgelen: float = Query(5, description="Length of edges between nodes"),
