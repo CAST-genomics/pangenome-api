@@ -4,6 +4,24 @@ import signal
 import subprocess
 import ssl
 import traceback
+import numpy as np
+import os
+import sys
+from panCT.panct.data import Region
+from panCT.panct.logging import getLogger
+from fastapi import FastAPI, Query, Security, HTTPException, Depends
+from fastapi.security.api_key import APIKeyHeader
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
+import gbz_utils as gbz
+from pathlib import Path
+import gfa_utils as gfa
+import bandage_graph
+from pydantic import BaseModel
+import tempfile
+import json
+import pysam
 
 tool_path = subprocess.check_output(
     ["git", "config", "--get", "tools.path"], text=True
@@ -12,25 +30,7 @@ data_path = subprocess.check_output(
     ["git", "config", "--get", "data.path"], text=True
 ).strip()
 
-import sys
 sys.path.append(tool_path)
-from panCT.panct.data import Region
-from panCT.panct.logging import getLogger
-
-from fastapi import FastAPI, Query, Security, HTTPException, Depends
-from fastapi.security.api_key import APIKeyHeader
-from fastapi.responses import JSONResponse
-from typing import Optional
-import gbz_utils as gbz
-from pathlib import Path
-import os
-import gfa_utils as gfa
-import bandage_graph
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-import tempfile
-import json
-import pysam
 
 logging.basicConfig(level=logging.INFO)
 api_log = logging.getLogger("app")
@@ -51,7 +51,6 @@ async def lifespan(app: FastAPI):
         api_log.error("lifespan shutdown reached pid=%s", os.getpid())
 
 app = FastAPI(lifespan=lifespan)
-import numpy as np
 
 class Settings(BaseModel):
     chr_input: str
@@ -371,7 +370,7 @@ async def read_items(
     end: int = Query(..., description="End coordinate"),
     graphtype: str = Query(..., description='Graph type: `"mc"` (minigraph-cactus) or `"minigraph"`'),
     version: str = Query("v2", description='pangenome release version: `"v1"` or `"v2"`'),
-    api: str = Query("v1", description = 'api release version: `"v1"`(without coordinates), `"v2"`(with coordinates), or `"v3"`(with coordinates and both api coords)'),
+    api: str = Query("v3", description = 'api release version: `"v1"`(without coordinates), `"v2"`(with coordinates), or `"v3"`(with coordinates and both api coords)'),
     pca: str = Query("hg38", description = 'coordinate system for pclai: `"hg38"`(based on hg38 coordinates) or `"assembly"`(based on coordinates of each assembly)'),
     debug_small_graphs: bool = Query(..., description="If true, every node's length is set to the number of basepairs"),
     minnodelen: float = Query(5, description="Minimum node length to draw.\nIf the drawn node length is smaller than this, it defaults to minnodelen."),
