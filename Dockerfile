@@ -9,7 +9,11 @@ RUN apt-get update && apt-get install -y \
 #build gbz-base
 RUN git clone https://github.com/jltsiren/gbz-base.git /build/gbz-base
 WORKDIR /build/gbz-base
-RUN cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/build/gbz-base/target \
+    cargo build --release && \
+    cp target/release/gbz2db /usr/local/bin/gbz2db && \
+    cp target/release/query /usr/local/bin/query
 
 #actual runtime
 FROM python:3.11-slim-bookworm
@@ -27,8 +31,8 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /build/gbz-base/target/release/gbz2db /usr/local/bin/gbz2db
-COPY --from=builder /build/gbz-base/target/release/query /usr/local/bin/query
+COPY --from=builder /usr/local/bin/gbz2db /usr/local/bin/gbz2db
+COPY --from=builder /usr/local/bin/query /usr/local/bin/query
 RUN chmod +x /usr/local/bin/gbz2db /usr/local/bin/query
 
 #install gfabase from their precompiled binary

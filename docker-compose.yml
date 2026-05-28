@@ -7,4 +7,4 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - .:/app
-      - ./data:/data
+      - ../data:/data
