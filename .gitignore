@@ -9,6 +9,9 @@
 *.cnf*
 *.JSON*
 
+#walk files
+*.walk.gz
+
 # python cache
 __pycache__
 
