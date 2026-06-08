@@ -471,21 +471,12 @@ class PGGraph:
                                 pclai_coord, pclai_x, pclai_y, pclai_r, pclai_g, pclai_b, pclai_score = pclai.split(":")
                                 if pclai_x == ".":
                                     continue
-                                if self.m_settings["API"] == "v3":
-                                    assign_pclai[pclai_coord] = {
-                                        "pclai_coord_system": pclai_coord_naming_conventions[pclai_coord],
-                                        "coordinates": [float(pclai_x), float(pclai_y)],
-                                        "RGB": [float(pclai_r), float(pclai_g), float(pclai_b)],
-                                        "confidence_score": pclai_score
-                                    }
-                                else:
-                                    assign_pclai[pclai_coord] = {
-                                        "coordinates": [float(pclai_x), float(pclai_y)],
-                                        "RGB": [float(pclai_r), float(pclai_g), float(pclai_b)],
-                                        "start": start,
-                                        "end": end,
-                                        "percentage": 1.0
-                                    }   
+                                assign_pclai[pclai_coord] = {
+                                    "pclai_coord_system": pclai_coord_naming_conventions[pclai_coord],
+                                    "coordinates": [float(pclai_x), float(pclai_y)],
+                                    "RGB": [float(pclai_r), float(pclai_g), float(pclai_b)],
+                                    "confidence_score": pclai_score
+                                }
                                                      
                             #TODO delete this part after fixing the bug in walks file
                             ###########
@@ -494,57 +485,22 @@ class PGGraph:
                             ###########
                                 
                             # add assembly information to node_nd_assembly, which will be added into the json_file --> node --> assembly_list
-                            if self.m_settings["PCLAI"] == "assembly" and self.m_settings["API"] != "v3":
-                                node_nd_assembly.append({
-                                    "assembly_name": assembly,
-                                    "haplotype": haplo, 
-                                    "metadata": [
-                                        {
-                                            "sequence_id": seq_id,
-                                            "path_strand": path_strand,
-                                            "node_strand": node_strand,
-                                            "start": start,
-                                            "end": end,
-                                            "pclai": [] if assign_pclai["asm"] == {} else [assign_pclai["asm"]],
-                                            "take": "yes"
-                                        }
-                                    ]
-                                })
-                            
-                            elif self.m_settings["PCLAI"] == "hg38" and self.m_settings["API"] != "v3":
-                                node_nd_assembly.append({
-                                    "assembly_name": assembly,
-                                    "haplotype": haplo, 
-                                    "metadata": [
-                                        {
-                                            "sequence_id": seq_id,
-                                            "path_strand": path_strand,
-                                            "node_strand": node_strand,
-                                            "start": start,
-                                            "end": end,
-                                            "pclai": [] if assign_pclai["hg38"] == {} else [assign_pclai["hg38"]],
-                                            "take": "yes"
-                                        }
-                                    ]
-                                })
-                            
-                            else:
-                                node_nd_assembly.append({
-                                    "assembly_name": assembly,
-                                    "haplotype": haplo, 
-                                    "metadata": [
-                                        {
-                                            "sequence_id": seq_id,
-                                            "path_strand": path_strand,
-                                            "node_strand": node_strand,
-                                            "start": start,
-                                            "end": end,
-                                            "pclai_hg38":  assign_pclai["hg38"],
-                                            "pclai_asm": assign_pclai["asm"],
-                                            "take": "yes"
-                                        }
-                                    ]
-                                })                                                        
+                            node_nd_assembly.append({
+                                "assembly_name": assembly,
+                                "haplotype": haplo, 
+                                "metadata": [
+                                    {
+                                        "sequence_id": seq_id,
+                                        "path_strand": path_strand,
+                                        "node_strand": node_strand,
+                                        "start": start,
+                                        "end": end,
+                                        "pclai_hg38":  assign_pclai["hg38"],
+                                        "pclai_asm": assign_pclai["asm"],
+                                        "take": "yes"
+                                    }
+                                ]
+                            })                                                        
                             
                             
                             # udpate pggraph.pgassemblies, which will be used to determine the range of the node, and whether a duplicated node will be taken or not
@@ -590,21 +546,12 @@ class PGGraph:
                                         pclai_coord, pclai_x, pclai_y, pclai_r, pclai_g, pclai_b, pclai_score = pclai.split(":")
                                         if pclai_x == ".":
                                             continue
-                                        if self.m_settings["API"] == "v3":
-                                            assign_pclai[pclai_coord] = {
-                                                "pclai_coord_system": pclai_coord_naming_conventions[pclai_coord],
-                                                "coordinates": [float(pclai_x), float(pclai_y)],
-                                                "RGB": [float(pclai_r), float(pclai_g), float(pclai_b)],
-                                                "confidence_score": pclai_score
-                                            }
-                                        else:
-                                            assign_pclai[pclai_coord] = {
-                                                "coordinates": [float(pclai_x), float(pclai_y)],
-                                                "RGB": [float(pclai_r), float(pclai_g), float(pclai_b)],
-                                                "start": start,
-                                                "end": end,
-                                                "percentage": 1.0
-                                            }       
+                                        assign_pclai[pclai_coord] = {
+                                            "pclai_coord_system": pclai_coord_naming_conventions[pclai_coord],
+                                            "coordinates": [float(pclai_x), float(pclai_y)],
+                                            "RGB": [float(pclai_r), float(pclai_g), float(pclai_b)],
+                                            "confidence_score": pclai_score
+                                        }   
                                                             
                                     #TODO delete this part after fixing the bug in walks file
                                     ###########
@@ -613,39 +560,16 @@ class PGGraph:
                                     ###########
                                         
                                     # add assembly information to node_nd_assembly, which will be added into the json_file --> node --> assembly_list
-                                    if self.m_settings["PCLAI"] == "assembly" and self.m_settings["API"] != "v3":
-                                        metadata_entry = {
-                                            "sequence_id": seq_id,
-                                            "path_strand": path_strand,
-                                            "node_strand": node_strand,
-                                            "start": start,
-                                            "end": end,
-                                            "pclai": [] if assign_pclai["asm"] == {} else [assign_pclai["asm"]],
-                                            "take": "no"
-                                        }
-                                    
-                                    elif self.m_settings["PCLAI"] == "hg38" and self.m_settings["API"] != "v3":
-                                        metadata_entry = {
-                                            "sequence_id": seq_id,
-                                            "path_strand": path_strand,
-                                            "node_strand": node_strand,
-                                            "start": start,
-                                            "end": end,
-                                            "pclai": [] if assign_pclai["hg38"] == {} else [assign_pclai["hg38"]],
-                                            "take": "no"
-                                        } 
-                                    
-                                    else:
-                                        metadata_entry = {
-                                            "sequence_id": seq_id,
-                                            "path_strand": path_strand,
-                                            "node_strand": node_strand,
-                                            "start": start,
-                                            "end": end,
-                                            "pclai_hg38": assign_pclai["hg38"],
-                                            "pclai_asm": assign_pclai["asm"],
-                                            "take": "no"
-                                        }
+                                    metadata_entry = {
+                                        "sequence_id": seq_id,
+                                        "path_strand": path_strand,
+                                        "node_strand": node_strand,
+                                        "start": start,
+                                        "end": end,
+                                        "pclai_hg38": assign_pclai["hg38"],
+                                        "pclai_asm": assign_pclai["asm"],
+                                        "take": "no"
+                                    }
                                     
                                     metadata.append(metadata_entry)
                                     

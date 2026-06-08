@@ -1,12 +1,22 @@
+import subprocess
+import sys
+
+tool_path = subprocess.check_output(
+    ["git", "config", "--get", "tools.path"], text=True
+).strip()
+data_path = subprocess.check_output(
+    ["git", "config", "--get", "data.path"], text=True
+).strip()
+
+sys.path.append(tool_path)
+
 from contextlib import asynccontextmanager
 import logging
 import signal
-import subprocess
 import ssl
 import traceback
 import numpy as np
 import os
-import sys
 from panCT.panct.data import Region
 from panCT.panct.logging import getLogger
 from fastapi import FastAPI, Query, Security, HTTPException, Depends
@@ -23,34 +33,10 @@ import tempfile
 import json
 import pysam
 
-tool_path = subprocess.check_output(
-    ["git", "config", "--get", "tools.path"], text=True
-).strip()
-data_path = subprocess.check_output(
-    ["git", "config", "--get", "data.path"], text=True
-).strip()
-
-sys.path.append(tool_path)
-
 logging.basicConfig(level=logging.INFO)
 api_log = logging.getLogger("app")
 
-def log_signal(signum, frame):
-    api_log.error("Received signal %s in pid=%s", signum, os.getpid())
-    api_log.error("".join(traceback.format_stack(frame)))
-
-for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
-    signal.signal(sig, log_signal)
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    api_log.info("startup pid=%s", os.getpid())
-    try:
-        yield
-    finally:
-        api_log.error("lifespan shutdown reached pid=%s", os.getpid())
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 class Settings(BaseModel):
     chr_input: str
@@ -64,8 +50,8 @@ class Settings(BaseModel):
     NODELENPERMB: float
     NAMELABEL: bool
 
-ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-ssl_context.load_cert_chain('/home/xbu/pgapi_cert/pangenome-api_ucsd_edu.pem', keyfile='/home/xbu/pgapi_cert/pangenome-api_ucsd_edu.key')
+# ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+# ssl_context.load_cert_chain('/home/xbu/pgapi_cert/pangenome-api_ucsd_edu.pem', keyfile='/home/xbu/pgapi_cert/pangenome-api_ucsd_edu.key')
 
 app.add_middleware(
     CORSMiddleware,
@@ -174,7 +160,7 @@ def SubgraphMC(query_region, gfa_preprocessed, gfa_postprocessed, reference_gbz,
         subgfa_postprocess.write(f"L\t{link[1]}\t{link[2]}\t{link[3]}\t{link[4]}\t{link[5]}\n")
 
 
-def SubgraphMini(query_region, gfa_preprocessed, gfa_postprocessed, reference_gfa, minigraph_walks, pca, log):
+def SubgraphMini(query_region, gfa_preprocessed, reference_gfa, log):
     # check gbz.db file and create subgraph
     gfa.check_gfabase_installed(log)
     gfa.check_gfafile(reference_gfa, log)
@@ -182,21 +168,24 @@ def SubgraphMini(query_region, gfa_preprocessed, gfa_postprocessed, reference_gf
     subgraph_gfa = gfa.extract_region_from_gfa(reference_gfa,query_region,gfa_preprocessed)
     if subgraph_gfa is None:
         log.error("Subset GFA is None")
-    
-    header = ""
+        
+    return
+
+def PreprocessMiniSubgraph(gfa_preprocessed, gfa_postprocessed, minigraph_walks, log):
+    if not os.path.exists(gfa_preprocessed):
+        log.error(f"Input file not found: {gfa_preprocessed}")
+        raise FileNotFoundError(f"Input file not found: {gfa_preprocessed}")
 
     subgfa_preprocess = open(gfa_preprocessed, "r")
     subgfa_postprocess = open(gfa_postprocessed, "w")
+    
+    header = ""
     links = []
     nodes = []
-    node_id_range_list = []
     for line in subgfa_preprocess:
         if line[0] == "S":
             splitted_line = line.strip().split("\t")
             node_id = int(splitted_line[1])
-            # default_coord = ""
-            # non_duplicated_assembly_coord = ""
-            # duplicated_assembly_coord = "."
 
             # updated to new walks format: 
             # .	48	GRCh38#0#chr1:356372-362698	HG00544#2#CM089383.1|+:>:17162-23470|hg38:.:.:.:.:.:.|asm:.:.:.:.:.:., ...
@@ -222,6 +211,8 @@ def SubgraphMini(query_region, gfa_preprocessed, gfa_postprocessed, reference_gf
         subgfa_postprocess.write(f"S\t{node[1]}\t{node[2]}\t{node[3]}\t{node[4]}\t{node[5]}\t{node[6]}\n")
     for link in links:
         subgfa_postprocess.write(f"L\t{link[1]}\t{link[2]}\t{link[3]}\t{link[4]}\t{link[5]}\t{link[6]}\t{link[7]}\t{link[8]}\n")
+    
+    return
 
 """
 this function will filter the assembly range list which may have multiple ranges based on different contigs per assembly.
@@ -316,51 +307,6 @@ def determineIfDupCoordShouldBeTaken(assembly_range, dup_assembly):
                 print(f"[DEBUG]:{assembly_id} has more than one duplicated coordinates in the right contig({dup_assembly[j]['metadata'][i]['sequence_id']}) and right range!")
 
     return
-
-
-"""
-return an assembly list and a pclai list of the same format as version 1 api, which will be used to directly add to the JSON file
-
-Input:
-    nd_assembly: 
-    dup_assembly: 
-
-"""
-def adjustToApiVersion1(nd_assembly, dup_assembly):
-    pclai = {}
-    assembly = []
-    for asm in nd_assembly:
-        assembly_name = asm["assembly_name"]
-        haplotype = asm["haplotype"]
-        seq_id = asm["metadata"][0]["sequence_id"]
-        asm_info = {
-            "assembly_name": assembly_name,
-            "haplotype": haplotype,
-            "sequence_id": seq_id
-        }
-        assembly.append(asm_info)
-        if len(asm["metadata"][0]["pclai"]) > 1:
-            coord_lst = []
-            rgb_lst = []
-            for lai in asm["metadata"][0]["pclai"]:
-                coord_lst.append(lai["coordinates"])
-                rgb_lst.append(lai["RGB"])
-            coord_median = np.median(coord_lst, axis=0)
-            updated_coord = coord_median.tolist()
-            rgb_median = np.median(rgb_lst, axis=0)
-            updated_rgb =rgb_median.tolist()
-            pclai[f"{assembly_name}#{haplotype}"] = {
-                "coordinates": updated_coord,
-                "RGB": updated_rgb
-            }
-        elif len(asm["metadata"][0]["pclai"]) == 1:
-            pclai[f"{assembly_name}#{haplotype}"] = {
-                "coordinates": asm["metadata"][0]["pclai"][0]["coordinates"],
-                "RGB": asm["metadata"][0]["pclai"][0]["RGB"]
-            }
-                
-    # print(dup_assembly)
-    return assembly, pclai
         
 
 @app.get("/json")
@@ -370,8 +316,6 @@ async def read_items(
     end: int = Query(..., description="End coordinate"),
     graphtype: str = Query(..., description='Graph type: `"mc"` (minigraph-cactus) or `"minigraph"`'),
     version: str = Query("v2", description='pangenome release version: `"v1"` or `"v2"`'),
-    api: str = Query("v3", description = 'api release version: `"v1"`(without coordinates), `"v2"`(with coordinates), or `"v3"`(with coordinates and both api coords)'),
-    pca: str = Query("hg38", description = 'coordinate system for pclai: `"hg38"`(based on hg38 coordinates) or `"assembly"`(based on coordinates of each assembly)'),
     debug_small_graphs: bool = Query(..., description="If true, every node's length is set to the number of basepairs"),
     minnodelen: float = Query(5, description="Minimum node length to draw.\nIf the drawn node length is smaller than this, it defaults to minnodelen."),
     nodeseglen: float = Query(20, description="Node length for each OGDF node"),
@@ -421,28 +365,29 @@ async def read_items(
             log.error(f"Invalid graph version {version}(valid versions: \"v2\", \"v1\" is not available yet)")     
     # create minigraph GFA subgraph
     elif graphtype == "minigraph" or graphtype == "Minigraph":
-        if version == "v1":
-            gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v1.gfa")
-            if not gfa_output.exists():
-                preprocess_gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v1_pre.gfa")
-                SubgraphMini(query_region, preprocess_gfa_output, gfa_output, minigraph_hg38_gfa_v1, minigraph_walks_v1, log)
-                os.remove(preprocess_gfa_output)
-        elif version == "v2":
-            gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v2.gfa")
-            if not gfa_output.exists():
+        # with the updated walks file coordinates and pclai information, we will turn v1 off for now. It will be back later 
+        # after we get the walks file running
+        # if version == "v1":
+        #     gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v1.gfa")
+        #     if not gfa_output.exists():
+        #         preprocess_gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v1_pre.gfa")
+        #         SubgraphMini(query_region, preprocess_gfa_output, gfa_output, minigraph_hg38_gfa_v1, minigraph_walks_v1, log)
+        #         os.remove(preprocess_gfa_output)
+        if version == "v2":
+            postprocess_gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v2.gfa")
+            if not postprocess_gfa_output.exists():
                 preprocess_gfa_output = Path(f"./cache/minigraph/subgraph_{chrom}_{str(start)}_{str(end)}_v2_pre.gfa")
-                SubgraphMini(query_region, preprocess_gfa_output, gfa_output, minigraph_hg38_gfa_v2, minigraph_walks_v2_updated, pca, log)
+                SubgraphMini(query_region, preprocess_gfa_output, minigraph_hg38_gfa_v2, log)
+                PreprocessMiniSubgraph(preprocess_gfa_output, postprocess_gfa_output, minigraph_walks_v2_updated, log)
                 os.remove(preprocess_gfa_output)
         else:
-            log.error(f"Invalid graph version {version}(valid versions: \"v1\" or \"v2\")")  
+            log.error(f"Invalid graph version {version}(valid versions: \"v2\") - v1 is temporarily turned off")  
     else:
         log.error(f"Invalid graph tyle {graphtype}(valid graph types: \"minigraph\" or \"MC\")")
         return
     settings = {
         "GRAPHTYPE": graphtype,
         "VERSION": version,
-        "API": api,
-        "PCLAI": pca,
         "DEBUG_SMALL_GRAPHS": debug_small_graphs,
         "MINNODELENGTH": minnodelen,
         "NODESEGLEN": nodeseglen,
@@ -450,101 +395,53 @@ async def read_items(
         "NODELENPERMB": nodelenpermb
     }
     
-    pggraph = bandage_graph.PGGraph(str(gfa_output), settings)
+    pggraph = bandage_graph.PGGraph(str(postprocess_gfa_output), settings)
     pggraph.BuildOGDFGraph()
     pggraph.LayoutGraph()
     assembly_range = adjustAssemblyRangeList(pggraph.pgassemblies) # {assembly_id1: {"sequence_id": seq_id, "region": 1000-2000}, assembly_id2: ...}
     # TODO adjust take in non duplicated coordinates if it's not from the right contig. Can look into real cases before this adjustment
     
-    if api in ["v2", "v3"]:
-        data = {
-            "queried_locus": f"GRCh38#0#{chrom}:{str(start)}-{str(end)}",
-            "actual_locus": f"GRCh38#0#{assembly_range['GRCh38#0']['sequence_id']}:{assembly_range['GRCh38#0']['region']}",
-            "node": {},
-            "edge": [],
-            "sequence": {}
-        }
+    data = {
+        "queried_locus": f"GRCh38#0#{chrom}:{str(start)}-{str(end)}",
+        "actual_locus": f"GRCh38#0#{assembly_range['GRCh38#0']['sequence_id']}:{assembly_range['GRCh38#0']['region']}",
+        "node": {},
+        "edge": [],
+        "sequence": {}
+    }
 
-        sequence = {}
-        node = {}
-        edges = []
+    sequence = {}
+    node = {}
+    edges = []
 
-        for pgnodes in pggraph.pgnodes.values():
-            if pgnodes.isDrawn():
-                # TODO check if this method can directly adjust the assembly list
-                determineIfDupCoordShouldBeTaken(assembly_range, pgnodes.m_dup_assembly)
-                node_info = {}
-                node_info["name"] = pgnodes.nodeName
-                node_info["length"] = pgnodes.nodeLength
-                node_info["assembly"] = pgnodes.m_nd_assembly
-                node_info["duplicated_assembly"] = pgnodes.m_dup_assembly
-                node_info["assembly_metadata"] = pgnodes.m_assembly_metadata
-                node_info["default_range"] = pgnodes.m_range
-                sequence[pgnodes.nodeName] = pgnodes.nodeSequence
-                odgf_coordinates = []
-                for ogdf_node in pgnodes.GetOgdfNode().m_ogdfNodes:
-                    coordinates = {"x": pggraph.m_graphAttributes.x(ogdf_node), "y": pggraph.m_graphAttributes.y(ogdf_node)}
-                    odgf_coordinates.append(coordinates)
-                node_info["ogdf_coordinates"] = odgf_coordinates
-                node[pgnodes.nodeName] = node_info
+    for pgnodes in pggraph.pgnodes.values():
+        if pgnodes.isDrawn():
+            # TODO check if this method can directly adjust the assembly list
+            determineIfDupCoordShouldBeTaken(assembly_range, pgnodes.m_dup_assembly)
+            node_info = {}
+            node_info["name"] = pgnodes.nodeName
+            node_info["length"] = pgnodes.nodeLength
+            node_info["assembly"] = pgnodes.m_nd_assembly
+            node_info["duplicated_assembly"] = pgnodes.m_dup_assembly
+            node_info["assembly_metadata"] = pgnodes.m_assembly_metadata
+            node_info["default_range"] = pgnodes.m_range
+            sequence[pgnodes.nodeName] = pgnodes.nodeSequence
+            odgf_coordinates = []
+            for ogdf_node in pgnodes.GetOgdfNode().m_ogdfNodes:
+                coordinates = {"x": pggraph.m_graphAttributes.x(ogdf_node), "y": pggraph.m_graphAttributes.y(ogdf_node)}
+                odgf_coordinates.append(coordinates)
+            node_info["ogdf_coordinates"] = odgf_coordinates
+            node[pgnodes.nodeName] = node_info
 
-        for node_pairs in pggraph.pgedges.keys():
-            if pggraph.pgedges[node_pairs].isDrawn():
-                edge = {}
-                edge["starting_node"] = node_pairs[0].nodeName
-                edge["ending_node"] = node_pairs[1].nodeName
-                edges.append(edge) 
+    for node_pairs in pggraph.pgedges.keys():
+        if pggraph.pgedges[node_pairs].isDrawn():
+            edge = {}
+            edge["starting_node"] = node_pairs[0].nodeName
+            edge["ending_node"] = node_pairs[1].nodeName
+            edges.append(edge) 
 
-        data["sequence"] = sequence
-        data["node"] = node
-        data["assembly"] = assembly_range
-        data["edge"] = edges
+    data["sequence"] = sequence
+    data["node"] = node
+    data["assembly"] = assembly_range
+    data["edge"] = edges
     
-    else:
-        data = {
-            "locus": f"{chrom}:{str(start)}-{str(end)}",
-            "node": {},
-            "edge": [],
-            "sequence": {}
-        }
-
-        sequence = {}
-        node = {}
-        edges = []
-
-        for pgnodes in pggraph.pgnodes.values():
-            if pgnodes.isDrawn():
-                determineIfDupCoordShouldBeTaken(assembly_range, pgnodes.m_dup_assembly)
-                # NOTE: as this is an outdated version just for the use before the new version is updated, we
-                # did not consider duplicated assembly. Please try to avoid certain regions like chr6 and chr14.
-                assembly, pclai = adjustToApiVersion1(pgnodes.m_nd_assembly, pgnodes.m_dup_assembly)
-                node_info = {}
-                node_info["name"] = pgnodes.nodeName
-                node_info["length"] = pgnodes.nodeLength
-                node_info["assembly"] = assembly
-                node_info["assembly_metadata"] = pgnodes.m_assembly_metadata
-                node_info["range"] = pgnodes.m_range
-                if not pclai:
-                    node_info["pclai_coordinates"] = None
-                else:
-                    node_info["pclai_coordinates"] = pclai
-                sequence[pgnodes.nodeName] = pgnodes.nodeSequence
-                odgf_coordinates = []
-                for ogdf_node in pgnodes.GetOgdfNode().m_ogdfNodes:
-                    coordinates = {"x": pggraph.m_graphAttributes.x(ogdf_node), "y": pggraph.m_graphAttributes.y(ogdf_node)}
-                    odgf_coordinates.append(coordinates)
-                node_info["ogdf_coordinates"] = odgf_coordinates
-                node[pgnodes.nodeName] = node_info
-
-        for node_pairs in pggraph.pgedges.keys():
-            if pggraph.pgedges[node_pairs].isDrawn():
-                edge = {}
-                edge["starting_node"] = node_pairs[0].nodeName
-                edge["ending_node"] = node_pairs[1].nodeName
-                edges.append(edge) 
-
-        data["sequence"] = sequence
-        data["node"] = node
-        data["edge"] = edges
-
     return JSONResponse(content=data)
