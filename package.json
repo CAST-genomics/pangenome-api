@@ -1,0 +1,10 @@
+{
+  "type": "module",
+  "dependencies": {
+    "canvas": "^3.2.3",
+    "d3": "^7.9.0",
+    "d3-selection-multi": "^1.0.1",
+    "deep-equal": "^2.2.3",
+    "jsdom": "^29.1.1"
+  }
+}
