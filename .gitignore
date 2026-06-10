@@ -14,3 +14,9 @@ __pycache__
 
 # OSX
 *.DS_Store*
+
+# directory
+cache/
+extract_svg/
+archived/
+node_modules/
