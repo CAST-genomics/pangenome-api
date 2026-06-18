@@ -1,0 +1,17 @@
+{
+  "name": "pangenome-api",
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "api",
+  "workspaceFolder": "/app",
+  "overrideCommand": true, //just run the fastapi dev command when you want
+  "shutdownAction": "stopCompose",
+  "forwardPorts": [8000],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance"
+      ]
+    }
+  }
+}
