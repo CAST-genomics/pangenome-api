@@ -47,9 +47,11 @@ RUN git clone https://github.com/CAST-genomics/panCT.git /opt/panct/panCT \
     && cd /opt/panct/panCT && git checkout 03c406b
 
 #fix ogdf and wheel to specific versions to avoid mismatch which currently exists
-RUN pip install --no-cache-dir pathlib "fastapi[standard]" pysam numpy click typer "ogdf-python==0.3.4" "ogdf-wheel==2023.9"
+RUN pip install --no-cache-dir "fastapi[standard]" pysam numpy click typer "ogdf-python==0.3.4" "ogdf-wheel==2023.9"
 
-COPY . /app
+# this should be uncommented if the code is needed in the image, but with docker
+# compose it shouldn't be (but with docker build it is)
+# COPY . /app
 
 RUN git config --global tools.path /opt/panct \
     && git config --global data.path /data
