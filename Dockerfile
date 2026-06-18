@@ -55,12 +55,12 @@ RUN git config --global tools.path /opt/panct \
     && git config --global data.path /data
 
 EXPOSE 8000
-VOLUME ["/data"]
-
-CMD ["fastapi", "dev", "--host", "0.0.0.0", "main.py"]
 
 # instructions to run docker image:
-# build image (run from project root):
-#   docker build -t pangenome-api .
-# start container
-#   docker run -p 8000:8000 -v /data:/data -v "$(pwd)":/app pangenome-api
+# build and start image:
+#   docker compose up --build
+# if image has already been built & doesn't need to be re-built, can simply run:
+#   docker compose up
+
+# to stop the docker image:
+#   docker compose down
