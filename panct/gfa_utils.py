@@ -1,20 +1,12 @@
 """
 Utilities for dealing with GFA files for minigraph
 """
-import sys
 import logging
 import os
 from shutil import which
 import subprocess
-import tempfile
 from pathlib import Path
-
-tool_path = subprocess.check_output(
-    ["git", "config", "--get", "tools.path"], text=True
-).strip()
-
-sys.path.append(tool_path)
-from panCT.panct.data import Region
+from .regions import Region
 
 def extract_region_from_gfa(gfa_file: Path, region: Region, gfa_output: Path) -> str:
     """

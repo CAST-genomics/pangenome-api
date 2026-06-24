@@ -1,39 +1,20 @@
 import subprocess
-import sys
-
-tool_path = subprocess.check_output(
-    ["git", "config", "--get", "tools.path"], text=True
-).strip()
-data_path = subprocess.check_output(
-    ["git", "config", "--get", "data.path"], text=True
-).strip()
-
-sys.path.append(tool_path)
-
-from contextlib import asynccontextmanager
 import logging
-import signal
-import ssl
-import traceback
-import numpy as np
 import os
-from panCT.panct.data import Region
-from panCT.panct.logging import getLogger
-from fastapi import FastAPI, Query, Security, HTTPException, Depends
-from fastapi.security.api_key import APIKeyHeader
+from fastapi import FastAPI, Query
 from fastapi import BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional
-import gbz_utils as gbz
+from panct import gbz_utils as gbz
+from panct import gfa_utils as gfa
+from panct.regions import Region
+from panct.logging import getLogger
 from pathlib import Path
-import gfa_utils as gfa
 import bandage_graph
 from pydantic import BaseModel
-import tempfile
-import json
 import pysam
 import re
+
 
 logging.basicConfig(level=logging.INFO)
 api_log = logging.getLogger("app")
@@ -62,6 +43,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+data_path = subprocess.check_output(
+    ["git", "config", "--get", "data.path"], text=True
+).strip()
 
 mc_hg38_gbz_v1 = Path(f"{data_path}/hprc-v1.1-mc-grch38.gbz")
 mc_hg38_gbz_v2 = Path(f"{data_path}/hprc-v2.0-mc-grch38.gbz")
@@ -517,7 +502,7 @@ async def bandage(
     - **GFA file content**: `dict`  
       GFA format of the specific region queried.
     """
-    log = getLogger(name="complexity", level="DEBUG")
+    log = getLogger(name="pggraph-json", level="DEBUG")
     
     query_region = Region(chrom, start, end)
 

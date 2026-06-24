@@ -16,7 +16,6 @@ __pycache__
 *.DS_Store*
 
 # directory
-cache/
 extract_svg/
 archived/
 node_modules/
