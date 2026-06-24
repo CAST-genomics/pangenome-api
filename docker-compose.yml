@@ -2,6 +2,7 @@ name: pangenome
 services:
   api:
     build: .
+    platform: linux/amd64
     command: ["fastapi", "dev", "--host", "0.0.0.0", "main.py"]
     ports:
       - "8000:8000"
