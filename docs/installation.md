@@ -9,7 +9,56 @@ Additional links to get started with pangenome-api and the Pangenome Browser it 
 
 ## Install With Docker
 
-TODO: @Jared
+### Install Docker
+The required tools for this project are the Docker Engine, some method to interface with it (e.g. the Docker CLI client), and Docker Compose.
+
+The easiest, most convenient, and most platform agnostic way of ensuring all dependencies are met is through the installation of [Docker Desktop](https://docs.docker.com/desktop/), which bundles all the necessary tools together (and more), though there are other methods should one want to minimize unecessary bloat.
+
+### Repo Setup
+Ensure the reference data ([download instructions](#download-reference-data-files)) lives in a *sibling* directory titled `/data`.
+```
+/some-root
+    /data
+        *.gbz
+        *.gfa
+        ...
+    /pangenome-api
+        ...
+```
+This is to prevent the large data files being included in Docker's build cache.
+
+### First Time Run
+Simply run
+```bash
+docker compose up --build
+```
+This will build the image (`Dockerfile`), then mount the necessary volumes and start the fastapi server (`docker-compose.yml`).
+> [!NOTE]
+> The first build will take a while (~10 minutes) as some dependencies are compiled.
+> Future builds will be significantly shorter, since each build step will be cached.
+
+> [!NOTE]
+> `docker compose up` will run the command `fastapi dev --host "0.0.0.0" main.py` by default.
+> The command can be changed by editing `docker-compose.yml`.
+> Different commands can be executed in a running container with `docker compose exec api [command]`
+
+### Future Runs
+The `--build` flag can be omitted in future runs. It only needs to be included if `Dockerfile` was updated.
+
+Optionally, to run the container detached from the terminal, the `-d` flag can be included. This is not recommended
+for development, as it makes logs more difficult to access.
+
+### Stopping the Image
+Simply run
+```bash
+docker compose down
+```
+This will stop the running image and free up the space it occupied.
+
+### Dev Containers
+A dev container configuration file has been included. This can be used for convenient local development in VSCode.
+More information about using dev containers can be found in [this article from its developers](https://code.visualstudio.com/docs/devcontainers/containers),
+but it should work out of the box if the extension is installed.
 
 ## Install Without Docker
 
