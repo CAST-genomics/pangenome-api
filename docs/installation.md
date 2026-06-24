@@ -99,7 +99,7 @@ To enable calling the gfabase and gbz-base without specializing their path, you 
 #TODO
 ```
 
-### Download reference data files
+### Download Reference Data Files
 
 TODO: would be best if we can store all the large data files in a s3 folder
 
