@@ -49,6 +49,24 @@ RUN git clone https://github.com/CAST-genomics/panCT.git /opt/panct/panCT \
 #fix ogdf and wheel to specific versions to avoid mismatch which currently exists
 RUN pip install --no-cache-dir "fastapi[standard]" pysam numpy click typer "ogdf-python==0.3.4" "ogdf-wheel==2023.9"
 
+#install vg from precompiled static binary (instead of conda)
+RUN curl -L https://github.com/vgteam/vg/releases/download/v1.75.0/vg \
+    -o /usr/local/bin/vg && \
+    chmod +x /usr/local/bin/vg
+
+#install node.js from tarball (version 24.9.0)
+RUN curl -L https://nodejs.org/dist/v24.9.0/node-v24.9.0-linux-x64.tar.gz \
+    -o /tmp/node.tar.gz && \
+    tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 && \
+    rm /tmp/node.tar.gz
+
+#move node modules to root since . is mounted into /app
+COPY package.json package-lock.json /tmp/npm/
+RUN --mount=type=cache,target=/root/.npm \
+    cd /tmp/npm && npm ci && \
+    mv /tmp/npm/node_modules / && \
+    rm -rf /tmp/npm
+
 # this should be uncommented if the code is needed in the image, but with docker
 # compose it shouldn't be (but with docker build it is)
 # COPY . /app
@@ -57,12 +75,3 @@ RUN git config --global tools.path /opt/panct \
     && git config --global data.path /data
 
 EXPOSE 8000
-
-# instructions to run docker image:
-# build and start image:
-#   docker compose up --build
-# if image has already been built & doesn't need to be re-built, can simply run:
-#   docker compose up
-
-# to stop the docker image:
-#   docker compose down
