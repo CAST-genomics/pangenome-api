@@ -23,3 +23,6 @@ cache/
 extract_svg/
 archived/
 node_modules/
+
+# environment variables
+.env
