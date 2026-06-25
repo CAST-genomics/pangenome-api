@@ -15,7 +15,7 @@ The required tools for this project are the Docker Engine, some method to interf
 The easiest, most convenient, and most platform agnostic way of ensuring all dependencies are met is through the installation of [Docker Desktop](https://docs.docker.com/desktop/), which bundles all the necessary tools together (and more), though there are other methods should one want to minimize unecessary bloat.
 
 ### Repo Setup
-Ensure the reference data ([download instructions](#download-reference-data-files)) lives in a *sibling* directory titled `/data`.
+By default the reference data ([download instructions](#download-reference-data-files)) should live in a *sibling* directory titled `/data`.
 ```
 /some-root
     /data
@@ -26,6 +26,12 @@ Ensure the reference data ([download instructions](#download-reference-data-file
         ...
 ```
 This is to prevent the large data files being included in Docker's build cache.
+
+If you wish to specify a different directory, add the following to a file named `.env`:
+```
+DATA_DIR=path/to/data
+```
+Where `path/to/data` is replaced with the actual path to your data directory.
 
 ### First Time Run
 Simply run
