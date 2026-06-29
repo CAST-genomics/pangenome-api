@@ -15,6 +15,32 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cp target/release/gbz2db /usr/local/bin/gbz2db && \
     cp target/release/query /usr/local/bin/query
 
+# compile adaptagrams & generate swig bindings
+# note: needs to be the same python version as runtime
+FROM python:3.11-slim-bookworm AS adaptagrams-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    build-essential \
+    swig \
+    autoconf \
+    automake \
+    libtool \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir setuptools
+
+RUN git clone https://github.com/mjwybrow/adaptagrams.git /build/adaptagrams \
+    && cd /build/adaptagrams && git checkout 840ebcff
+
+WORKDIR /build/adaptagrams/cola
+RUN mkdir -p m4 \
+    && autoreconf --install --verbose \
+    && ./configure \
+    && make -j"$(nproc)" \
+    && make -f Makefile-swig-python
+    
 #actual runtime
 FROM python:3.11-slim-bookworm
 
@@ -67,6 +93,10 @@ RUN --mount=type=cache,target=/root/.npm \
     mv /tmp/npm/node_modules / && \
     rm -rf /tmp/npm
 
+# binary + bindings, and add adaptagrams to pythonpath so import finds it
+COPY --from=adaptagrams-builder /build/adaptagrams/cola/adaptagrams.py /opt/adaptagrams/
+COPY --from=adaptagrams-builder /build/adaptagrams/cola/_adaptagrams*.so /opt/adaptagrams/
+ENV PYTHONPATH=/opt/adaptagrams
 # this should be uncommented if the code is needed in the image, but with docker
 # compose it shouldn't be (but with docker build it is)
 # COPY . /app
