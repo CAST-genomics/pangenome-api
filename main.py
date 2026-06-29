@@ -34,6 +34,7 @@ import tempfile
 import json
 import pysam
 import re
+import adaptagrams_converter
 
 logging.basicConfig(level=logging.INFO)
 api_log = logging.getLogger("app")
@@ -578,7 +579,6 @@ async def bandage(
     pggraph = bandage_graph.PGGraph(str(postprocess_gfa_output), settings)
     pggraph.BuildOGDFGraph()
     if linear:
-        import adaptagrams_converter
         ag = adaptagrams_converter.AdaptagramsGraph(pggraph)
         ag.seed_linear_layout(assembly)
         ag.build_fd_layout()  # TEMP: skip .run() — return seeded positions only
