@@ -123,7 +123,7 @@ class AdaptagramsGraph:
 
             self._add_edge(first_idx, second_idx, edge_len)
 
-    def _resolve(self, node):
+    def resolve(self, node):
         """Get whichever node is in layout (node or its reverse compliment)"""
         if self._node_in_layout(node):
             return node
@@ -141,8 +141,8 @@ class AdaptagramsGraph:
             edge.DetermineIfDrawn()
             if not edge.isDrawn():
                 continue
-            u = self._resolve(edge.startingNode)
-            v = self._resolve(edge.endingNode)
+            u = self.resolve(edge.startingNode)
+            v = self.resolve(edge.endingNode)
             if u in nodes and v in nodes and u is not v:
                 child[u] = v
                 has_parent.add(v)
