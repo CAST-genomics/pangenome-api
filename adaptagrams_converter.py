@@ -62,13 +62,13 @@ class AdaptagramsGraph:
         """
         Adds every drawn node to the graph, including bandage subnodes
         """
+        seg_len = self.pggraph.m_settings["NODESEGLEN"]
         for node in self.pggraph.pgnodes.values():
             if not node.isDrawn() or self._this_or_rc_in_layout(node):
                 continue
 
             drawn_len = node.GetDrawnNodeLength()
             num_edges = node.GetNumOgdfGraphEdges(drawn_len)
-            len_per_edge = drawn_len / num_edges
 
             #add rect for each subnode
             chain = []
@@ -77,7 +77,7 @@ class AdaptagramsGraph:
                 idx = self._new_rect()
                 chain.append(idx)
                 if i > 0:
-                    self._add_edge(prev_idx, idx, len_per_edge)
+                    self._add_edge(prev_idx, idx, seg_len)
                 prev_idx = idx
 
             self.node_to_rects[node] = chain
@@ -163,19 +163,18 @@ class AdaptagramsGraph:
         if y is None:
             y = self.rect_size / 2.0
         if branch_gap is None:
-            branch_gap = self.rect_size
+            branch_gap = self.pggraph.m_settings["EDGELEN"]
 
+        seg_len = self.pggraph.m_settings["NODESEGLEN"]
         fixed = set()
         x = 0.0
         for node in self._assembly_topo_order(assembly):
             chain = self.node_to_rects[node]
-            drawn_len = node.GetDrawnNodeLength()
-            step = drawn_len / (len(chain) - 1) if len(chain) > 1 else 0.0
             for i, idx in enumerate(chain):
-                self.rs[idx].moveCentreX(x + i * step)
+                self.rs[idx].moveCentreX(x + i * seg_len)
                 self.rs[idx].moveCentreY(y)
                 fixed.add(idx)
-            x += drawn_len
+            x += (len(chain) - 1) * seg_len
 
         self._seed_branches(fixed, y, branch_gap, iters)
 
