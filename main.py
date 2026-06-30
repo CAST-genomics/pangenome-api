@@ -634,4 +634,7 @@ async def bandage(
     data["assembly"] = assembly_range
     data["edge"] = edges
     
+    #free up refs
+    ag.close()
+
     return JSONResponse(content=data)
