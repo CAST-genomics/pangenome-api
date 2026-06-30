@@ -133,25 +133,29 @@ class AdaptagramsGraph:
         return None
 
     def _assembly_topo_order(self, assembly):
-        """Linear walk down selected assembly, starting from head (node with indegree 0)"""
+        """Topological sort of selected assembly using Kahn's"""
         nodes = {n for n in self.node_to_rects if assembly in n.m_assembly}
-        child = {}
-        has_parent = set()
+        children = {n: set() for n in nodes}
+        indeg = {n: 0 for n in nodes}
         for edge in self.pggraph.pgedges.values():
             edge.DetermineIfDrawn()
             if not edge.isDrawn():
                 continue
             u = self.resolve(edge.startingNode)
             v = self.resolve(edge.endingNode)
-            if u in nodes and v in nodes and u is not v:
-                child[u] = v
-                has_parent.add(v)
+            if u in nodes and v in nodes and u is not v and v not in children[u]:
+                children[u].add(v)
+                indeg[v] += 1
 
-        head = next((n for n in nodes if n not in has_parent), None)
+        frontier = [n for n in nodes if indeg[n] == 0]
         order = []
-        while head is not None:
-            order.append(head)
-            head = child.get(head)
+        while frontier:
+            u = frontier.pop()
+            order.append(u)
+            for v in children[u]:
+                indeg[v] -= 1
+                if indeg[v] == 0:
+                    frontier.append(v)
         return order
 
     def seed_linear_layout(self, assembly, y=None, branch_gap=None, iters=20):
