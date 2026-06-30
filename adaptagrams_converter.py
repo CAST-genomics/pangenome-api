@@ -25,6 +25,7 @@ class AdaptagramsGraph:
         self.edge_lengths = []
 
         self.node_to_rects = {}
+        self._fixed = set()
 
         #need to store rect pointers so they don't get garbage collected mid-layout
         self._rect_objs = []
@@ -166,17 +167,17 @@ class AdaptagramsGraph:
             branch_gap = self.pggraph.m_settings["EDGELEN"]
 
         seg_len = self.pggraph.m_settings["NODESEGLEN"]
-        fixed = set()
+        self._fixed = set()
         x = 0.0
         for node in self._assembly_topo_order(assembly):
             chain = self.node_to_rects[node]
             for i, idx in enumerate(chain):
                 self.rs[idx].moveCentreX(x + i * seg_len)
                 self.rs[idx].moveCentreY(y)
-                fixed.add(idx)
+                self._fixed.add(idx)
             x += (len(chain) - 1) * seg_len
 
-        self._seed_branches(fixed, y, branch_gap, iters)
+        self._seed_branches(self._fixed, y, branch_gap, iters)
 
     def _rect_adjacency(self):
         """Adjacency matrix over all rects in graph"""
@@ -226,8 +227,19 @@ class AdaptagramsGraph:
                 for idx in self.node_to_rects[node]]
 
     def build_fd_layout(self, ideal_length=1.0):
+        """Builds and runs fd layout"""
+        #lock each assembly rect at its seeded (linear) position
+        self._locks = adap.ColaLocks()
+        for idx in self._fixed:
+            r = self.rs[idx]
+            self._locks.push_back(adap.Lock(idx, r.getCentreX(), r.getCentreY()))
+        self._pre = adap.PreIteration(self._locks)
+
         self._fd = adap.ConstrainedFDLayout(self.rs, self.es, ideal_length,
-                                            adap.Doubles(self.edge_lengths))
+                                            adap.Doubles(self.edge_lengths),
+                                            None, self._pre)
+        self._fd.setAvoidNodeOverlaps(True)
+        self._fd.run()
         return self._fd
 
     def close(self):
@@ -235,6 +247,8 @@ class AdaptagramsGraph:
         Drop all our C++ refs so they can be garbage collected
         """
         self._fd = None
+        self._pre = None
+        self._locks = None
         self.rs = None
         self.es = None
         self.node_to_rects.clear()
