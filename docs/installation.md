@@ -76,7 +76,13 @@ git clone https://github.com/CAST-genomics/pangenome-api
 
 ### Install Dependencies
 
+We recommand installing inside a conda environment:
+
 ```bash
+# create a conda environment for pangenome-api
+conda create -n pangenome-api python=3.11
+conda activate pangenome-api
+
 # install Python packages
 pip install -r requirements.txt
 pip install 'ogdf-python[quickstart]'
@@ -101,6 +107,7 @@ gbz-base and gfabase are subgraphing tools built in Rust. Please follow the link
     - TODO: test the updated versions for mac and linux
 
 To enable calling the gfabase and gbz-base without specializing their path, you can add the executable path to your system with the following command
+
 ```txt
 #TODO
 ```
@@ -108,6 +115,22 @@ To enable calling the gfabase and gbz-base without specializing their path, you 
 ### Download Reference Data Files
 
 TODO: would be best if we can store all the large data files in a s3 folder
+
+#### List of Datafiles:
+- 3.1G, minigraph version1 reference, `hprc-v1.0-minigraph-grch38.gfa`
+- 782M,  minigraph version1 reference (binary), `hprc-v1.0-minigraph-grch38.gfab`
+- 3.3G, minigraph version2 reference, `hprc-v2.0-minigraph-grch38.gfa`
+- 839M, minigraph version2 reference (binary), `hprc-v2.0-minigraph-grch38.gfab`
+- 9.9M, minigraph version1 walks file, `hprc_v1.0_minigraph_filtered_with_id.walk.gz`
+- 415, minigraph version1 walks file (tabix), `hprc_v1.0_minigraph_filtered_with_id.walk.gz.tbi`
+- 3.5G, minigraph version2 walks file,  `v1_1_hprc_v2.0_minigraph.sorted.pclai.walk.gz`
+- 688, minigraph version2 walks file (tabix),  `v1_1_hprc_v2.0_minigraph.sorted.pclai.walk.gz.tbi`
+- 5.6G, minigraph cactus version 1 reference (gbz-based processed .db file), `hprc-v1.1-mc-grch38.gbz.db`
+- 8.7G,  minigraph cactus version 2 reference (gbz-based processed .db file), `hprc-v2.0-mc-grch38.gbz.db`
+- 3.3G, minigraph cactus version1 walks file, `hprc-v1.1-mc-grch38-mapped-flattened.walk.gz`
+- 76K, minigraph cactus version1 walks file (tabix), `hprc-v1.1-mc-grch38-mapped-flattened.walk.gz.tbi`
+- (projected) 60G, minigraph cactus version2 walks file, `hprc-v2.0-mc-grch38.walk.gz`
+- (projected) 5M, minigraph cactus version2 walks file (tabix), `hprc-v2.0-mc-grch38.walk.gz.tbi`
 
 Add the path to the data files to git config
 ```
