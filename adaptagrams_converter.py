@@ -47,9 +47,8 @@ class AdaptagramsGraph:
         rc = node.getReverseComplement()
         return self._node_in_layout(node) or (rc is not None and self._node_in_layout(rc))
 
-    def _new_rect(self):
-        #a rect_size x rect_size rect (spanning from 0 to rect_size)
-        r = adap.Rectangle(0.0, self.rect_size, 0.0, self.rect_size)
+    def _new_rect(self, width):
+        r = adap.Rectangle(0.0, width, 0.0, self.rect_size)
         idx = len(self._rect_objs)
         self._rect_objs.append(r)
         self.rs.push_back(r)
@@ -75,7 +74,7 @@ class AdaptagramsGraph:
             chain = []
             prev_idx = None
             for i in range(num_edges + 1):
-                idx = self._new_rect()
+                idx = self._new_rect(seg_len)
                 chain.append(idx)
                 if i > 0:
                     self._add_edge(prev_idx, idx, seg_len)
