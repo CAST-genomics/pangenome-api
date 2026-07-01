@@ -218,6 +218,17 @@ class AdaptagramsGraph:
         return [(self.rs[idx].getCentreX(), self.rs[idx].getCentreY())
                 for idx in self.node_to_rects[node]]
 
+    def _forward_x_constraints(self):
+        """Makes non asm edges point forward"""
+        cs = adap.CompoundConstraintPtrs()
+        for k in range(len(self.edge_lengths)):
+            e = self.es[k]
+            i, j = (e.first, e.second) if hasattr(e, "first") else (e[0], e[1])
+            if i in self._fixed or j in self._fixed:
+                continue
+            cs.push_back(adap.SeparationConstraint(adap.XDIM, i, j, 0.0))
+        return cs
+
     def build_fd_layout(self, ideal_length=1.0):
         """Builds and runs fd layout"""
         #lock each assembly rect at its seeded (linear) position
@@ -230,6 +241,8 @@ class AdaptagramsGraph:
         self._fd = adap.ConstrainedFDLayout(self.rs, self.es, ideal_length,
                                             adap.Doubles(self.edge_lengths),
                                             None, self._pre)
+        self._constraints = self._forward_x_constraints()
+        self._fd.setConstraints(self._constraints)
         self._fd.setAvoidNodeOverlaps(True)
         return self._fd
 
@@ -240,6 +253,7 @@ class AdaptagramsGraph:
         self._fd = None
         self._pre = None
         self._locks = None
+        self._constraints = None
         self.rs = None
         self.es = None
         self.node_to_rects.clear()
