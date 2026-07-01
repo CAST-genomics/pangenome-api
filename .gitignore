@@ -9,6 +9,9 @@
 *.cnf*
 *.JSON*
 
+#walk files
+*.walk.gz
+
 # python cache
 __pycache__
 
@@ -20,3 +23,6 @@ cache/
 extract_svg/
 archived/
 node_modules/
+
+# environment variables
+.env
