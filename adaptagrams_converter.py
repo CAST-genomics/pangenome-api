@@ -63,13 +63,13 @@ class AdaptagramsGraph:
         """
         Adds every drawn node to the graph, including bandage subnodes
         """
-        seg_len = self.pggraph.m_settings["NODESEGLEN"]
         for node in self.pggraph.pgnodes.values():
             if not node.isDrawn() or self._this_or_rc_in_layout(node):
                 continue
 
             drawn_len = node.GetDrawnNodeLength()
             num_edges = node.GetNumOgdfGraphEdges(drawn_len)
+            seg_len = drawn_len / num_edges
 
             #add rect for each subnode
             chain = []
@@ -159,25 +159,27 @@ class AdaptagramsGraph:
                     frontier.append(v)
         return order
 
-    def seed_linear_layout(self, assembly, y=None, branch_gap=None, iters=20):
+    def seed_linear_layout(self, assembly, y=None, branch_gap=None):
         """Seed initial rect positions for fd, including assembly & non-assembly branches"""
         if y is None:
             y = self.rect_size / 2.0
         if branch_gap is None:
             branch_gap = self.pggraph.m_settings["EDGELEN"]
 
-        seg_len = self.pggraph.m_settings["NODESEGLEN"]
         self._fixed = set()
         x = 0.0
         for node in self._assembly_topo_order(assembly):
             chain = self.node_to_rects[node]
+            drawn_len = node.GetDrawnNodeLength()
+            #same per-edge length as _add_nodes so node spans its true drawn length
+            seg_len = drawn_len / node.GetNumOgdfGraphEdges(drawn_len)
             for i, idx in enumerate(chain):
                 self.rs[idx].moveCentreX(x + i * seg_len)
                 self.rs[idx].moveCentreY(y)
                 self._fixed.add(idx)
             x += (len(chain) - 1) * seg_len
 
-        self._seed_branches(self._fixed, y, branch_gap, iters)
+        self._seed_branches(self._fixed, y, branch_gap)
 
     def _rect_adjacency(self):
         """Adjacency matrix over all rects in graph"""
@@ -189,37 +191,28 @@ class AdaptagramsGraph:
             adj[b].append(a)
         return adj
 
-    def _seed_branches(self, fixed, base_y, gap, iters):
-        """Best attempt at semi-optimal seeding for fd. Each rect position becomes mean
-        of its neighbors over `iters` iterations. Kind of like KNN clustering algorithm"""
+    def _seed_branches(self, fixed, base_y, gap):
         adj = self._rect_adjacency()
-        x = {i: self.rs[i].getCentreX() for i in range(len(self._rect_objs))}
+        seen = set(fixed)
+        x = {i: self.rs[i].getCentreX() for i in fixed}
 
-        #bfs from backbone and set x to backbone x - save depth
-        depth = {i: 0 for i in fixed}
-        frontier = list(fixed)
-        while frontier:
-            nxt = []
-            for u in frontier:
-                for v in adj[u]:
-                    if v not in depth:
-                        depth[v] = depth[u] + 1
-                        x[v] = x[u]
-                        nxt.append(v)
-            frontier = nxt
+        def walk(cur, prev, level):
+            y = base_y + level * gap
+            while cur is not None and cur not in seen:
+                seen.add(cur)
+                x[cur] = x[prev] + gap
+                self.rs[cur].moveCentreX(x[cur])
+                self.rs[cur].moveCentreY(y)
+                nbrs = [w for w in adj[cur] if w not in seen]
+                prev, cur = cur, (nbrs[0] if nbrs else None)
+                #rest are subbubbles
+                for w in nbrs[1:]:
+                    walk(w, prev, level + 1)
 
-        #pull free rects to mean x of neighbors
-        free = [i for i in depth if i not in fixed]
-        for _ in range(iters):
-            for i in free:
-                nb = adj[i]
-                if nb:
-                    x[i] = sum(x[j] for j in nb) / len(nb)
-
-        #update positions
-        for i in free:
-            self.rs[i].moveCentreX(x[i])
-            self.rs[i].moveCentreY(base_y + depth[i] * gap)
+        #first layer neighbors are starts of bubbles
+        for f in list(fixed):
+            for w in adj[f]:
+                walk(w, f, 1)
 
     def get_segment_coordinates(self, node):
         """Gets rect centers for every rect in node"""
@@ -239,7 +232,6 @@ class AdaptagramsGraph:
                                             adap.Doubles(self.edge_lengths),
                                             None, self._pre)
         self._fd.setAvoidNodeOverlaps(True)
-        self._fd.run()
         return self._fd
 
     def close(self):

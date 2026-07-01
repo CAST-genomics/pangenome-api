@@ -581,7 +581,7 @@ async def bandage(
     if linear:
         ag = adaptagrams_converter.AdaptagramsGraph(pggraph)
         ag.seed_linear_layout(assembly)
-        ag.build_fd_layout()
+        ag.build_fd_layout().run()
     else:
         pggraph.LayoutGraph()
     assembly_range = adjustAssemblyRangeList(pggraph.pgassemblies) # {assembly_id1: {"sequence_id": seq_id, "region": 1000-2000}, assembly_id2: ...}
