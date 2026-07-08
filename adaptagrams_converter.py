@@ -23,6 +23,7 @@ class AdaptagramsGraph:
         self.rs = adap.RectanglePtrs()
         self.es = adap.ColaEdges()
         self.edge_lengths = []
+        self._internal_edges = set()
 
         self.node_to_rects = {}
         self._fixed = set()
@@ -54,7 +55,9 @@ class AdaptagramsGraph:
         self.rs.push_back(r)
         return idx
 
-    def _add_edge(self, i, j, ideal_length):
+    def _add_edge(self, i, j, ideal_length, internal=False):
+        if internal:
+            self._internal_edges.add(len(self.edge_lengths))
         self.es.push_back(adap.ColaEdge(i, j))
         self.edge_lengths.append(float(ideal_length))
 
@@ -77,7 +80,7 @@ class AdaptagramsGraph:
                 idx = self._new_rect(seg_len)
                 chain.append(idx)
                 if i > 0:
-                    self._add_edge(prev_idx, idx, seg_len)
+                    self._add_edge(prev_idx, idx, seg_len, internal=True)
                 prev_idx = idx
 
             self.node_to_rects[node] = chain
@@ -222,6 +225,8 @@ class AdaptagramsGraph:
         """Makes non asm edges point forward"""
         cs = adap.CompoundConstraintPtrs()
         for k in range(len(self.edge_lengths)):
+            if k in self._internal_edges:
+                continue
             e = self.es[k]
             i, j = (e.first, e.second) if hasattr(e, "first") else (e[0], e[1])
             if i in self._fixed or j in self._fixed:
