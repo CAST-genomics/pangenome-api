@@ -226,22 +226,18 @@ class AdaptagramsGraph:
             i, j = (e.first, e.second) if hasattr(e, "first") else (e[0], e[1])
             if i in self._fixed or j in self._fixed:
                 continue
-            cs.push_back(adap.SeparationConstraint(adap.XDIM, i, j, 0.0))
+            cs.push_back(adap.SeparationConstraint(adap.XDIM, i, j, 0.5))
         return cs
 
     def build_fd_layout(self, ideal_length=1.0):
         """Builds and runs fd layout"""
-        #lock each assembly rect at its seeded (linear) position
-        self._locks = adap.ColaLocks()
-        for idx in self._fixed:
-            r = self.rs[idx]
-            self._locks.push_back(adap.Lock(idx, r.getCentreX(), r.getCentreY()))
-        self._pre = adap.PreIteration(self._locks)
+        self._constraints = self._forward_x_constraints()
+        self._fixed_rel = adap.FixedRelativeConstraint(
+            self.rs, adap.Unsigneds(list(self._fixed)), True)
+        self._constraints.push_back(self._fixed_rel)
 
         self._fd = adap.ConstrainedFDLayout(self.rs, self.es, ideal_length,
-                                            adap.Doubles(self.edge_lengths),
-                                            None, self._pre)
-        self._constraints = self._forward_x_constraints()
+                                            adap.Doubles(self.edge_lengths))
         self._fd.setConstraints(self._constraints)
         self._fd.setAvoidNodeOverlaps(True)
         return self._fd
@@ -251,8 +247,7 @@ class AdaptagramsGraph:
         Drop all our C++ refs so they can be garbage collected
         """
         self._fd = None
-        self._pre = None
-        self._locks = None
+        self._fixed_rel = None
         self._constraints = None
         self.rs = None
         self.es = None
