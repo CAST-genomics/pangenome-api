@@ -499,7 +499,7 @@ async def bandage(
     edgelen: float = Query(5, description="Length of edges between nodes"),
     nodelenpermb: float = Query(1000, description="Formula:\n`drawnNodeLength = nodelenpermb * node_length_in_bp / 1,000,000`"),
     linear: bool = Query(False, description="If true, linearize the selected assembly via AdaptagramsGraph instead of the default OGDF layout"),
-    assembly: str = Query("GRCh38", description="Assembly to linearize when `linear` is true (must match a node assembly token, e.g. `GRCh38`)")
+    assembly: str = Query("GRCh38", description="Assembly and haplotype to linearize when `linear` is true (in `assembly#haplotype` format - e.g. `GRCh38#0`)")
 ):
     """
     ## Parameters
@@ -515,7 +515,7 @@ async def bandage(
     - `edgelen`: float — Edge length between nodes
     - `nodelenpermb`: float — Drawn node length scaling factor
     - `linear`: bool — Whether output should be linearized wrt an assembly
-    - `assembly`: str — Assembly to linearize against
+    - `assembly`: str — Assembly to linearize against, provided in `sample_name#haplotype` format.
 
     ## Returns
 
@@ -579,8 +579,12 @@ async def bandage(
     pggraph = bandage_graph.PGGraph(str(postprocess_gfa_output), settings)
     pggraph.BuildOGDFGraph()
     if linear:
+        #more input validation may be required but tbd
+        parts = assembly.split('#')
+        sample = parts[0]
+        haplotype = parts[1] if len(parts) > 1 else None
         ag = adaptagrams_converter.AdaptagramsGraph(pggraph)
-        ag.seed_linear_layout(assembly)
+        ag.seed_linear_layout(assembly=sample, haplotype=haplotype)
         ag.build_fd_layout().run()
     else:
         pggraph.LayoutGraph()
@@ -635,6 +639,7 @@ async def bandage(
     data["edge"] = edges
     
     #free up refs
-    ag.close()
+    if linear:
+        ag.close()
 
     return JSONResponse(content=data)

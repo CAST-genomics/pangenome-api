@@ -95,14 +95,22 @@ class AdaptagramsGraph:
             return rc
         return None
 
+    def _matches(self, node):
+        """True if node has an entry for the selected assembly + haplotype"""
+        for entry in node.m_nd_assembly + node.m_dup_assembly:
+            if entry["assembly_name"] == self._assembly and \
+                    (self._haplotype is None or entry["haplotype"] == self._haplotype):
+                return True
+        return False
+
     def _is_asm(self, node):
-        """True if node (or its rc) belongs to the selected assembly"""
+        """True if node (or its rc) belongs to the selected assembly+haplotype"""
         r = self.resolve(node)
-        return r is not None and self._assembly in r.m_assembly
+        return r is not None and self._matches(r)
 
     def _is_asm_name(self, name):
         node = self.pggraph.pgnodes.get(name)
-        return node is not None and self._assembly in node.m_assembly
+        return node is not None and self._matches(node)
 
     def _node_width(self, name):
         return self.pggraph.pgnodes[name].GetDrawnNodeLength()
@@ -188,11 +196,13 @@ class AdaptagramsGraph:
 
             arc_idx += 1
 
-    def seed_linear_layout(self, assembly, y=None, branch_gap=None):
+    def seed_linear_layout(self, assembly, haplotype=None):
         """
-        Initial placement of spine and bubbles
+        Initial placement of spine and bubbles.
+        haplotype filters to one haplotype of assembly; `None` = all.
         """
         self._assembly = assembly
+        self._haplotype = haplotype
         self._spine_y = 0.0
 
         out_adj, in_adj = build_adjacency(self.pggraph)
