@@ -499,7 +499,7 @@ async def bandage(
     edgelen: float = Query(5, description="Length of edges between nodes"),
     nodelenpermb: float = Query(1000, description="Formula:\n`drawnNodeLength = nodelenpermb * node_length_in_bp / 1,000,000`"),
     linear: bool = Query(False, description="If true, linearize the selected assembly via AdaptagramsGraph instead of the default OGDF layout"),
-    assembly: str = Query("GRCh38", description="Assembly and haplotype to linearize when `linear` is true (in `assembly#haplotype` format - e.g. `GRCh38#0`)")
+    assembly: str = Query("GRCh38#0", description="Assembly and haplotype to linearize when `linear` is true (in `assembly#haplotype` format - e.g. `GRCh38#0`)")
 ):
     """
     ## Parameters
