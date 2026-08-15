@@ -35,6 +35,14 @@ import json
 import pysam
 import re
 
+ssl_context = None
+cert_path = os.getenv("SSL_CERT_PATH")
+key_path = os.getenv("SSL_KEY_PATH")
+
+if cert_path and key_path:
+    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ssl_context.load_cert_chain(cert_path, keyfile=key_path)
+
 logging.basicConfig(level=logging.INFO)
 api_log = logging.getLogger("app")
 
@@ -51,10 +59,7 @@ class Settings(BaseModel):
     EDGELEN: float
     NODELENPERMB: float
     NAMELABEL: bool
-
-ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-ssl_context.load_cert_chain('/home/xbu/pgapi_cert/pangenome-api_ucsd_edu.pem', keyfile='/home/xbu/pgapi_cert/pangenome-api_ucsd_edu.key')
-
+    
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Adjust this to restrict access in production
@@ -343,7 +348,7 @@ def ConvertVgToJson(vg_file, json_file):
     return proc.returncode == 0
 
 
-def GenerateSeqTubeMapSvg(json_file, svg_file, start, end, nodewidthoption):
+def GenerateSeqTubeMapSvg(json_file, svg_file, start, end, nodewidthoption, pclai_color_scheme = None):
     """
     generate sequence tube map svg using the generate-svg javascript in ./seqtubemap
 
@@ -362,6 +367,8 @@ def GenerateSeqTubeMapSvg(json_file, svg_file, start, end, nodewidthoption):
         True if we were able to create the .svg file
     """
     cmd = ["node", str(generate_svg_js_script), str(json_file), str(svg_file), str(start), str(end), nodewidthoption]
+    if pclai_color_scheme is not None:
+        cmd.append(json.dumps(pclai_color_scheme))
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     print("stdout:", proc.stdout.decode())
@@ -517,6 +524,26 @@ def determineIfDupCoordShouldBeTaken(assembly_range, dup_assembly):
                 print(f"[DEBUG]:{assembly_id} has more than one duplicated coordinates in the right contig({dup_assembly[j]['metadata'][i]['sequence_id']}) and right range!")
 
     return
+
+# TODO provide option for asm coord based pclai
+def GetPclaiColorScheme(minigraph_node, minigraph_walk, log):
+    pclai_color_scheme = {}
+    for line in minigraph_walk.fetch(".", minigraph_node-1, minigraph_node):
+        _, node_id, _, asm_list, _ = line.strip().split("\t")
+        print(f"in GetPclaiColorScheme, current node id is {node_id}")
+        for asm in asm_list.split(","):
+            _, x_coord, y_coord, r, g, b, score = asm.split("|")[2].split(":")
+            asm_contig_name = asm.split("|")[0]
+            if x_coord == ".":
+                # TODO: ask Doug about the grey color he used for pclai
+                pclai_color_scheme[asm_contig_name] = [(211.0, 211.0, 211.0), (None, None), None]
+            else:
+                pclai_color_scheme[asm_contig_name] = [(float(r), float(g), float(b)), (float(x_coord), float(y_coord)), score]
+        
+    if pclai_color_scheme == {}:
+        # print error message node not found
+        pclai_color_scheme = None
+    return pclai_color_scheme
         
 @app.get("/seqtubemap")
 async def seqtubemap(
@@ -526,7 +553,8 @@ async def seqtubemap(
     end: int = Query(25252095, description="End coordinate"),
     version: str = Query("v2", description='pangenome release version: `"v1"` or `"v2"`'),
     pathnumoption: str = Query("compressed", description='options for the number of path: `"compressed"`(compress same path as one single path) or `"normal"` (show each path seperately)'),
-    nodewidthoption: str = Query("compressed", description='Options for the width of sequence nodes:`"compressed"`(scale node width with log2 of number of bp) or `"normal"`(scale node width linearly with number of bp)')
+    nodewidthoption: str = Query("compressed", description='Options for the width of sequence nodes:`"compressed"`(scale node width with log2 of number of bp) or `"normal"`(scale node width linearly with number of bp)'),
+    minigraphnode: int = Query(None, description="If the queried region is based on a minigraph node, record the node ID to enable Point Cloud Local Ancestry Inference coloring")
 ):
     
     log = getLogger(name="complexity", level="DEBUG")
@@ -553,7 +581,15 @@ async def seqtubemap(
     SeqTubeGfaProcessor(preprocess_gfa_subgraph_w_walk, postprocess_gfa_subgraph, pathnumoption)
     ConvertGfaToVg(postprocess_gfa_subgraph, vg_subgraph)
     ConvertVgToJson(vg_subgraph, json_subgraph)
-    GenerateSeqTubeMapSvg(json_subgraph, seqtubemap_svg, start, end, nodewidthoption)
+    
+    pclai_color_scheme = None
+    if minigraphnode is not None:
+        if version == "v1":
+            # TODO
+            pclai_color_scheme = None
+        elif version == "v2":
+            pclai_color_scheme = GetPclaiColorScheme(minigraphnode, minigraph_walks_v2_updated, log)
+    GenerateSeqTubeMapSvg(json_subgraph, seqtubemap_svg, start, end, nodewidthoption, pclai_color_scheme)
     
     background_tasks.add_task(delete_files, [postprocess_gfa_subgraph, vg_subgraph, json_subgraph, seqtubemap_svg])
     return FileResponse(seqtubemap_svg, media_type="image/svg+xml")

@@ -8,6 +8,7 @@
 *.pem*
 *.cnf*
 *.JSON*
+*.env*
 
 # python cache
 __pycache__

@@ -198,6 +198,7 @@ export function create(params) {
   config.clickableNodesFlag = params.clickableNodes || false;
   config.hideLegendFlag = params.hideLegend || false;
   config.nodeWidthOption = params.nodeWidthOption;
+  config.pclaiColorScheme = params.pclaiColorScheme || null;
   const tr = createTubeMap();
   if (!config.hideLegendFlag) drawLegend(tr);
 }
@@ -2410,6 +2411,20 @@ function generateTrackColor(track, highlight) {
     config.colorSchemes[sourceID] = defaultTrackColors(track.type);
   }
 
+  // When a PCLAI color scheme is loaded, every haplotype/path track must be
+  // colored by it — either its actual PCLAI rgb, or a neutral light grey if
+  // this specific track has no entry in the scheme. The default palette
+  // logic below is only reached when PCLAI is off entirely (config.pclaiColorScheme
+  // is null), preserving the original behavior in that case.
+  if (config.pclaiColorScheme && track.type !== "read") {
+    const pclaiEntry = getPclaiEntry(track.name);
+    if (pclaiEntry) {
+      const [r, g, b] = pclaiEntry[0];
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+    return "rgb(211, 211, 211)"; // light grey fallback — no PCLAI entry for this track
+  }
+
   if (track.hasOwnProperty("type") && track.type === "read") {
     if (config.colorSchemes[sourceID].colorReadsByMappingQuality) {
       trackColor = d3.interpolateRdYlGn(
@@ -2458,6 +2473,32 @@ function generateTrackAlpha(track, highlight) {
     }
   }
   return trackAlpha;
+}
+
+// Look up the PCLAI entry for a track by its (already-truncated) name, which
+// should match "sample#haplotype#contig" keys in config.pclaiColorScheme.
+// Returns null if there's no scheme loaded, or no entry for this track.
+function getPclaiEntry(trackName) {
+  if (!config.pclaiColorScheme || !trackName) return null;
+  return config.pclaiColorScheme[trackName] || null;
+}
+
+// Returns [x, y] for a track. Every track gets a consistent pair: real
+// numbers if PCLAI has coordinates for this assembly, or [null, null]
+// if there's no entry, or the entry has no coordinate (x_coord was ".").
+function getPclaiXY(trackName) {
+  const entry = getPclaiEntry(trackName);
+  if (!entry || !entry[1]) return [null, null];
+  const [x, y] = entry[1];
+  return [x === undefined ? null : x, y === undefined ? null : y];
+}
+
+// Returns the PCLAI confidence score for a track, or null if there's no
+// entry (or the entry has no score — e.g. the grey placeholder case).
+function getPclaiScore(trackName) {
+  const entry = getPclaiEntry(trackName);
+  if (!entry || entry[2] === undefined || entry[2] === null) return null;
+  return entry[2];
 }
 
 function getReadXStart(read) {
@@ -3109,6 +3150,7 @@ function drawNodes(dNodes, groupNode) {
     .append("path")
     .attr("id", (d) => d.name)
     .attr("d", (d) => d.d)
+    .attr("sequence", (d) => d.seq)
     .style("fill", (d) => colorNodes(d.name)["fill"])
     .style("fill-opacity", (d) => colorNodes(d.name)["fill-opacity"])
     .style("stroke", (d) => colorNodes(d.name)["outline"])
@@ -3499,6 +3541,9 @@ function drawTrackRectangles(rectangles, type, groupTrack) {
     .attr("trackName", (d) => d.name)
     .attr("class", (d) => `track${d.id}`)
     .attr("color", (d) => d.color)
+    .attr("pclaiX", (d) => { const [x] = getPclaiXY(d.name); return x === null ? "None" : x; })
+    .attr("pclaiY", (d) => { const [, y] = getPclaiXY(d.name); return y === null ? "None" : y; })
+    .attr("pclaiScore", (d) => { const s = getPclaiScore(d.name); return s === null ? "None" : s; })
     .append("svg:title")
 }
 
@@ -3608,6 +3653,9 @@ function drawTrackCurves(type, groupTrack) {
     .attr("trackName", (d) => d.name)
     .attr("class", (d) => `track${d.id}`)
     .attr("color", (d) => d.color)
+    .attr("pclaiX", (d) => { const [x] = getPclaiXY(d.name); return x === null ? "None" : x; })
+    .attr("pclaiY", (d) => { const [, y] = getPclaiXY(d.name); return y === null ? "None" : y; })
+    .attr("pclaiScore", (d) => { const s = getPclaiScore(d.name); return s === null ? "None" : s; })
     .append("svg:title")
 }
 
@@ -3625,6 +3673,9 @@ function drawTrackCorners(corners, type, groupTrack) {
     .attr("trackName", (d) => d.name)
     .attr("class", (d) => `track${d.id}`)
     .attr("color", (d) => d.color)
+    .attr("pclaiX", (d) => { const [x] = getPclaiXY(d.name); return x === null ? "None" : x; })
+    .attr("pclaiY", (d) => { const [, y] = getPclaiXY(d.name); return y === null ? "None" : y; })
+    .attr("pclaiScore", (d) => { const s = getPclaiScore(d.name); return s === null ? "None" : s; })
     .append("svg:title")
 }
 
@@ -3699,6 +3750,17 @@ function generateNodeWidth() {
   }
 }
 
+// Given a full vg/GFA path name, keep only the first three PanSN-spec fields
+// (sample#haplotype#contig), discarding any trailing metadata field (e.g.
+// vg's internal phase-block/fragment index) that vg appends on its own and
+// that currently carries no real information (always "0" in our pipeline).
+function truncateTrackName(name) {
+  if (!name) return name;
+  const parts = name.split("#");
+  if (parts.length <= 3) return name;
+  return parts.slice(0, 3).join("#");
+}
+
 // extract track info from vg-json
 export function vgExtractTracks(vg, pathSourceTrackId, haplotypeSourceTrackID) {
   const result = [];
@@ -3742,7 +3804,7 @@ export function vgExtractTracks(vg, pathSourceTrackId, haplotypeSourceTrackID) {
       // This is a path
       track.sourceTrackID = pathSourceTrackId;
     }
-    if (path.hasOwnProperty("name")) track.name = path.name;
+    if (path.hasOwnProperty("name")) track.name = truncateTrackName(path.name);
     if (path.hasOwnProperty("indexOfFirstBase")) {
       track.indexOfFirstBase = Number(path.indexOfFirstBase);
     }
