@@ -34,6 +34,7 @@ import tempfile
 import json
 import pysam
 import re
+import adaptagrams_converter
 
 ssl_context = None
 cert_path = os.getenv("SSL_CERT_PATH")
@@ -606,7 +607,9 @@ async def bandage(
     minnodelen: float = Query(5, description="Minimum node length to draw.\nIf the drawn node length is smaller than this, it defaults to minnodelen."),
     nodeseglen: float = Query(20, description="Node length for each OGDF node"),
     edgelen: float = Query(5, description="Length of edges between nodes"),
-    nodelenpermb: float = Query(1000, description="Formula:\n`drawnNodeLength = nodelenpermb * node_length_in_bp / 1,000,000`")
+    nodelenpermb: float = Query(1000, description="Formula:\n`drawnNodeLength = nodelenpermb * node_length_in_bp / 1,000,000`"),
+    linear: bool = Query(False, description="If true, linearize the selected assembly via AdaptagramsGraph instead of the default OGDF layout"),
+    assembly: str = Query("GRCh38#0", description="Assembly and haplotype to linearize when `linear` is true (in `assembly#haplotype` format - e.g. `GRCh38#0`)")
 ):
     """
     ## Parameters
@@ -621,6 +624,8 @@ async def bandage(
     - `nodeseglen`: float — Node length for every OGDF node
     - `edgelen`: float — Edge length between nodes
     - `nodelenpermb`: float — Drawn node length scaling factor
+    - `linear`: bool — Whether output should be linearized wrt an assembly
+    - `assembly`: str — Assembly to linearize against, provided in `sample_name#haplotype` format.
 
     ## Returns
 
@@ -683,7 +688,16 @@ async def bandage(
     
     pggraph = bandage_graph.PGGraph(str(postprocess_gfa_output), settings)
     pggraph.BuildOGDFGraph()
-    pggraph.LayoutGraph()
+    if linear:
+        #more input validation may be required but tbd
+        parts = assembly.split('#')
+        sample = parts[0]
+        haplotype = parts[1] if len(parts) > 1 else None
+        ag = adaptagrams_converter.AdaptagramsGraph(pggraph)
+        ag.seed_linear_layout(assembly=sample, haplotype=haplotype)
+        ag.build_fd_layout().run()
+    else:
+        pggraph.LayoutGraph()
     assembly_range = adjustAssemblyRangeList(pggraph.pgassemblies) # {assembly_id1: {"sequence_id": seq_id, "region": 1000-2000}, assembly_id2: ...}
     # TODO adjust take in non duplicated coordinates if it's not from the right contig. Can look into real cases before this adjustment
     
@@ -711,10 +725,14 @@ async def bandage(
             node_info["assembly_metadata"] = pgnodes.m_assembly_metadata
             node_info["default_range"] = pgnodes.m_range
             sequence[pgnodes.nodeName] = pgnodes.nodeSequence
-            odgf_coordinates = []
-            for ogdf_node in pgnodes.GetOgdfNode().m_ogdfNodes:
-                coordinates = {"x": pggraph.m_graphAttributes.x(ogdf_node), "y": pggraph.m_graphAttributes.y(ogdf_node)}
-                odgf_coordinates.append(coordinates)
+            if linear:
+                resolved = ag.resolve(pgnodes)
+                odgf_coordinates = [{"x": x, "y": y} for x, y in ag.get_segment_coordinates(resolved)] if resolved else []
+            else:
+                odgf_coordinates = []
+                for ogdf_node in pgnodes.GetOgdfNode().m_ogdfNodes:
+                    coordinates = {"x": pggraph.m_graphAttributes.x(ogdf_node), "y": pggraph.m_graphAttributes.y(ogdf_node)}
+                    odgf_coordinates.append(coordinates)
             node_info["ogdf_coordinates"] = odgf_coordinates
             node[pgnodes.nodeName] = node_info
 
@@ -730,4 +748,8 @@ async def bandage(
     data["assembly"] = assembly_range
     data["edge"] = edges
     
+    #free up refs
+    if linear:
+        ag.close()
+
     return JSONResponse(content=data)
