@@ -1018,7 +1018,8 @@ def bandage(
     edgelen: float = Query(5, description="Length of edges between nodes"),
     nodelenpermb: float = Query(1000, description="Formula:\n`drawnNodeLength = nodelenpermb * node_length_in_bp / 1,000,000`"),
     linear: bool = Query(False, description="If true, linearize the selected assembly via AdaptagramsGraph instead of the default OGDF layout"),
-    assembly: str = Query("GRCh38#0", description="Assembly and haplotype to linearize when `linear` is true (in `assembly#haplotype` format - e.g. `GRCh38#0`)")
+    assembly: str = Query("GRCh38#0", description="Assembly and haplotype to linearize when `linear` is true (in `assembly#haplotype` format - e.g. `GRCh38#0`)"),
+    bp_scaled_spine: bool = Query(True, description="For linear mode only. If true, each node in the assembly spine is drawn proportional to its number of base pairs")
 ):
     """
     ## Parameters
@@ -1035,6 +1036,7 @@ def bandage(
     - `nodelenpermb`: float — Drawn node length scaling factor
     - `linear`: bool — Whether output should be linearized wrt an assembly
     - `assembly`: str — Assembly to linearize against, provided in `sample_name#haplotype` format.
+    - `bp_scaled_spine`: bool — Linear mode only. Spine node width proportional to bp.
 
     ## Returns
 
@@ -1103,10 +1105,16 @@ def bandage(
         sample = parts[0]
         haplotype = parts[1] if len(parts) > 1 else None
         ag = adaptagrams_converter.AdaptagramsGraph(pggraph)
-        ag.seed_linear_layout(assembly=sample, haplotype=haplotype)
+        ag.seed_linear_layout(assembly=sample, haplotype=haplotype,
+                              bp_scaled=bp_scaled_spine)
         ag.build_fd_layout().run()
+        spine_report = ag.spine_report()
+        if not spine_report["monotonic"]:
+            log.warning(
+                f"Non-monotonic spine for {assembly}: {spine_report['violations']}")
     else:
         pggraph.LayoutGraph()
+        spine_report = None
     assembly_range = adjustAssemblyRangeList(pggraph.pgassemblies) # {assembly_id1: {"sequence_id": seq_id, "region": 1000-2000}, assembly_id2: ...}
     # TODO adjust take in non duplicated coordinates if it's not from the right contig. Can look into real cases before this adjustment
     
@@ -1156,7 +1164,13 @@ def bandage(
     data["node"] = node
     data["assembly"] = assembly_range
     data["edge"] = edges
-    
+
+    #present only for linear layouts. lets frontend identify from
+    #dragged files / pasted urls
+    if spine_report is not None:
+        data["spine"] = spine_report
+
+
     #free up refs
     if linear:
         ag.close()

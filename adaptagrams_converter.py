@@ -7,6 +7,12 @@ from bubble_finding import build_adjacency, find_all_bubbles
 
 NODE_SPACING = 30.0   #horizontal gap between consecutive nodes
 
+#total units the entire spine occupies regardless of locus size
+TARGET_SPINE_WIDTH = 2000.0
+
+#min width of nodes off spine as a fraction of the total spine width
+OFF_SPINE_MIN_WIDTH_FRACTION = 1.0 / 500.0
+
 
 class AdaptagramsGraph:
     """
@@ -37,6 +43,11 @@ class AdaptagramsGraph:
 
         self.node_to_rects = {}
         self._fixed = set()
+
+        #set at first point where total bp on spine is known
+        self._bp_scale = None
+        self._spine_bp_total = 0
+        self._asm_order = []
 
         #need to store rect pointers so they don't get garbage collected mid-layout
         self._rect_objs = []
@@ -113,10 +124,35 @@ class AdaptagramsGraph:
         return node is not None and self._matches(node)
 
     def _node_width(self, name):
-        return self.pggraph.pgnodes[name].GetDrawnNodeLength()
+        """
+        Get the width of a node off the assembly spine.
+        """
+        node = self.pggraph.pgnodes[name]
+        if self._bp_scale is None:
+            return node.GetDrawnNodeLength()
+        floor = TARGET_SPINE_WIDTH * OFF_SPINE_MIN_WIDTH_FRACTION
+        return max(node.GetLength() * self._bp_scale, floor)
+
+    def _spine_width(self, name):
+        """
+        Get the width of a node on the assembly spine.
+        Will be proportional to the number of basepairs in the node, scaled to fit desired total length.
+        """
+        node = self.pggraph.pgnodes[name]
+        if self._bp_scale is None:
+            #legacy approach
+            chain = self.node_to_rects[node]
+            return max(1, len(chain) - 1) * NODE_SPACING
+        return max(node.GetLength(), 1) * self._bp_scale
+
+    def _spine_segment(self, name):
+        """Gets center-to-center pitch between consecutive rects of a spine node."""
+        chain = self.node_to_rects[self.pggraph.pgnodes[name]]
+        n = len(chain)
+        return self._spine_width(name) / (n - 1) if n > 1 else 0.0
 
     def _place_chain(self, name, x, y):
-        """Place a node's subnode rects starting at (x, y), spanning drawn length"""
+        """Place a node's subnode rects starting at (x, y), spanning its width"""
         node = self.pggraph.pgnodes[name]
         chain = self.node_to_rects[node]
         n = len(chain)
@@ -124,7 +160,8 @@ class AdaptagramsGraph:
             self.rs[chain[0]].moveCentreX(x)
             self.rs[chain[0]].moveCentreY(y)
             return
-        seg = node.GetDrawnNodeLength() / (n - 1)
+        seg = (self._spine_segment(name) if self._is_asm_name(name)
+               else self._node_width(name) / (n - 1))
         for i, idx in enumerate(chain):
             self.rs[idx].moveCentreX(x + i * seg)
             self.rs[idx].moveCentreY(y)
@@ -196,10 +233,15 @@ class AdaptagramsGraph:
 
             arc_idx += 1
 
-    def seed_linear_layout(self, assembly, haplotype=None):
+    def seed_linear_layout(self, assembly, haplotype=None, bp_scaled=True):
         """
         Initial placement of spine and bubbles.
         haplotype filters to one haplotype of assembly; `None` = all.
+
+        bp_scaled=True makes spine width exactly proportional to node bp, which
+        is what the frontend's annotation track requires to map reference
+        coordinates onto the graph at a constant rate. False restores the legacy
+        fixed-pitch grid for comparison.
         """
         self._assembly = assembly
         self._haplotype = haplotype
@@ -225,6 +267,12 @@ class AdaptagramsGraph:
                         queue.append(nb)
         self._asm_order = asm_order
 
+        #normalize against the spine's total number of bp
+        self._spine_bp_total = sum(
+            self.pggraph.pgnodes[n].GetLength() for n in asm_order)
+        self._bp_scale = (
+            TARGET_SPINE_WIDTH / max(1, self._spine_bp_total) if bp_scaled else None)
+
         bubbles = find_all_bubbles(self.pggraph, out_adj, in_adj)
         bubble_by_source = {b.source: b for b in bubbles}
 
@@ -234,7 +282,7 @@ class AdaptagramsGraph:
             if name in placed:
                 continue
             self._place_chain(name, spine_x, 0.0)
-            spine_x += self._node_width(name)
+            spine_x += self._spine_width(name)
             placed.add(name)
 
             bubble = bubble_by_source.get(name)
@@ -252,6 +300,33 @@ class AdaptagramsGraph:
                 self._fixed.update(self.node_to_rects[node])
 
         self._build_springs()
+
+    def _assembly_metadata(self, name):
+        """First metadata entry on `name` for the selected assembly+haplotype."""
+        node = self.pggraph.pgnodes.get(name)
+        if node is None:
+            return None
+        for entry in node.m_nd_assembly + node.m_dup_assembly:
+            if entry["assembly_name"] != self._assembly:
+                continue
+            if self._haplotype is not None and entry["haplotype"] != self._haplotype:
+                continue
+            for meta in entry.get("metadata", []):
+                return meta
+        return None
+
+    def spine_report(self):
+        """Facts about layout which frontend can use to identify linear files which were dropped in"""
+        return {
+            "assembly": self._assembly,
+            "haplotype": self._haplotype,
+            "bp_scaled": self._bp_scale is not None,
+            "bp_scale": self._bp_scale,
+            "total_bp": self._spine_bp_total,
+            "total_width": (self._spine_bp_total * self._bp_scale
+                            if self._bp_scale is not None else None),
+            "node_count": len(self._asm_order)
+        }
 
     def _edge_rects(self, edge):
         start, end = edge.startingNode, edge.endingNode
@@ -315,15 +390,32 @@ class AdaptagramsGraph:
 
     def _spine_x_chain(self):
         """
-        Rigid front-to-back x ordering of assembly rects
+        Rigid front-to-back x ordering of assembly rects.
+
+        The final True is `equality`, so these are exact placements, not minimum
+        gaps - the FD relax projects onto them rather than around them. That makes
+        this method, and not the layout solver, the thing that decides spine
+        geometry.
+
+        Two gaps are in play:
+          - within a node: _spine_segment(name), so the node's first and last rect
+            centres are exactly `bp * bp_scale` apart;
+          - between nodes: 0.0, so the last centre of one node coincides with the
+            first centre of the next. Nodes are contiguous, with no seam for the
+            annotation track's bp mapping to fall through.
+
+        Total spine width is therefore sum(bp) * bp_scale == TARGET_SPINE_WIDTH.
+
+        (Docstring generated by Claude Opus 5.0)
         """
         cs = []
         prev = None
         for name in self._asm_order:
             chain = self.node_to_rects[self.pggraph.pgnodes[name]]
+            seg = self._spine_segment(name)
             for k, idx in enumerate(chain):
                 if prev is not None:
-                    gap = NODE_SPACING if k > 0 else 0.0
+                    gap = seg if k > 0 else 0.0
                     cs.append(adap.SeparationConstraint(adap.XDIM, prev, idx, gap, True))
                 prev = idx
         return cs
