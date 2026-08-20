@@ -1109,9 +1109,6 @@ def bandage(
                               bp_scaled=bp_scaled_spine)
         ag.build_fd_layout().run()
         spine_report = ag.spine_report()
-        if not spine_report["monotonic"]:
-            log.warning(
-                f"Non-monotonic spine for {assembly}: {spine_report['violations']}")
     else:
         pggraph.LayoutGraph()
         spine_report = None
