@@ -241,6 +241,32 @@
   pre .dim { color: var(--faint); }
   pre .hit { color: var(--critical); font-weight: 600; }
 
+  /* ---- stage bars ---- */
+  .stages { display: flex; flex-direction: column; gap: var(--s3); }
+  .srow { display: flex; flex-direction: column; gap: var(--s1); }
+  .shead {
+    display: flex; flex-wrap: wrap; align-items: baseline;
+    gap: var(--s2); font-family: var(--mono); font-size: 0.78rem;
+  }
+  .shead .sregion { color: var(--ink); font-weight: 500; }
+  .shead .stotal { color: var(--critical); font-weight: 600; margin-left: auto; }
+  .shead .snote { color: var(--faint); }
+  .sbar { display: flex; width: 100%; height: 22px; border: 1px solid var(--rule); background: var(--surface); }
+  .sbar span { display: block; min-width: 0; }
+  .sfoot {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 0 var(--s2);
+  }
+  .sfoot b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .sbar .s-ex  { background: var(--critical); }
+  .sbar .s-vg  { background: var(--accent); }
+  .sbar .s-svg { background: var(--warn); }
+  .sbar .s-oth { background: var(--faint); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s3); font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+  .legend b { display: inline-block; width: 0.7em; height: 0.7em; margin-right: 0.45em; }
+  .legend .s-ex { background: var(--critical); } .legend .s-vg { background: var(--accent); }
+  .legend .s-svg { background: var(--warn); } .legend .s-oth { background: var(--faint); }
+
   /* ---- lane diagram ---- */
   figure { margin: 0; display: flex; flex-direction: column; gap: var(--s2); }
   figcaption { font-size: 0.85rem; color: var(--muted); max-width: var(--measure); }
@@ -273,14 +299,14 @@
   <header class="mast">
     <span class="eyebrow">PangenomeAPI · performance diagnosis · 27 Aug 2026</span>
     <h1>The 120-Second Tube Map</h1>
-    <p class="standfirst">The <code>/seqtubemap</code> endpoint takes <strong>two minutes</strong> to return a <strong>10 MB SVG</strong> for a 10 kb region — and while it does, it takes the entire API down. Measured against the live service at <span class="m">pangenome-api.ucsd.edu</span>, plus a local stage-timing harness.</p>
+    <p class="standfirst">The <code>/seqtubemap</code> endpoint takes <strong>two minutes</strong> to return a <strong>10 MB SVG</strong> for a 10 kb region — and while it does, it takes the entire API down. Measured against the live service at <span class="m">pangenome-api.ucsd.edu</span>, with server-side stage timings and a local harness.</p>
   </header>
 
   <div class="stats">
     <div class="stat"><span class="n crit">120.4s</span><span class="l">to render 10 kb</span></div>
     <div class="stat"><span class="n crit">10.1 MB</span><span class="l">SVG returned</span></div>
     <div class="stat"><span class="n">464</span><span class="l">stacked lanes, every region</span></div>
-    <div class="stat"><span class="n">722 ms</span><span class="l">fixed boot cost per request</span></div>
+    <div class="stat"><span class="n crit">77%</span><span class="l">of a 10 kb request in one Python loop</span></div>
   </div>
 
   <hr class="sec-rule">
@@ -325,7 +351,7 @@
 <span class="dim">[stage]</span> io:write-svg             9.8ms
                        <span class="hit">total 1441.7ms</span></pre>
 
-    <p>The server spent <strong>35.3 s</strong> producing a smaller graph than this. So the SVG generation stage is roughly <strong>1–2 seconds of it</strong>, and something on the order of <strong>34 seconds sits upstream</strong> — in <code>gbz-base</code> subgraph extraction, <code>SeqTubeGfaProcessor</code>, <code>vg convert</code>, and <code>vg view -j</code>. That split is inferred, not directly measured; §06 says how to close it.</p>
+    <p>The server spent <strong>35.3 s</strong> producing a smaller graph than this, so most of the time had to sit upstream of SVG generation. That reasoning was right about <em>where</em> and wrong about <em>how much</em>: §06 now carries server-side timings, and upstream is <strong>30.1 s of a 38.9 s request</strong> — close to the 34 s inferred here — but SVG generation is <strong>8.2 s</strong>, not 1–2 s. <strong>This harness understates the server's Node stage by 4–8×</strong>, and the gap widens with region size. Trust §06 over this section.</p>
     <p>Note the first three lines. <strong>722 ms of that total is fixed cost</strong> — booting JSDOM, node-canvas, and importing 130 KB of <code>tubemap.js</code> — paid on every single request no matter how small the region.</p>
   </section>
 
@@ -443,8 +469,56 @@ SPINES=40,150,600 HAPS=464 ALT=0.08 node perf/cross.mjs</pre>
   <hr class="sec-rule">
 
   <section>
-    <h2><span class="num">06</span>The one gap</h2>
-    <p>The ~34 s upstream figure is <strong>inferred by subtraction</strong>, not measured. Everything else in this report is a direct observation. Closing it is small: add tagged timers around the four pipeline calls in <code>seqtubemap</code> — <code>SubgraphMC</code>, <code>SeqTubeGfaProcessor</code>, <code>ConvertGfaToVg</code>, <code>ConvertVgToJson</code>, <code>GenerateSeqTubeMapSvg</code> — and log the split per request. That turns the largest remaining unknown into a number and tells you whether the first real fix belongs in <code>gbz-base</code> extraction or in the <code>vg</code> conversion hop.</p>
+    <h2><span class="num">06</span>The gap, closed</h2>
+    <p>The instrumentation shipped, was deployed to the live server, and three fresh regions were captured — 90 bp, 3 kb, 10 kb, all <code>cached=False</code>. A fourth request arrived in the same log by accident, against a <strong>cached</strong> 35.9 kb region, and turned out to be the most informative line in the file.</p>
+
+    <div class="stages">
+      <div class="srow">
+        <div class="shead"><span class="sregion">90 bp</span><span class="snote">13 nodes</span><span class="stotal">3.71 s</span></div>
+        <div class="sbar"><span class="s-ex" style="width:22.9%"></span><span class="s-vg" style="width:5.7%"></span><span class="s-svg" style="width:71.4%"></span></div>
+        <div class="sfoot"><b>0.85s</b> extract · <b>0.21s</b> vg · <b>2.65s</b> svg</div>
+      </div>
+      <div class="srow">
+        <div class="shead"><span class="sregion">3 kb</span><span class="snote">118 nodes</span><span class="stotal">12.22 s</span></div>
+        <div class="sbar"><span class="s-ex" style="width:63.3%"></span><span class="s-vg" style="width:1.7%"></span><span class="s-svg" style="width:35.0%"></span></div>
+        <div class="sfoot"><b>7.73s</b> extract · <b>0.21s</b> vg · <b>4.28s</b> svg</div>
+      </div>
+      <div class="srow">
+        <div class="shead"><span class="sregion">10 kb</span><span class="snote">381 nodes</span><span class="stotal">38.89 s</span></div>
+        <div class="sbar"><span class="s-ex" style="width:77.3%"></span><span class="s-vg" style="width:1.6%"></span><span class="s-svg" style="width:21.0%"></span></div>
+        <div class="sfoot"><b>30.08s</b> extract · <b>0.63s</b> vg · <b>8.18s</b> svg</div>
+      </div>
+      <div class="srow">
+        <div class="shead"><span class="sregion">35.9 kb</span><span class="snote">cached — extraction skipped</span><span class="stotal">93.56 s</span></div>
+        <div class="sbar"><span class="s-vg" style="width:2.2%"></span><span class="s-oth" style="width:0.6%"></span><span class="s-svg" style="width:97.2%"></span></div>
+        <div class="sfoot"><b>0.00s</b> extract · <b>2.06s</b> vg · <b>0.55s</b> colour · <b>90.95s</b> svg</div>
+      </div>
+      <div class="legend">
+        <span><b class="s-ex"></b>subgraph_extract</span>
+        <span><b class="s-vg"></b>gfa_to_vg + vg_to_json</span>
+        <span><b class="s-svg"></b>generate_svg</span>
+        <span><b class="s-oth"></b>colour scheme</span>
+      </div>
+    </div>
+
+    <div class="findings">
+      <article class="finding is-crit">
+        <div class="fhead"><h3>The slow stage is one Python loop, not <code>gbz-base</code></h3><span class="chip measured">Measured</span></div>
+        <p><code>subgraph_extract</code> wraps two calls: the <code>gbz-base</code> query, and <code>GenerateWalksMC</code>, which adds W lines. The query prints its own timing on the line above — <span class="m">Used 0.042 seconds</span>. That is <strong>0.042 s of the 30.077 s</strong>. The rest is a Python loop doing one tabix <code>fetch</code> per node across 464 haplotypes, at a flat <strong>65–79 ms per node</strong> across three orders of magnitude of region size. A constant that size is per-iteration overhead, not an algorithm that grows — which makes it the most tractable win on the server, and it is in our own code rather than in a dependency.</p>
+      </article>
+
+      <article class="finding is-out">
+        <div class="fhead"><h3>The <code>vg</code> round trip costs nothing</h3><span class="chip measured">Measured</span></div>
+        <p><code>gfa_to_vg</code> + <code>vg_to_json</code> is <strong>0.63 s of the 10 kb request — 1.6%</strong>. Deleting the two subprocess spawns and two temp files buys back six tenths of a second out of thirty-nine. The case for removing it survives on provisioning and architecture grounds; it is no longer a performance item, and it drops to last in the plan. This measurement was taken to decide whether it was the <em>first</em> real fix. It is the last.</p>
+      </article>
+
+      <article class="finding is-warn">
+        <div class="fhead"><h3>SVG generation is superlinear, and takes over at scale</h3><span class="chip measured">Measured</span></div>
+        <p>2.6 → 4.3 → 8.2 → 91.0 s against 0.43 → 3.64 → 11.59 → 41.0 MB of JSON. From 11.6 MB to 41 MB, <strong>3.5× the data costs 11× the time</strong>. The cached 35.9 kb row is the proof case: extraction skipped entirely, and it still took 93.6 s, <strong>97% of it in SVG generation</strong>. Caching buys nothing at large spans, because the stage it skips is not the one that dominates there — and the case for removing the browser is larger than §02 estimated, not smaller.</p>
+      </article>
+    </div>
+
+    <p>With these numbers, nothing in this report is inferred by subtraction any more. Note also the floor: a 13-node, 90 bp region still spends <strong>2.65 s</strong> in <code>generate_svg</code>. That is §02's 722 ms of JSDOM boot and <code>tubemap.js</code> import, measured on server hardware at roughly 3.5×. No region is served faster than that while the browser emulation stands.</p>
   </section>
 
   <footer>

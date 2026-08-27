@@ -97,6 +97,12 @@ bad B shows up as an error card rather than as a diff nobody ran.
 **D** — delete the `vg convert` / `vg view -j` round trip. Gated on measuring
 `subgraph_extract` on the live server; if upstream extraction dominates, this is noise.
 
+> *Amended 2026-08-27, after the measurement.* Upstream does dominate — `subgraph_extract` is
+> 77% of a 10 kb request, and the `vg` round trip is **1.6%**. D is noise as a performance
+> item, and stands only as a provisioning and architecture cleanup. The upstream cost turned
+> out to be `GenerateWalksMC` rather than `gbz-base`, which is a new increment outside this
+> ADR; see [the plan](../perf/seqtubemap-plan.md).
+
 ## Considered and rejected
 
 **Mutating the existing URL in place** — hoisting the per-strand constants out of every band
@@ -132,8 +138,9 @@ new format is how dead code becomes permanent.
 - **Correctness is `parseBands`-equivalence, not byte-identity** — except in B, where
   byte-compatibility is the constraint that lets the repos move independently.
 - **Golden fixtures**: `pgb` already commits five real documents spanning 0.29 MB to 13.56
-  MB. The matching *inputs* do not exist outside the live server and must be obtained; see
-  [`docs/perf/deploy-request.md`](../perf/deploy-request.md).
+  MB. The matching *inputs* were obtained from the live server on 2026-08-27 and are
+  committed at [`tests/fixtures/seqtubemap/`](../../tests/fixtures/seqtubemap/), matched to
+  their outputs on strand count. **B's oracle is end-to-end.**
 - **`seqtubemap/tubemap.js` is declared a fork.** It is an unmarked 4,000-line vendored copy
   of `vgteam/sequence-tube-map`, carrying upstream's eslint header and no provenance. B
   removes its DOM sink, so the re-sync option is gone in fact; the header comment makes it
