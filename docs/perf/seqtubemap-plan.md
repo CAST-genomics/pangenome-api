@@ -17,10 +17,15 @@ Written 2026-08-27, at the end of the diagnosis phase.
 
 | | |
 | --- | --- |
-| Branch | `perf/seqtubemap-diagnosis` at `ab3e5b0`, local only, `main` untouched |
-| Diagnosis | Complete, with one open gap (see Step 1) |
+| Branch | `perf/seqtubemap-diagnosis`, PR [#12](https://github.com/CAST-genomics/PangenomeAPI/pull/12) open |
+| Diagnosis | Complete. One gap remains: the upstream stage (see Step 0) |
+| Grilling | Complete, 2026-08-27. Produced [`CONTEXT.md`](../../CONTEXT.md) and [ADR 0001](../adr/0001-additive-band-format.md) |
 | Built | Local harness (`perf/`), server-side stage timers (`main.py`) |
 | Changed in production behaviour | Nothing yet |
+
+**The shape of the work is now settled.** Steps 1 and 2 below are done; what remains is
+Step 0 (a deploy, not a decision) and Step 3 (the build). The increments are A-D under
+*The roadmap* and they come from ADR 0001, not from this document.
 
 ## Decisions already made — do not reopen
 
@@ -38,7 +43,29 @@ real defect worth its own issue — it just isn't the performance strategy.)
 
 **The target is systemic plumbing inefficiency**, not hot loops and not data volume. The
 working thesis is that the server is a set of separately-authored pieces joined by temp
-files and subprocesses, and that the cost lives in the joins.
+files and subprocesses, and that the cost lives in the joins. Measurement bore this out: the
+single largest cost is a headless browser emulated to serialize XML that the client parses
+straight back into numbers.
+
+Added by the grilling session, 2026-08-27. Each of these is recorded with its reasoning in
+[ADR 0001](../adr/0001-additive-band-format.md):
+
+**The band format is additive, never a replacement.** `?format=bands` appears beside the
+existing SVG URL, which keeps working. The two repos never deploy in lockstep, and the SVG
+stays as the oracle the band payload is checked against.
+
+**The band data is canonical; the SVG is derived from it.** Not two sinks over one layout —
+one path, so drift is impossible by construction rather than by discipline.
+
+**`pgb` is the sole consumer**, and the `parseBands` grammar is an internal encoding between
+two repos on one team rather than a public contract.
+
+**Correctness is `parseBands`-equivalence**, not byte-identity — except in increment B,
+where byte-compatibility is a deliberate constraint so the client need not move at all.
+
+**`pathnumoption` does not exist on the band route.** It is measurably dead
+(`main.py:212-226`, byte-identical output to `normal`), and fixing it would merge strands,
+which is a data change and out of scope.
 
 ## Known-good baseline
 
@@ -75,9 +102,17 @@ whole plan.
 > This does not block Step 1. Start the deploy, then begin grilling; fold the numbers in
 > when they arrive.
 
-## Step 1 — Sharpen the idea
+## Step 1 — Sharpen the idea ✅ *done 2026-08-27*
 
 **Skill:** `/grill-with-docs` — the stateful interview.
+
+**Outcome:** six rounds. Produced [`CONTEXT.md`](../../CONTEXT.md) — which `CLAUDE.md` had
+been promising all along — and [ADR 0001](../adr/0001-additive-band-format.md). Two
+measurements were taken mid-interview to settle questions rather than guess at them: the
+layout-vs-DOM split (§7 of the findings) and the five-fixture byte census (§8).
+
+The one-sentence statement of the change, per the exit criteria: **`/seqtubemap` publishes
+the numbers it already has, instead of emulating a browser to hide them in XML.**
 
 Precede it with **`/compact`**, not `/clear`. The diagnosis context matters to the
 grilling — particularly the ruled-out paths above — but the raw sweep output does not, and
@@ -108,7 +143,14 @@ from the GFA, skipping `vg convert` and `vg view -j` entirely?* That is a questi
 answered by throwaway code against a real GFA, not by argument. Bridge with **`/handoff`**
 out and back, and reference the prototype branch from the resulting issue.
 
-## Step 2 — Decide the build shape
+## Step 2 — Decide the build shape ✅ *done 2026-08-27*
+
+**Answer: multi-session.** Four separable increments with real ordering between them, so
+**`/to-spec`** then **`/to-tickets`**, filing into `CAST-genomics/PangenomeAPI` per
+[`docs/agents/issue-tracker.md`](../agents/issue-tracker.md), each ticket declaring its
+blocking edges. A-D below are the increments those tickets cover.
+
+*Original guidance, retained:*
 
 **Skill:** still inside the Step 1 window. Do not compact between Steps 1 and 2.
 
@@ -134,30 +176,82 @@ self-contained, so the previous one's context is disposable.
 
 ### The roadmap, in order
 
-Ranked on evidence as of 2026-08-27. **Step 0's numbers may reorder this** — in particular,
-if `subgraph_extract` dominates, items 1–2 win less than their effort suggests and the real
-work moves into how the `gbz-base` query is issued.
+Superseded 2026-08-27 by the grilling session. The previous ranking led with *delete the
+`vg` round trip*, on the reasoning that it was the most obviously silly thing in the
+pipeline. Two measurements re-ranked it: the DOM is **93.7%** of the memory, and **41-47%**
+of every response carries no information. The ceiling has a name now, so the work that
+raises it goes first and `vg` drops to last. Full reasoning in
+[ADR 0001](../adr/0001-additive-band-format.md).
 
-1. **Delete the `vg` round trip.** `GFA → protobuf → JSON` exists only to change format
-   between two processes this project controls, and inflates the payload **13×** (3.9 B per
-   node visit as a GFA walk, 51.0 B as vg JSON, identical information). The target schema is
-   trivial — `node[]` of `{id, sequence}`, `path[]` of `{name, mapping[].position}` — and
-   the GFA already contains it. Removes two subprocess spawns and two temp files.
-2. **Stop round-tripping through disk.** With `vg` gone, the remaining stages can pass bytes
-   rather than filenames. The SVG is currently written to disk purely so `FileResponse` can
-   read it back.
-3. **Unblock the event loop.** `seqtubemap` is `async def` with four blocking
-   `subprocess.run` calls inside it. This wins no latency but stops one slow request from
-   killing every concurrent one — currently a hard outage, observed.
-4. **Kill the per-request Node boot.** 722 ms measured, paid on every request, to start a
-   process that immediately rebuilds the same JSDOM document.
-5. **Only then** revisit the layout substrate — running the tube map layout without
-   emulating a browser, or moving it to the client. Real, but 1–4 are cheaper and may make
-   it unnecessary.
+Ranked by **what it wins**, against the goals in priority order: (1) no request blocks
+another, (2) the unfetchable-node ceiling rises, (3) wall-clock. Bytes are a consequence of
+these, never a target in themselves.
 
-Not on this list but worth its own issue: **`pathnumoption=compressed` never fires**
-(`main.py:212–226`) — it keys on the entire walk across the region, so one SNP prevents any
-collapse. A correctness defect, not a performance item.
+| | change | wins | risk |
+| --- | --- | --- | --- |
+| **#12** | stage timing *(PR open)* | measurement | none — no behaviour change |
+| **A** | `async def` → `def` ×2; lazy `TabixFile` | goal 1 | very low |
+| **B** | capture the d3 joins; derive SVG from band data; **delete jsdom + canvas** | goal 2 | low — see below |
+| **C** | floats not strings; binary body; `?format=bands` | goals 2, 3 | medium |
+| **D** | delete the `vg` round trip | goal 3 | gated on Step 0 |
+
+**A — unblock the event loop.** `main.py:470` and `:527` are both `async def`, and neither
+awaits anything: every pipeline stage is a blocking `subprocess.run`. FastAPI runs a plain
+`def` endpoint in a threadpool automatically, so **deleting the word `async` twice is the
+fix.** Ship it with the lazy `TabixFile` opens (`main.py:71`, `:73`, `:81`), which currently
+prevent the app from booting unless all three `.walk.gz` derivatives are present even for a
+request that touches none of them. Both are server-wide, so this improves `/json` too —
+which also makes it the easiest PR in the programme for Cici to say yes to.
+
+**B — delete the browser.** Capture the d3 data joins rather than appending to a document,
+emit the SVG from the captured band data, and drop `jsdom` and `canvas` from
+`package.json` — two of five dependencies, present solely to feed `tubemap.js`.
+
+The reason B is *low* risk and not medium: it is held **byte-compatible with `pgb`'s
+existing parser by design**. `parseBands.ts` requires `style="fill: rgb(R, G, B);
+fill-opacity: 1;" trackID="N" trackName="…"` contiguous and in that order, and its
+conformance gate counts `<rect>` + `<path>` in `g.track`. Dropping `color=`, `class=`, and
+the empty `<title>` children changes neither. So B is a **server-only change against an
+unchanged client**, and `pgb` becomes its conformance test — a bad B surfaces as an error
+card in the frontend rather than as a diff nobody ran.
+
+B ships band data carrying *path strings*, not six floats, and that is deliberate: it takes
+the entire ceiling win without touching a line of geometry code, and leaves C as a pure
+encoding change with B's own output as its oracle.
+
+**C — the format.** The path builder emits floats; the response becomes a JSON header (the
+viewBox and the ~464-row strand table) plus a binary body of `Float32 × 6 + Uint16` per band.
+Roughly **1.5 MB against today's 10.07 MB** at the 10 kb region, with `pgb`'s regex pass
+deleted rather than shrunk — typed arrays copy straight into the GPU buffer. This is the
+increment where `pgb` changes, and where `pgb`'s ADR 0002 gets amended.
+
+**D — delete the `vg` round trip.** Unchanged in substance from the original item 1:
+`GFA → protobuf → JSON` exists only to change format between two processes this project
+controls, inflates the payload **13×** (3.9 B per segment visit as a GFA walk, 51.0 B as vg
+JSON), and costs two subprocess spawns and two temp files. It sits *upstream* of layout, so
+the band format does not touch it. **Do not start it until Step 0 reports** — if
+`subgraph_extract` dominates, this is noise.
+
+Also worth its own issue, and not a performance item: **`pathnumoption=compressed` never
+fires** (`main.py:212-226`). It keys on the entire walk across the region, so a single SNP
+prevents any collapse — measured byte-identical to `normal` at 1000 bp. It is a correctness
+defect, and ADR 0001 records why it is not carried onto the band route.
+
+### Two things to do alongside
+
+**Declare the fork.** `seqtubemap/tubemap.js` is an unmarked 4,000-line vendored copy of
+`vgteam/sequence-tube-map`, carrying upstream's eslint header and no provenance, version, or
+README note. B removes its DOM sink, so the re-sync option is gone in fact; a header comment
+naming upstream and the commit makes it gone on paper. This is the single most
+duct-taped-feeling artifact in the repo and one comment fixes the feeling as well as the
+fact.
+
+**Get golden inputs.** `pgb` commits five real documents in
+`src/tubemap/__tests__/fixtures/` — 0.29 MB to 13.56 MB, 369 to 464 strands, including the
+two at the fetch ceiling. Those pin the *expected* side. The matching **inputs** exist only
+on the live server, so the intermediates for those five regions are part of the ask in
+[`deploy-request.md`](./deploy-request.md). Once they land, the fixtures become end-to-end
+and B has a real oracle.
 
 ## Step 4 — Verify
 
@@ -170,7 +264,14 @@ re-run the local harness to confirm the Node stage did not regress:
 node perf/bench.mjs --axis=spine
 SPINES=40,150,600 HAPS=464 ALT=0.08 node perf/cross.mjs
 python3 perf/gfa-rewrite-bench.py
+node --expose-gc --max-old-space-size=8192 perf/rss-split.mjs \\
+  perf/fixtures/split-400.json 0 8000 compressed
 ```
+
+`rss-split.mjs` is the one that matters after B: it should report the DOM share at or near
+**zero**, because there should no longer be a DOM. Its `--expose-gc` requirement is not
+optional — retained-memory numbers taken without a forced collection measure garbage rather
+than retention.
 
 Update `seqtubemap-latency.md` with after-numbers beside the before-numbers. Update the
 artifact by passing its URL — publishing without it forks the link into a second artifact.
@@ -194,9 +295,13 @@ artifact by passing its URL — publishing without it forks the link into a seco
 
 ## Open questions
 
-- Does `subgraph_extract` dominate? (Step 0 answers this.)
-- Is the SVG-over-HTTP contract with pgb fixed, or can the response shape change? This
-  gates roadmap item 5 entirely and is a pgb question, not an API one.
-- Does anything downstream depend on the intermediate `.gfa` / `.vg` / `.json` files
-  existing on disk, or are they purely internal? They are deleted after every response,
-  which suggests purely internal — worth confirming before removing them.
+- **Does `subgraph_extract` dominate?** Step 0 answers this. It is the last unmeasured
+  number in the whole effort, and it gates increment D alone — every other increment is
+  correct regardless of where the upstream time goes.
+- **Does anything depend on the intermediate `.gfa` / `.vg` / `.json` files existing on
+  disk?** They are deleted after every response, which suggests purely internal — worth
+  confirming with Cici before removing them.
+
+*Closed by the grilling session:* whether the SVG contract can change (yes — `pgb` is the
+sole consumer and the two repos are one team), and whether `create()`'s cost is layout or
+DOM (DOM, 93.7%).

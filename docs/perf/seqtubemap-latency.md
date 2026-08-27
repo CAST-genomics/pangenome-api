@@ -183,6 +183,11 @@ SPINES=40,150,600 HAPS=464 ALT=0.08 node perf/cross.mjs
 The ~34 s upstream figure in §2 is **inferred by subtraction**. Everything else in this
 document is a direct observation.
 
+> **Still true as of §9.** Sections 7-9 added three more direct measurements and closed the
+> layout-vs-DOM question, but none of them touches the upstream stage. This remains the one
+> number in the document that nobody has watched a clock for, and it is the only thing
+> gating increment **D** in [ADR 0001](../adr/0001-additive-band-format.md).
+
 Server-side stage timers are now in place (`stage_timing()` in `main.py`, wrapping all five
 pipeline calls). Each request emits one greppable line:
 
@@ -206,6 +211,111 @@ Capture a spread — 90 bp, 3 kb, 10 kb — each against a **fresh region** so `
 because the cached path skips the stage most likely to dominate. That result either confirms
 the ~34 s upstream inference or overturns it, and tells you whether the first real fix
 belongs in `gbz-base` extraction or the `vg` conversion hop.
+
+## 7. Where the memory goes — the DOM, not the layout
+
+Measured 2026-08-27 with `perf/rss-split.mjs`, which marks retained heap (a forced full GC
+before every mark) at each boundary of a render, then tears the document down and marks
+again. What is released by emptying the DOM is what the DOM was holding; what survives is
+`tubemap.js`'s module-level layout state.
+
+| fixture | `create()` retained | **DOM share** | layout share |
+| --- | ---: | ---: | ---: |
+| spine 150 x 464 strands | 567.6 MB | **530.7 MB (93.5%)** | 36.9 MB |
+| spine 400 x 464 strands | 1522.7 MB | **1427.5 MB (93.7%)** | 95.2 MB |
+
+Two sizes, two points four decimal places apart. The layout is roughly **15x smaller** than
+the document built to hold it, and holds no DOM references — emptying the document releases
+essentially all of it.
+
+This closes a question section 3 could not answer. `render:create()` was measured as one
+stage covering both the layout computation and the jsdom construction, and the ranking of
+every proposed fix depended on which of the two it was. It is the DOM. Consequently the
+unfetchable-node ceiling — roughly 43% of catalogued nodes, per `pgb`'s ADR 0001 — is a DOM
+ceiling, and removing the DOM should raise it by about an order of magnitude.
+
+Reproduce with:
+
+```sh
+node perf/gen-vg-json.mjs perf/fixtures/split-400.json \
+  --spineNodes=400 --haplotypes=464 --bubbleRate=0.3 --altFreq=0.08 --seqLen=20 --seed=7
+node --expose-gc --max-old-space-size=8192 perf/rss-split.mjs \
+  perf/fixtures/split-400.json 0 8000 compressed
+```
+
+`--expose-gc` is mandatory; without it the harness refuses to run, because retained-memory
+numbers taken without a forced collection are garbage-in-flight rather than retention.
+
+## 8. Where the bytes go — five real documents
+
+Sections 1-3 measured byte composition on one 90 bp response. `pgb` commits five real golden
+documents in `src/tubemap/__tests__/fixtures/`, spanning 0.29 MB to 13.56 MB and 369 to 464
+strands, including the two at the fetch ceiling. The composition is stable across all of
+them.
+
+| | 90 bp | 600 bp | chr8 1.4 kb | node 5514 | node 5520 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| size | 0.29 MB | 3.37 MB | 3.97 MB | 12.92 MB | 13.56 MB |
+| strands | 464 | 369 | 463 | 378 | 464 |
+| `d=` — the geometry | 15.0% | 28.1% | 25.6% | 28.4% | 29.9% |
+| `style=` — 1 of ~464 rgb triples | 16.4% | 14.5% | 13.9% | 14.4% | 14.2% |
+| `trackName=` — 1 of ~464 names | 11.4% | 10.3% | 14.5% | 10.1% | 10.1% |
+| `color=` — *the same rgb as `style`* | 8.6% | 7.6% | 7.3% | 7.3% | 7.5% |
+| `class="track{id}"` — same int as `trackID` | 5.4% | 4.8% | 4.7% | 4.8% | 4.8% |
+| `<title></title>` — empty | 5.0% | 4.4% | 4.2% | 4.3% | 4.3% |
+| **redundant total** | **46.9%** | **41.5%** | **44.6%** | **40.9%** | **40.8%** |
+
+Read that bottom row as: **between 41% and 47% of every response carries no information.**
+Each row above it is either a per-strand constant re-serialized once per band, or — in the
+case of `color=` and `class=` — a second copy of a value already present in the same
+element, or, in the case of `<title></title>`, nothing whatsoever. Node 5520 alone carries
+**40,716 empty `<title>` elements**, which is also 40,716 jsdom nodes feeding directly into
+section 7.
+
+The geometry, the only genuinely per-band content in the document, is under a third of it.
+
+Two further facts from the same pass:
+
+- **Zero `<text>` and zero `<line>` elements**, in every one of the five. No labels, no
+  legend, no axis. The production document is bands and segment boxes and nothing else.
+- **The strand count is not always 464** — 369, 378, 463, 464 across the set. It is a
+  property of the region, not a constant.
+
+## 9. The geometry never needed a browser
+
+At `seqtubemap/tubemap.js:3599`:
+
+```js
+.data(flattenedGroups).enter().append("path")
+  .attr("d", (d) => d.path)        // already a complete "M ... C ... Z" string
+  .style("fill", (d) => d.color)
+  .attr("trackID", (d) => d.id)
+  .attr("trackName", (d) => d.name)
+  .append("svg:title")             // an empty <title> on every band
+```
+
+`d.path` is a finished string before any element exists. jsdom's entire contribution to this
+pipeline is to hold that string and hand it back through `outerHTML`. `tubemap.js`'s total
+DOM surface is five `d3.` calls, `document.getElementById`, and `getComputedTextLength`.
+
+Meanwhile `pgb` never renders the result. `src/tubemap/parseBands.ts` regexes it —
+*"deliberately regex over raw response text, never `DOMParser`"* — back into six floats per
+band. The round trip is: layout computes numbers, jsdom holds them as XML, the wire carries
+the XML, and the client parses the XML back into numbers.
+
+What the client actually reads is three things:
+
+| | consumed by `pgb` |
+| --- | --- |
+| document | viewBox — dimensions and centre |
+| bands | geometry, `trackID`, rgb, `trackName`, `pclaiX/Y/Score` |
+| segment boxes | `id`, outline, `sequence` |
+
+Everything else in the payload is ignored, which is the same set section 8 measures as
+redundant.
+
+The decision this evidence produced is
+[ADR 0001](../adr/0001-additive-band-format.md).
 
 ---
 
