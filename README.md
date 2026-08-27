@@ -58,6 +58,18 @@ it renders a real tube map, which reaches Node through `jsdom` and `canvas`.
 Both suites run in CI on every pull request (`.github/workflows/ci.yml`), where
 `vg` and panCT are installed and a skip is turned into a failure.
 
+### Golden tube map documents
+
+`npm test` includes a golden test: two committed subgraphs are rendered through
+the sequence tube map generator and the output is compared **byte for byte**
+against committed documents. It is the safety net for the `/seqtubemap` rework,
+whose increments each claim the output is unchanged.
+
+When a change is *meant* to alter the output, re-baseline deliberately with
+`npm run baseline:golden` and review the resulting diff as part of that change.
+Details, including why the fixtures are synthetic, are in
+[`tests/fixtures/tubemap-golden/README.md`](tests/fixtures/tubemap-golden/README.md).
+
 ## The vendored tube map layout
 
 `seqtubemap/` holds a **vendored fork** of the sequence tube map layout, not a
