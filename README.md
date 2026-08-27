@@ -87,6 +87,8 @@ Wolfgang Beyer.
 | `seqtubemap/config-global.mjs` | `src/config-global.mjs` | unmodified |
 | `seqtubemap/config-client.js` | `src/config-client.js` | emptied |
 | `seqtubemap/generate-svg.mjs` | — | ours |
+| `seqtubemap/render.mjs` | — | ours |
+| `seqtubemap/band-data.mjs` | — | ours |
 
 **`tubemap.js` is a fork and does not track upstream.** It arrived already
 trimmed of upstream's interactive browser half (mouse handlers, zoom, legend

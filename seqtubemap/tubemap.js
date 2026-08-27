@@ -56,6 +56,7 @@ import "d3-selection-multi";
 import "./config-client.js";
 import externalConfig from "./config-global.mjs";
 import { defaultTrackColors } from "./common.mjs";
+import { BandCollector } from "./band-data.mjs";
 import deepEqual from "deep-equal";
 // const deepEqual = require("deep-equal");
 
@@ -217,6 +218,11 @@ export let minYCoordinate = 0;
 export let maxXCoordinate = 0;
 let trackForRuler;
 
+// The band data of the most recent render, gathered by the same draw functions
+// that build the document, from the same lists and in the same order. See
+// band-data.mjs, and getBandData() below for how a caller reads it.
+const bandCollector = new BandCollector();
+
 let bed;
 
 // main function to call from outside
@@ -367,6 +373,7 @@ function createTubeMap() {
   trackCorners = [];
   trackVerticalRectangles = [];
   trackRectanglesStep3 = [];
+  bandCollector.reset();
   assignments = [];
   extraLeft = [];
   extraRight = [];
@@ -483,6 +490,7 @@ function createTubeMap() {
     console.log(assignments);
   }
   getImageDimensions();
+  bandCollector.setExtent({ maxXCoordinate, maxYCoordinate, minYCoordinate });
   t("getImageDimensions");
 
   // all drawn tracks are grouped
@@ -3220,18 +3228,31 @@ function drawNodes(dNodes, groupNode) {
 
   console.log("config:", config);
 
+  const segments = dNodes.map((node) => {
+    const colors = colorNodes(node.name);
+    return bandCollector.segment({
+      id: node.name,
+      outline: node.d,
+      sequence: node.seq,
+      fill: colors["fill"],
+      fillOpacity: colors["fill-opacity"],
+      stroke: colors["outline"],
+      strokeWidth: "2px",
+    });
+  });
+
   groupNode
     .selectAll("node")
-    .data(dNodes)
+    .data(segments)
     .enter()
     .append("path")
-    .attr("id", (d) => d.name)
-    .attr("d", (d) => d.d)
-    .attr("sequence", (d) => d.seq)
-    .style("fill", (d) => colorNodes(d.name)["fill"])
-    .style("fill-opacity", (d) => colorNodes(d.name)["fill-opacity"])
-    .style("stroke", (d) => colorNodes(d.name)["outline"])
-    .style("stroke-width", "2px")
+    .attr("id", (d) => d.id)
+    .attr("d", (d) => d.outline)
+    .attr("sequence", (d) => d.sequence)
+    .style("fill", (d) => d.fill)
+    .style("fill-opacity", (d) => d.fillOpacity)
+    .style("stroke", (d) => d.stroke)
+    .style("stroke-width", (d) => d.strokeWidth)
     .append("svg:title")
 }
 
@@ -3600,28 +3621,79 @@ function filterObjectByAttribute(attribute, value) {
   return (item) => item[attribute] === value;
 }
 
+// The strand row for a shape about to be drawn. The per-band constants — id,
+// name, colour and PCLAI placement — are looked up once here and shared by
+// every band of that strand, instead of being re-derived per attribute.
+function collectStrand(shape) {
+  const [pclaiX, pclaiY] = getPclaiXY(shape.name);
+  return bandCollector.strand({
+    id: shape.id,
+    name: shape.name,
+    color: shape.color,
+    pclaiX,
+    pclaiY,
+    pclaiScore: getPclaiScore(shape.name),
+  });
+}
+
+function strandOf(band) {
+  return bandCollector.strandOf(band);
+}
+
+// The band data keeps a missing PCLAI placement as null; the document has
+// always written the string "None" for it.
+function orNone(value) {
+  return value === null ? "None" : value;
+}
+
+// Bind the per-strand attributes every band carries. Shared by the three shapes
+// so that a change to what a band says about its strand cannot reach one shape
+// and miss another.
+function bindStrandAttributes(selection) {
+  return selection
+    .attr("trackID", (d) => strandOf(d).id)
+    // A corner carries no strand name, because the layout builds one without a
+    // name to give it (see the trackCorners.push calls above). Its strand row
+    // knows the name; the element has never said it, and must not start to.
+    .attr("trackName", (d) => (d.kind === "corner" ? null : strandOf(d).name))
+    .attr("class", (d) => `track${strandOf(d).id}`)
+    .attr("color", (d) => strandOf(d).color)
+    .attr("pclaiX", (d) => orNone(strandOf(d).pclaiX))
+    .attr("pclaiY", (d) => orNone(strandOf(d).pclaiY))
+    .attr("pclaiScore", (d) => orNone(strandOf(d).pclaiScore));
+}
+
 function drawTrackRectangles(rectangles, type, groupTrack) {
   rectangles = rectangles.filter(filterObjectByAttribute("type", type));
 
-  groupTrack
-    .selectAll("trackRectangles")
-    .data(rectangles)
-    .enter()
-    .append("rect")
-    .attr("x", (d) => d.xStart)
-    .attr("y", (d) => d.yStart)
-    .attr("width", (d) => d.xEnd - d.xStart + 1)
-    .attr("height", (d) => d.yEnd - d.yStart + 1)
-    .style("fill", (d) => d.color)
-    .style("fill-opacity", (d) => d.alpha)
-    .attr("trackID", (d) => d.id)
-    .attr("trackName", (d) => d.name)
-    .attr("class", (d) => `track${d.id}`)
-    .attr("color", (d) => d.color)
-    .attr("pclaiX", (d) => { const [x] = getPclaiXY(d.name); return x === null ? "None" : x; })
-    .attr("pclaiY", (d) => { const [, y] = getPclaiXY(d.name); return y === null ? "None" : y; })
-    .attr("pclaiScore", (d) => { const s = getPclaiScore(d.name); return s === null ? "None" : s; })
-    .append("svg:title")
+  // Collect first, then draw what was collected: the elements below are bound
+  // to the bands themselves, so the band data and the document are one list
+  // read twice rather than two descriptions that have to be kept in step.
+  const bands = rectangles.map((rectangle) =>
+    bandCollector.band({
+      kind: "rect",
+      strand: collectStrand(rectangle),
+      x: rectangle.xStart,
+      y: rectangle.yStart,
+      width: rectangle.xEnd - rectangle.xStart + 1,
+      height: rectangle.yEnd - rectangle.yStart + 1,
+      alpha: rectangle.alpha,
+    })
+  );
+
+  bindStrandAttributes(
+    groupTrack
+      .selectAll("trackRectangles")
+      .data(bands)
+      .enter()
+      .append("rect")
+      .attr("x", (d) => d.x)
+      .attr("y", (d) => d.y)
+      .attr("width", (d) => d.width)
+      .attr("height", (d) => d.height)
+      .style("fill", (d) => strandOf(d).color)
+      .style("fill-opacity", (d) => d.alpha)
+  ).append("svg:title")
 }
 
 function compareCurvesByXYStartValue(a, b) {
@@ -3718,42 +3790,50 @@ function drawTrackCurves(type, groupTrack) {
     flattenedGroups = flattenedGroups.concat(groupedCurves[key]);
   }
 
-  groupTrack
-    .selectAll("trackCurves")
-    .data(flattenedGroups)
-    .enter()
-    .append("path")
-    .attr("d", (d) => d.path)
-    .style("fill", (d) => d.color)
-    .style("fill-opacity", (d) => d.alpha)
-    .attr("trackID", (d) => d.id)
-    .attr("trackName", (d) => d.name)
-    .attr("class", (d) => `track${d.id}`)
-    .attr("color", (d) => d.color)
-    .attr("pclaiX", (d) => { const [x] = getPclaiXY(d.name); return x === null ? "None" : x; })
-    .attr("pclaiY", (d) => { const [, y] = getPclaiXY(d.name); return y === null ? "None" : y; })
-    .attr("pclaiScore", (d) => { const s = getPclaiScore(d.name); return s === null ? "None" : s; })
-    .append("svg:title")
+  // Collected in the order they are about to be drawn — which is the order the
+  // grouping and the within-group sort above arrived at, not the order the
+  // curves were generated in.
+  const bands = flattenedGroups.map((curve) =>
+    bandCollector.band({
+      kind: "curve",
+      strand: collectStrand(curve),
+      path: curve.path,
+      alpha: curve.alpha,
+    })
+  );
+
+  bindStrandAttributes(
+    groupTrack
+      .selectAll("trackCurves")
+      .data(bands)
+      .enter()
+      .append("path")
+      .attr("d", (d) => d.path)
+      .style("fill", (d) => strandOf(d).color)
+      .style("fill-opacity", (d) => d.alpha)
+  ).append("svg:title")
 }
 
 function drawTrackCorners(corners, type, groupTrack) {
   corners = corners.filter(filterObjectByAttribute("type", type));
 
-  groupTrack
-    .selectAll("trackCorners")
-    .data(corners)
-    .enter()
-    .append("path")
-    .attr("d", (d) => d.path)
-    .style("fill", (d) => d.color)
-    .attr("trackID", (d) => d.id)
-    .attr("trackName", (d) => d.name)
-    .attr("class", (d) => `track${d.id}`)
-    .attr("color", (d) => d.color)
-    .attr("pclaiX", (d) => { const [x] = getPclaiXY(d.name); return x === null ? "None" : x; })
-    .attr("pclaiY", (d) => { const [, y] = getPclaiXY(d.name); return y === null ? "None" : y; })
-    .attr("pclaiScore", (d) => { const s = getPclaiScore(d.name); return s === null ? "None" : s; })
-    .append("svg:title")
+  const bands = corners.map((corner) =>
+    bandCollector.band({
+      kind: "corner",
+      strand: collectStrand(corner),
+      path: corner.path,
+    })
+  );
+
+  bindStrandAttributes(
+    groupTrack
+      .selectAll("trackCorners")
+      .data(bands)
+      .enter()
+      .append("path")
+      .attr("d", (d) => d.path)
+      .style("fill", (d) => strandOf(d).color)
+  ).append("svg:title")
 }
 
 // extract info about nodes from vg-json
@@ -4203,4 +4283,16 @@ function filterReads(reads) {
 
 export function getImageCoordinates() {
   return { maxXCoordinate, maxYCoordinate, minYCoordinate };
+}
+
+/**
+ * The complete band data of the most recent create() call: every band's
+ * geometry and strand, the per-strand table of colour, name and placement, the
+ * segment boxes, and the document's dimensions. See band-data.mjs.
+ *
+ * The document is still built and still returned exactly as before; this is the
+ * same numbers by a shorter route, for a caller that wants them as numbers.
+ */
+export function getBandData() {
+  return bandCollector.data();
 }
