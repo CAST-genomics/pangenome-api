@@ -29,3 +29,10 @@ node_modules/
 .env
 
 .ipynb_checkpoints
+# test fixtures — small, committed on purpose. The exemption is load-bearing on
+# a case-insensitive filesystem, where `*.JSON*` above swallows tiny-vg.json.
+!tests/fixtures/**
+
+# test tooling
+.pytest_cache/
+.tools/
