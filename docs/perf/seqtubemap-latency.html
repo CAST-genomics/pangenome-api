@@ -1,0 +1,454 @@
+<title>The 120-Second Tube Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+
+<style>
+  :root {
+    --ground:   #F4F6F5;
+    --surface:  #FFFFFF;
+    --ink:      #141B1A;
+    --muted:    #5C6A66;
+    --faint:    #8B9793;
+    --rule:     #DCE2DF;
+    --accent:   #0F6E62;
+    --accent-w: #E3EFEC;
+    --critical: #A8321E;
+    --crit-w:   #F7E7E3;
+    --warn:     #B07A16;
+    --warn-w:   #F6EEDC;
+    --ok:       #3F7A4E;
+
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --serif: "IBM Plex Serif", Georgia, serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --measure: 68ch;
+    --s1: 0.4rem; --s2: 0.75rem; --s3: 1.15rem;
+    --s4: 1.9rem; --s5: 3rem; --s6: 4.5rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0F1513;
+      --surface:  #171F1C;
+      --ink:      #E7ECE9;
+      --muted:    #9AA8A3;
+      --faint:    #6E7C77;
+      --rule:     #28332F;
+      --accent:   #57C3B1;
+      --accent-w: #14302B;
+      --critical: #E0725C;
+      --crit-w:   #331914;
+      --warn:     #D9A748;
+      --warn-w:   #302512;
+      --ok:       #72B384;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:   #0F1513;
+    --surface:  #171F1C;
+    --ink:      #E7ECE9;
+    --muted:    #9AA8A3;
+    --faint:    #6E7C77;
+    --rule:     #28332F;
+    --accent:   #57C3B1;
+    --accent-w: #14302B;
+    --critical: #E0725C;
+    --crit-w:   #331914;
+    --warn:     #D9A748;
+    --warn-w:   #302512;
+    --ok:       #72B384;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 78rem;
+    margin: 0 auto;
+    padding: var(--s5) var(--s4) var(--s6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s5);
+  }
+
+  .col { max-width: var(--measure); }
+
+  /* ---- masthead ---- */
+  .mast { display: flex; flex-direction: column; gap: var(--s3); }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 600;
+    font-size: clamp(2.1rem, 5.5vw, 3.4rem);
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 1.12rem;
+    color: var(--muted);
+    max-width: var(--measure);
+    margin: 0;
+  }
+  .standfirst strong { color: var(--ink); font-weight: 600; }
+
+  /* ---- headline stat row ---- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+  }
+  .stat { background: var(--surface); padding: var(--s3) var(--s3) var(--s2); }
+  .stat .n {
+    font-family: var(--mono);
+    font-size: 1.85rem;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+    display: block;
+    line-height: 1.1;
+  }
+  .stat .n.crit { color: var(--critical); }
+  .stat .l {
+    font-size: 0.8rem;
+    color: var(--muted);
+    display: block;
+    margin-top: var(--s1);
+  }
+
+  /* ---- sections ---- */
+  section { display: flex; flex-direction: column; gap: var(--s3); }
+  h2 {
+    font-family: var(--serif);
+    font-size: 1.55rem;
+    font-weight: 600;
+    letter-spacing: -0.012em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--faint);
+    margin-right: 0.7em;
+    letter-spacing: 0.06em;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-size: 1.02rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  p { margin: 0; max-width: var(--measure); }
+  .sec-rule { border: 0; border-top: 1px solid var(--rule); margin: 0; }
+
+  code, .m {
+    font-family: var(--mono);
+    font-size: 0.87em;
+    background: var(--accent-w);
+    color: var(--accent);
+    padding: 0.12em 0.36em;
+    border-radius: 2px;
+  }
+
+  /* ---- tables ---- */
+  .scroll { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 34rem; }
+  th, td { padding: 0.62rem 0.9rem; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    border-bottom: 1px solid var(--rule);
+  }
+  tbody td { font-family: var(--mono); font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--rule); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr.peak td { background: var(--crit-w); }
+  tbody tr.peak td:first-child { font-weight: 600; }
+  td.bad { color: var(--critical); font-weight: 600; }
+  .const { color: var(--faint); }
+
+  /* ---- findings ---- */
+  .findings { display: flex; flex-direction: column; gap: var(--s3); }
+  .finding {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    padding: var(--s3) var(--s3) var(--s3) 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+  }
+  .finding.is-crit { border-left-color: var(--critical); }
+  .finding.is-warn { border-left-color: var(--warn); }
+  .finding.is-out  { border-left-color: var(--faint); }
+  .fhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); }
+  .chip {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 0.2em 0.5em;
+    border-radius: 2px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .chip.measured { background: var(--crit-w);   color: var(--critical); }
+  .chip.inferred { background: var(--warn-w);   color: var(--warn); }
+  .chip.ruled    { background: var(--rule);     color: var(--muted); }
+  .finding p { font-size: 0.95rem; color: var(--muted); }
+  .finding p strong { color: var(--ink); font-weight: 600; }
+  .ref { font-family: var(--mono); font-size: 0.78rem; color: var(--faint); }
+
+  /* ---- evidence block ---- */
+  pre {
+    margin: 0;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    padding: var(--s3);
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  pre .dim { color: var(--faint); }
+  pre .hit { color: var(--critical); font-weight: 600; }
+
+  /* ---- lane diagram ---- */
+  figure { margin: 0; display: flex; flex-direction: column; gap: var(--s2); }
+  figcaption { font-size: 0.85rem; color: var(--muted); max-width: var(--measure); }
+  .lanes { width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--rule); }
+  /* var() does not resolve in SVG presentation attributes — style via CSS. */
+  .lanes .panel  { fill: var(--ground); stroke: var(--rule); }
+  .lanes .lane   { stroke: var(--accent); stroke-width: 1.4; opacity: 0.55; }
+  .lanes .merged { stroke: var(--accent); stroke-width: 4; }
+  .lanes .arrow  { stroke: var(--faint); stroke-width: 1.2; fill: none; }
+  .lanes .lbl    { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+  .lanes .sub    { fill: var(--faint); font-family: var(--mono); font-size: 10px; }
+
+  ul { margin: 0; padding-left: 1.1rem; max-width: var(--measure); display: flex; flex-direction: column; gap: var(--s1); }
+  li { color: var(--muted); }
+  li strong { color: var(--ink); font-weight: 600; }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: var(--s3);
+    font-size: 0.85rem;
+    color: var(--faint);
+    max-width: var(--measure);
+  }
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+  <header class="mast">
+    <span class="eyebrow">PangenomeAPI · performance diagnosis · 27 Aug 2026</span>
+    <h1>The 120-Second Tube Map</h1>
+    <p class="standfirst">The <code>/seqtubemap</code> endpoint takes <strong>two minutes</strong> to return a <strong>10 MB SVG</strong> for a 10 kb region — and while it does, it takes the entire API down. Measured against the live service at <span class="m">pangenome-api.ucsd.edu</span>, plus a local stage-timing harness.</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><span class="n crit">120.4s</span><span class="l">to render 10 kb</span></div>
+    <div class="stat"><span class="n crit">10.1 MB</span><span class="l">SVG returned</span></div>
+    <div class="stat"><span class="n">464</span><span class="l">stacked lanes, every region</span></div>
+    <div class="stat"><span class="n">722 ms</span><span class="l">fixed boot cost per request</span></div>
+  </div>
+
+  <hr class="sec-rule">
+
+  <section>
+    <h2><span class="num">01</span>What the live API actually does</h2>
+    <p>Five sequential requests against <code>chr8</code> from position <span class="m">78,771,162</span>, growing the region each time. Everything else held constant: <code>version=v2</code>, <code>pathnumoption=normal</code>, <code>nodewidthoption=compressed</code>.</p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Region</th><th>TTFB</th><th>Bytes</th><th>Tracks</th><th>Elements</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>90 bp</td><td>1.46 s</td><td>177,593</td><td class="const">464</td><td>1,201</td></tr>
+          <tr><td>300 bp</td><td>7.87 s</td><td>606,428</td><td class="const">464</td><td>3,641</td></tr>
+          <tr><td>1,000 bp</td><td>1.89 s</td><td>1,300,847</td><td class="const">464</td><td>7,553</td></tr>
+          <tr><td>3,000 bp</td><td class="bad">35.33 s</td><td>3,152,494</td><td class="const">464</td><td>18,073</td></tr>
+          <tr class="peak"><td>10,000 bp</td><td class="bad">120.40 s</td><td>10,071,688</td><td class="const">464</td><td>57,225</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Two readings matter here. <strong>Track count never moves</strong> — 464 at every region size, because that is the haplotype count, and it multiplies everything downstream. And <strong>time is wildly nonlinear and noisy</strong>: 1,000 bp came back faster than 300 bp. That inversion is the one piece of caching in the system leaking through — <code>preprocess_gfa_subgraph</code> is the only artifact checked with <code>.exists()</code>, so a previously-touched region skips the most expensive upstream step.</p>
+  </section>
+
+  <hr class="sec-rule">
+
+  <section>
+    <h2><span class="num">02</span>Where the time is not</h2>
+    <p>A local harness runs the Node half of the pipeline in isolation, mirroring <code>generate-svg.mjs</code> stage for stage. On a synthetic graph of <strong>36,106 elements</strong> — twice the size of the real 3,000 bp response — the entire Node stage completes in <strong>1.44 seconds</strong>:</p>
+
+    <pre><span class="dim">[stage]</span> import:jsdom+canvas    437.6ms  <span class="dim">rss=154MB</span>
+<span class="dim">[stage]</span> jsdom:construct-dom    109.0ms  <span class="dim">rss=179MB</span>
+<span class="dim">[stage]</span> import:tubemap.js      175.6ms  <span class="dim">rss=208MB</span>
+<span class="dim">[stage]</span> io:read-input            0.4ms
+<span class="dim">[stage]</span> parse:JSON.parse         4.5ms
+<span class="dim">[stage]</span> convert:vgExtractNodes   0.1ms
+<span class="dim">[stage]</span> convert:vgExtractTracks  0.7ms
+<span class="dim">[stage]</span> render:create()        647.2ms  <span class="dim">rss=468MB</span>
+<span class="dim">[stage]</span> serialize:outerHTML     48.4ms
+<span class="dim">[stage]</span> io:write-svg             9.8ms
+                       <span class="hit">total 1441.7ms</span></pre>
+
+    <p>The server spent <strong>35.3 s</strong> producing a smaller graph than this. So the SVG generation stage is roughly <strong>1–2 seconds of it</strong>, and something on the order of <strong>34 seconds sits upstream</strong> — in <code>gbz-base</code> subgraph extraction, <code>SeqTubeGfaProcessor</code>, <code>vg convert</code>, and <code>vg view -j</code>. That split is inferred, not directly measured; §06 says how to close it.</p>
+    <p>Note the first three lines. <strong>722 ms of that total is fixed cost</strong> — booting JSDOM, node-canvas, and importing 130 KB of <code>tubemap.js</code> — paid on every single request no matter how small the region.</p>
+  </section>
+
+  <hr class="sec-rule">
+
+  <section>
+    <h2><span class="num">03</span>Findings</h2>
+    <div class="findings">
+
+      <article class="finding is-crit">
+        <div class="fhead"><h3>One slow request takes down the whole API</h3><span class="chip measured">Measured</span></div>
+        <p><code>seqtubemap</code> is declared <code>async def</code>, but every call inside it is blocking: four synchronous <code>subprocess.run</code> invocations plus the gbz extraction. That blocks the FastAPI event loop outright. This was confirmed by accident — four unrelated requests issued while the 120 s call was in flight <strong>all failed with no HTTP status at all</strong>, then succeeded immediately once it finished. Concurrent requests don't queue, they die.</p>
+        <p class="ref">main.py:452 · blocking calls at :250, :273, :293</p>
+      </article>
+
+      <article class="finding is-crit">
+        <div class="fhead"><h3>Path aggregation is implemented, but effectively never fires</h3><span class="chip measured">Measured</span></div>
+        <p>The <code>pathnumoption=compressed</code> option groups haplotypes into <code>path_summary</code> keyed on <code>walk_update</code> — <strong>the entire node traversal across the whole region, as one string</strong>. Two haplotypes collapse only if their walks are byte-identical end to end, so a single SNP anywhere in the window keeps them apart. At 1,000 bp, <code>compressed</code> and <code>normal</code> returned <strong>byte-identical 1,300,847-byte responses</strong>: nothing collapsed.</p>
+        <p>This is aggregation at the wrong granularity. Collapsing tracks that agree <em>between branch points</em>, rather than across the entire walk, is what would actually merge those 464 lanes — and is closer to what a tube map is meant to draw.</p>
+        <p class="ref">main.py:212–226</p>
+      </article>
+
+      <article class="finding is-warn">
+        <div class="fhead"><h3>Most of the payload is repeated strings, not geometry</h3><span class="chip measured">Measured</span></div>
+        <p>In the real 90 bp response: <strong><code>style=</code> is 14% of bytes</strong> (<code>fill: rgb(211, 211, 211); fill-opacity: 1;</code> written out hundreds of times) and <strong><code>trackName=</code> is 13%</strong> — each track's full name, e.g. <code>NA20806#1#CM102444.1#0[80060344-80060632]</code>, duplicated per element. Actual path geometry <code>d=</code> is only 8%. There are 599 <code>&lt;title&gt;</code> elements for tooltips against 517 <code>&lt;rect&gt;</code>s.</p>
+      </article>
+
+      <article class="finding is-warn">
+        <div class="fhead"><h3>A browser is emulated server-side to emit XML</h3><span class="chip measured">Measured</span></div>
+        <p>To run the browser visualization component on the server, <code>generate-svg.mjs</code> stands up a full JSDOM document with <code>pretendToBeVisual: true</code>, plus a node-canvas instance whose only job is backing a monkey-patched <code>getComputedTextLength</code> for text measurement — then discards all of it and takes <code>.outerHTML</code> as a string. Nothing is rasterized; the cost is DOM emulation, and it is the <strong>722 ms fixed floor</strong> on every request.</p>
+        <p>The caveat: the layout math in <code>create()</code> is real work that has to happen somewhere. What is gratuitous is routing it through a DOM — not that it happens.</p>
+        <p class="ref">seqtubemap/generate-svg.mjs</p>
+      </article>
+
+      <article class="finding is-out">
+        <div class="fhead"><h3>Result caching is not the fix</h3><span class="chip ruled">Ruled out</span></div>
+        <p>The code deletes every intermediate <em>and the finished SVG</em> after each response, so identical repeat requests recompute from scratch — 3.18 s then 3.01 s for the same region. That looked like an easy win, but scientists poke arbitrary nodes across a loaded graph and rarely repeat a specific retrieval, so a cache would almost never hit. <strong>Ruled out on access-pattern grounds.</strong></p>
+        <p class="ref">main.py:485</p>
+      </article>
+
+    </div>
+  </section>
+
+  <hr class="sec-rule">
+
+  <section>
+    <h2><span class="num">04</span>Why 464 lanes is the multiplier</h2>
+    <figure>
+      <svg class="lanes" viewBox="0 0 720 190" role="img" aria-label="Diagram: 464 haplotype lanes rendered separately versus collapsed by shared segment">
+        <text class="lbl" x="16" y="20">pathnumoption=normal — 464 lanes, 7,080px tall</text>
+        <text class="lbl" x="410" y="20">collapsed per segment</text>
+        <rect class="panel" x="16" y="32" width="330" height="140"/>
+        <g class="lane">
+          <line x1="30" y1="40" x2="332" y2="40"/><line x1="30" y1="46" x2="332" y2="46"/>
+          <line x1="30" y1="52" x2="332" y2="52"/><line x1="30" y1="58" x2="332" y2="58"/>
+          <line x1="30" y1="64" x2="332" y2="64"/><line x1="30" y1="70" x2="332" y2="70"/>
+          <line x1="30" y1="76" x2="332" y2="76"/><line x1="30" y1="82" x2="332" y2="82"/>
+          <line x1="30" y1="88" x2="332" y2="88"/><line x1="30" y1="94" x2="332" y2="94"/>
+          <line x1="30" y1="100" x2="332" y2="100"/><line x1="30" y1="106" x2="332" y2="106"/>
+          <line x1="30" y1="112" x2="332" y2="112"/><line x1="30" y1="118" x2="332" y2="118"/>
+          <line x1="30" y1="124" x2="332" y2="124"/><line x1="30" y1="130" x2="332" y2="130"/>
+          <line x1="30" y1="136" x2="332" y2="136"/><line x1="30" y1="142" x2="332" y2="142"/>
+          <line x1="30" y1="148" x2="332" y2="148"/><line x1="30" y1="154" x2="332" y2="154"/>
+          <line x1="30" y1="160" x2="332" y2="160"/><line x1="30" y1="166" x2="332" y2="166"/>
+        </g>
+        <text class="sub" x="176" y="186" text-anchor="middle">…×464</text>
+
+        <path class="arrow" d="M360 100 L392 100"/>
+        <path class="arrow" d="M386 95 L392 100 L386 105"/>
+
+        <rect class="panel" x="404" y="32" width="300" height="140"/>
+        <g class="merged">
+          <line x1="420" y1="70" x2="688" y2="70"/>
+          <line x1="420" y1="94" x2="688" y2="94"/>
+          <line x1="420" y1="118" x2="688" y2="118"/>
+        </g>
+        <text class="sub" x="554" y="186" text-anchor="middle">shared segments merge</text>
+      </svg>
+      <figcaption>Every haplotype gets its own ~15 px row regardless of whether it differs from its neighbours anywhere in the window. At 90 bp that produces a 7,080 px-tall image; at 10 kb it produces 57,225 elements.</figcaption>
+    </figure>
+
+    <p>A local sweep holding tracks at 464 while growing the graph shows how steeply the byte count and memory follow — and where it stops working entirely:</p>
+
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Spine nodes</th><th>create()</th><th>SVG</th><th>Elements</th><th>Peak RSS</th></tr></thead>
+        <tbody>
+          <tr><td>40</td><td>656 ms</td><td>4.92 MB</td><td>38,167</td><td>514 MB</td></tr>
+          <tr><td>150</td><td>1,975 ms</td><td>15.49 MB</td><td>119,053</td><td>1,222 MB</td></tr>
+          <tr><td>600</td><td>7,662 ms</td><td>57.32 MB</td><td>441,121</td><td>3,879 MB</td></tr>
+          <tr class="peak"><td>2,400</td><td class="bad">OOM</td><td class="bad">—</td><td class="bad">—</td><td class="bad">6 GB heap exhausted</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>These are synthetic graphs and diverge more than real haplotypes do, so treat the absolute numbers as an upper bound. The shape is the point: <strong>memory, not CPU, is what ends the run.</strong></p>
+  </section>
+
+  <hr class="sec-rule">
+
+  <section>
+    <h2><span class="num">05</span>The harness</h2>
+    <p>Four files in <code>perf/</code>, no genomics toolchain required — they exercise the JSON→SVG boundary directly, so none of <code>data.path</code>, <code>tools.path</code>, or the HPRC graph files need to be provisioned.</p>
+    <ul>
+      <li><strong><code>gen-vg-json.mjs</code></strong> — deterministic synthetic vg JSON: reference spine, bubbles, haplotypes. Tunable <code>spineNodes</code>, <code>haplotypes</code>, <code>bubbleRate</code>, <code>altFreq</code>, <code>seqLen</code>, <code>seed</code>.</li>
+      <li><strong><code>stage-timer.mjs</code></strong> — mirrors <code>generate-svg.mjs</code> stage for stage, timing each and measuring output composition. Runs as its own process, because <code>tubemap.js</code> holds module-level layout state. Emits progress to stderr so a crash still names the stage that died.</li>
+      <li><strong><code>bench.mjs</code></strong> — sweeps one graph dimension at a time; <code>--input=real.json</code> takes a real fixture.</li>
+      <li><strong><code>cross.mjs</code></strong> — the tracks × nodes cross term, which is the case that matters.</li>
+    </ul>
+    <pre>node perf/stage-timer.mjs &lt;input.json&gt; &lt;out.svg&gt; &lt;start&gt; &lt;end&gt; &lt;nodeWidthOption&gt;
+node perf/bench.mjs --axis=spine
+SPINES=40,150,600 HAPS=464 ALT=0.08 node perf/cross.mjs</pre>
+    <p><code>perf/fixtures/</code> is gitignored — the sweeps generate hundreds of MB.</p>
+  </section>
+
+  <hr class="sec-rule">
+
+  <section>
+    <h2><span class="num">06</span>The one gap</h2>
+    <p>The ~34 s upstream figure is <strong>inferred by subtraction</strong>, not measured. Everything else in this report is a direct observation. Closing it is small: add tagged timers around the four pipeline calls in <code>seqtubemap</code> — <code>SubgraphMC</code>, <code>SeqTubeGfaProcessor</code>, <code>ConvertGfaToVg</code>, <code>ConvertVgToJson</code>, <code>GenerateSeqTubeMapSvg</code> — and log the split per request. That turns the largest remaining unknown into a number and tells you whether the first real fix belongs in <code>gbz-base</code> extraction or in the <code>vg</code> conversion hop.</p>
+  </section>
+
+  <footer>
+    Measured 27 Aug 2026 against <span class="m">pangenome-api.ucsd.edu:8000</span> and locally on Node v26.7.0 / darwin 25.5.0. Live-API timings are single samples on a shared service and carry real variance; the local harness is deterministic and repeatable.
+  </footer>
+
+</div>
