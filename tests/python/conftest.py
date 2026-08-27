@@ -1,16 +1,19 @@
 """Shared setup for the Python tests.
 
-Booting `main` is the whole difficulty here: it reaches for panCT, for four
-tabix-indexed walk derivatives, and — through `bandage_graph` and
-`adaptagrams_converter` — for two natively-compiled layout libraries that only
-exist inside the Docker image. None of that is needed to answer "does the app
-boot and serve", so this module stands each one up cheaply:
+Booting `main` is the whole difficulty here: it reaches for panCT and —
+through `bandage_graph` and `adaptagrams_converter` — for two
+natively-compiled layout libraries that only exist inside the Docker image.
+None of that is needed to answer "does the app boot and serve", so this module
+stands each one up cheaply:
 
-* the walk derivatives become tiny tabix files written into a temp directory,
 * the native layout libraries become import stubs,
 * panCT is used for real when the machine has it, and stubbed when it does not,
 * `tools.path` and `data.path` are supplied through git's environment config,
   so the developer's own `git config --local` values are left alone.
+
+`data.path` points at an empty directory on purpose: the walk derivatives are
+opened when something reads them, so the whole suite runs on a machine that
+has none of them. A test that wants one writes it with `walk_stand_in`.
 
 The panCT stub is the one stand-in that costs something: a machine without
 panCT boots the app against a placeholder `Region`, so a break in panCT's own
@@ -34,14 +37,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # developer machine without `vg`, and must fail the build instead of skipping.
 REQUIRE_ALL = os.environ.get("PANGENOME_TESTS_REQUIRE_ALL") == "1"
 
-# The four `.walk.gz` derivatives `main` opens at import time (main.py:77-88).
-WALK_FILES = (
-    "hprc-v1.1-mc-grch38-mapped-flattened.walk.gz",
-    "hprc-v2.0-mc-grch38-v2.2.walk.gz",
-    "hprc_v1.0_minigraph_filtered_with_id.walk.gz",
-    "v1_1_hprc_v2.0_minigraph.sorted.pclai.walk.gz",
-)
-
 
 def _skip_or_fail(reason: str) -> None:
     """Skip for a missing dependency — unless CI said there must not be one."""
@@ -50,20 +45,20 @@ def _skip_or_fail(reason: str) -> None:
     pytest.skip(reason)
 
 
-def _write_walk_stand_ins(data_dir: Path) -> None:
-    """Write one bgzipped, tabix-indexed stand-in per walk derivative.
+def _write_walk_stand_in(path: Path) -> Path:
+    """Write one bgzipped, tabix-indexed stand-in for a walk derivative.
 
     A few bed rows in place of a multi-gigabyte walk file: enough for
-    `pysam.TabixFile` to open, which is all module import requires.
+    `pysam.TabixFile` to open and fetch from.
     """
     import pysam
 
-    for name in WALK_FILES:
-        plain = data_dir / name[: -len(".gz")]
-        plain.write_text("chr1\t0\t100\nchr1\t100\t200\n")
-        pysam.tabix_compress(str(plain), str(data_dir / name), force=True)
-        plain.unlink()
-        pysam.tabix_index(str(data_dir / name), preset="bed", force=True)
+    plain = path.with_suffix("")
+    plain.write_text("chr1\t0\t100\nchr1\t100\t200\n")
+    pysam.tabix_compress(str(plain), str(path), force=True)
+    plain.unlink()
+    pysam.tabix_index(str(path), preset="bed", force=True)
+    return path
 
 
 def _install_native_stubs() -> None:
@@ -143,10 +138,14 @@ def _panct_path() -> str | None:
 
 @pytest.fixture(scope="session")
 def data_dir(tmp_path_factory) -> Path:
-    """A stand-in for the graph data directory, holding only the walk files."""
-    directory = tmp_path_factory.mktemp("data")
-    _write_walk_stand_ins(directory)
-    return directory
+    """A stand-in for the graph data directory, holding nothing at all."""
+    return tmp_path_factory.mktemp("data")
+
+
+@pytest.fixture
+def walk_stand_in(tmp_path) -> Path:
+    """A tiny stand-in walk derivative, for a test that needs one present."""
+    return _write_walk_stand_in(tmp_path / "stand-in.walk.gz")
 
 
 @pytest.fixture(scope="session")

@@ -154,10 +154,11 @@ fast one does not wait.
 
 ### [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19) — Lazy tabix opens
 
-Three module-scope `pysam.TabixFile` opens (`main.py:71`, `:73`, `:81`) mean the app cannot
-boot unless all three `.walk.gz` derivatives are present, even for a request touching none of
-them. They are team-generated files, not public downloads — this is the first wall anyone
-hits trying to run the server.
+Done. The `.walk.gz` derivatives used to be opened at module scope, so the app could not boot
+unless all of them were present — even for a request touching none of them. They are
+team-generated files, not public downloads, which made this the first wall anyone hit trying
+to run the server. Each is now opened the first time something reads it (`WalkDerivative` in
+`main.py`), once per process, and a missing one is a 503 naming the file and what wanted it.
 
 ---
 

@@ -46,9 +46,10 @@ pytest                 # Python: boots the app and exercises the endpoint seam
 npm test               # Node: drives the sequence tube map generator
 ```
 
-Neither suite needs graph data: the Python tests stand in tiny files for the
-`.walk.gz` derivatives and stub the two natively-compiled layout libraries, and
-the Node tests read a committed vg JSON fixture. panCT is used for real if you
+Neither suite needs graph data: the Python tests run against an empty data
+directory — the `.walk.gz` derivatives are opened only when a request reads one
+— and stub the two natively-compiled layout libraries, while the Node tests
+read a committed vg JSON fixture. panCT is used for real if you
 have it — from the `tools.path` Step 5 sets, or from `PANCT_PATH` — and stubbed
 if you do not. Tests that shell out to `vg` skip when it is not installed, and
 so does the `/seqtubemap` endpoint test when `node_modules` is not installed —

@@ -15,6 +15,7 @@ import logging
 import time
 import signal
 import ssl
+import threading
 import traceback
 import numpy as np
 import os
@@ -74,17 +75,84 @@ mc_hg38_gbz_v1 = Path(f"{data_path}/hprc-v1.1-mc-grch38.gbz")
 mc_hg38_gbz_v2 = Path(f"{data_path}/hprc-v2.0-mc-grch38.gbz")
 minigraph_hg38_gfa_v1 = Path(f"{data_path}/hprc-v1.0-minigraph-grch38.gfa")
 minigraph_hg38_gfa_v2 = Path(f"{data_path}/hprc-v2.0-minigraph-grch38.gfa")
-mc_mapped_walks_v1 = pysam.TabixFile(f"{data_path}/hprc-v1.1-mc-grch38-mapped-flattened.walk.gz")
-mc_mapped_walks_v2 = pysam.TabixFile(f"{data_path}/hprc-v2.0-mc-grch38-v2.2.walk.gz")
-minigraph_walks_v1 = pysam.TabixFile(f"{data_path}/hprc_v1.0_minigraph_filtered_with_id.walk.gz")
 generate_svg_js_script = Path("./seqtubemap/generate-svg.mjs")
+
+
+class MissingWalkDerivative(RuntimeError):
+    """A walk derivative was read and is not on this machine."""
+
+
+class WalkDerivative:
+    """One tabix-indexed walk derivative, opened the first time it is read.
+
+    Stands in for the `pysam.TabixFile` the call sites used to be handed: they
+    call `fetch` and nothing else. The open is deferred because these files are
+    team-generated rather than public downloads, so requiring all of them at
+    import time stopped the application from booting for anyone who had none of
+    them — including for requests that read no walk derivative at all. A missing file is
+    now a `MissingWalkDerivative` on the request that needed it, naming the file
+    and what wanted it, instead of a crash before the first request.
+
+    The handle is kept, so a file is opened once per process rather than once
+    per request. Endpoints run in FastAPI's threadpool, hence the lock.
+    """
+
+    def __init__(self, path, purpose):
+        self.path = Path(path)
+        self.purpose = purpose
+        self._tabix_file = None
+        self._lock = threading.Lock()
+
+    def fetch(self, *args, **kwargs):
+        return self._open().fetch(*args, **kwargs)
+
+    def _open(self):
+        with self._lock:
+            if self._tabix_file is None:
+                try:
+                    self._tabix_file = pysam.TabixFile(str(self.path))
+                except (OSError, ValueError) as error:
+                    # pysam raises for both the file and its tabix index, and
+                    # says only "could not open" — the path and the caller are
+                    # what makes it actionable.
+                    raise MissingWalkDerivative(
+                        f"{self.path} could not be opened, and it is needed to "
+                        f"{self.purpose}. It is a team-generated walk derivative: "
+                        f"put it, and its tabix index, in the directory named by "
+                        f"`git config data.path`. ({error})"
+                    ) from error
+        return self._tabix_file
+
+
+@app.exception_handler(MissingWalkDerivative)
+def missing_walk_derivative_handler(request, exc):
+    """Report a missing derivative to the client rather than only to the log."""
+    api_log.error(str(exc))
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+mc_mapped_walks_v1 = WalkDerivative(
+    f"{data_path}/hprc-v1.1-mc-grch38-mapped-flattened.walk.gz",
+    "map the chopped node ids of a minigraph-cactus v1 subgraph back to their unchopped ids",
+)
+mc_mapped_walks_v2 = WalkDerivative(
+    f"{data_path}/hprc-v2.0-mc-grch38-v2.2.walk.gz",
+    "attach strands to a minigraph-cactus v2 subgraph",
+)
+minigraph_walks_v1 = WalkDerivative(
+    f"{data_path}/hprc_v1.0_minigraph_filtered_with_id.walk.gz",
+    "attach strands to a minigraph v1 subgraph",
+)
 
 # walks updated in 4/22/2026 with features:
 #   1. filled missing nodes
 #   2. pclai for both hg38 and asm coordinates
 #   3. discarded median approach, used impainting methods on euclidean distance
 #   4. with assembly coordinates
-minigraph_walks_v2_updated = pysam.TabixFile(f"{data_path}/v1_1_hprc_v2.0_minigraph.sorted.pclai.walk.gz")
+minigraph_walks_v2_updated = WalkDerivative(
+    f"{data_path}/v1_1_hprc_v2.0_minigraph.sorted.pclai.walk.gz",
+    "attach strands and PCLAI colours to a minigraph v2 subgraph",
+)
 
 def delete_files(path_list):
     for path in path_list:
@@ -185,7 +253,7 @@ def GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_w
             subgraph minigraph cactus gfa w/o W lines
         preprocess_gfa_subgraph_w_walk: Path
             output file path; subgraph minigraph cactus gfa w W lines added
-        mc_mapped_walks_v2: pysam.TabixFile Object
+        mc_mapped_walks_v2: WalkDerivative
             minigraph cactus walk file
     """
     
