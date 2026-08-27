@@ -34,6 +34,26 @@ git config --local tools.path [PATH_TO_TOOL_DIR_WITH_PANCT]
 git config --local data.path [PATH_TO_DATA_DIR_WITH_MINIGRAPH_AND_MINIGRAPH-CACTUS_GFA]
 ```
 
+## How to Test
+
+Two suites, one command each. Both are safe to run on a machine without graph
+data; anything that genuinely needs a missing dependency skips and says so.
+
+```
+pip install -r requirements-test.txt
+pytest                 # Python: boots the app and exercises the vg seam
+npm test               # Node: drives the sequence tube map generator
+```
+
+Neither suite needs graph data: the Python tests stand in tiny files for the
+`.walk.gz` derivatives and stub the two natively-compiled layout libraries, and
+the Node tests read a committed vg JSON fixture. panCT is used for real if you
+have it — from the `tools.path` Step 5 sets, or from `PANCT_PATH` — and stubbed
+if you do not. Tests that shell out to `vg` skip when it is not installed.
+
+Both suites run in CI on every pull request (`.github/workflows/ci.yml`), where
+`vg` and panCT are installed and a skip is turned into a failure.
+
 ## How to Use:
 In the pangenome-api folder, run:
 ```

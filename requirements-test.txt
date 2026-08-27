@@ -1,0 +1,10 @@
+# Everything needed to run `pytest`, on top of a Python 3.11+ interpreter.
+#
+# The runtime dependencies here are a subset of the Dockerfile's: the two
+# natively-compiled layout libraries (ogdf-python, adaptagrams) are stood in for
+# by tests/python/conftest.py rather than built, since no test exercises layout.
+fastapi
+numpy
+pysam
+pytest
+httpx  # the transport behind fastapi.testclient.TestClient

@@ -1,0 +1,282 @@
+{
+  "node": [
+    {
+      "id": 1,
+      "sequence": "ATGG"
+    },
+    {
+      "id": 2,
+      "sequence": "AGGCATGA"
+    },
+    {
+      "id": 3,
+      "sequence": "CGCTATA"
+    },
+    {
+      "id": 4,
+      "sequence": "CGTAT"
+    },
+    {
+      "id": 5,
+      "sequence": "GGTGTTAA"
+    },
+    {
+      "id": 6,
+      "sequence": "AATCCCT"
+    },
+    {
+      "id": 7,
+      "sequence": "GCCAATCAGC"
+    },
+    {
+      "id": 8,
+      "sequence": "TGTGTAGGT"
+    },
+    {
+      "id": 9,
+      "sequence": "TGTTGTAGCGGT"
+    },
+    {
+      "id": 10,
+      "sequence": "TCGGGCAA"
+    },
+    {
+      "id": 11,
+      "sequence": "TGAGGGTCTGTG"
+    },
+    {
+      "id": 12,
+      "sequence": "ATGGACATTGG"
+    },
+    {
+      "id": 13,
+      "sequence": "GTCAGTTAG"
+    },
+    {
+      "id": 14,
+      "sequence": "ACCCAAAA"
+    }
+  ],
+  "path": [
+    {
+      "name": "GRCh38#0#chr1",
+      "freq": 1,
+      "indexOfFirstBase": 0,
+      "mapping": [
+        {
+          "position": {
+            "node_id": 1,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 3,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 5,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 7,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 9,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 10,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 12,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 13,
+            "is_reverse": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "HG10000#1#chr1",
+      "freq": 1,
+      "indexOfFirstBase": 0,
+      "mapping": [
+        {
+          "position": {
+            "node_id": 2,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 3,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 5,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 8,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 9,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 11,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 12,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 14,
+            "is_reverse": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "HG10001#2#chr1",
+      "freq": 1,
+      "indexOfFirstBase": 0,
+      "mapping": [
+        {
+          "position": {
+            "node_id": 2,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 3,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 6,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 8,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 9,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 10,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 12,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 13,
+            "is_reverse": false
+          }
+        }
+      ]
+    },
+    {
+      "name": "HG10002#1#chr1",
+      "freq": 1,
+      "indexOfFirstBase": 0,
+      "mapping": [
+        {
+          "position": {
+            "node_id": 1,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 3,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 5,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 8,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 9,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 10,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 12,
+            "is_reverse": false
+          }
+        },
+        {
+          "position": {
+            "node_id": 14,
+            "is_reverse": false
+          }
+        }
+      ]
+    }
+  ]
+}

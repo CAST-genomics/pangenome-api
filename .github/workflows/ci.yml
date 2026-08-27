@@ -1,0 +1,81 @@
+# Runs both test suites on every pull request, and on pushes to main.
+#
+# The two suites are independent — the Python one boots the app, the Node one
+# drives the sequence tube map generator — so they run as separate jobs and either can
+# fail the build on its own.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  python:
+    name: Python tests
+    runs-on: ubuntu-latest
+    env:
+      # Both pinned to the versions the Dockerfile installs.
+      VG_VERSION: v1.75.0
+      PANCT_COMMIT: 03c406b
+      PANCT_PATH: ${{ github.workspace }}/.tools
+      # In CI a missing dependency is a broken workflow, not a bare machine:
+      # tests that would skip for want of one fail the build instead.
+      PANGENOME_TESTS_REQUIRE_ALL: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      # The endpoint seam still shells out to `vg`, so CI has it. Tests that
+      # need it skip with a reason elsewhere; here they must actually run.
+      - name: Cache vg
+        id: cache-vg
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/bin/vg
+          key: vg-${{ env.VG_VERSION }}
+      - name: Install vg
+        if: steps.cache-vg.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.local/bin
+          curl -fsSL "https://github.com/vgteam/vg/releases/download/${VG_VERSION}/vg" -o ~/.local/bin/vg
+          chmod +x ~/.local/bin/vg
+      - name: Put vg on PATH
+        run: |
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install panCT
+        run: |
+          git clone --quiet https://github.com/CAST-genomics/panCT.git "$PANCT_PATH/panCT"
+          git -C "$PANCT_PATH/panCT" checkout --quiet "$PANCT_COMMIT"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Check vg is available
+        run: vg version
+
+      - name: Run tests
+        run: pytest
+
+  node:
+    name: Node tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
