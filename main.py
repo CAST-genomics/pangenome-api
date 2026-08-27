@@ -661,7 +661,7 @@ async def seqtubemap(
     seqtubemap_svg = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_path{pathnumoption}_{version}.svg")
       
     stages = {}
-    subgraph_cached = preprocess_gfa_subgraph.exists()
+    subgraph_cached = preprocess_gfa_subgraph_w_walk.exists()
 
     with stage_timing(stages, "subgraph_extract"):
         if not subgraph_cached:
@@ -669,7 +669,7 @@ async def seqtubemap(
                 log.error("version 1 is currently unavailable for minigraph cactus")
                 # SubgraphMC(query_region, preprocess_gfa_subgraph, mc_hg38_gbz_v1, log)
             elif version == "v2":
-                SubgraphMC(query_region, preprocess_gfa_subgraph, mc_hg38_gbz_v2, log)
+                SubgraphMC(query_region, preprocess_gfa_subgraph_no_walk, mc_hg38_gbz_v2, log)
                 GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_walk, mc_mapped_walks_v2, log)   
                 background_tasks.add_task(delete_files, [preprocess_gfa_subgraph_no_walk])
             else:
@@ -707,7 +707,7 @@ async def seqtubemap(
         f"json_mb={size_mb(json_subgraph)} svg_mb={size_mb(seqtubemap_svg)}"
     )
 
-    background_tasks.add_task(delete_files, [postprocess_gfa_subgraph, vg_subgraph, json_subgraph, seqtubemap_svg])
+    background_tasks.add_task(delete_files, [vg_subgraph, json_subgraph, seqtubemap_svg])
     return FileResponse(seqtubemap_svg, media_type="image/svg+xml")
 
 
