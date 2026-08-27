@@ -174,12 +174,28 @@ def PreprocessMCSubgraphV1(gfa_preprocessed, gfa_postprocessed, mc_mapped_walks,
         subgfa_postprocess.write(f"L\t{link[1]}\t{link[2]}\t{link[3]}\t{link[4]}\t{link[5]}\n")
 
 def GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_walk, mc_mapped_walks_v2, log):
+    
+    """
+    Add W lines to minigraph cactus subgraph .gfa
+
+    Parameters
+    ----------
+        preprocess_gfa_subgraph_no_walk: Path
+            subgraph minigraph cactus gfa w/o W lines
+        preprocess_gfa_subgraph_w_walk: Path
+            output file path; subgraph minigraph cactus gfa w W lines added
+        mc_mapped_walks_v2: pysam.TabixFile Object
+            minigraph cactus walk file
+    """
+    
     gfa_no_walk = open(preprocess_gfa_subgraph_no_walk, "r")
     gfa_w_walk = open(preprocess_gfa_subgraph_w_walk, "w")
     strand_translation = {"+":">", "-":"<"}
     
-    #coord_table = {nodeid:assembly:{contig:[[coordinate],[node_id],[strand]]}}
+    #coord_table = {assembly:{contig:[[coordinate],[node_id],[strand]]}}
     coord_table = {}
+    #dup_coord_table = {assembly:{contig:{nodeid:[coordinate_x, coordinate_y, strand]}}}
+    dup_coord_table = {}
     for line in gfa_no_walk:
         if line[0] == "S":
             node_id = int(line.split("\t")[1])
@@ -196,17 +212,43 @@ def GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_w
                         coord_table[asm] = {contig:[[(coord,coord+length)],[node_id],[strand]]}
                     else:
                         if contig not in coord_table[asm]:
-                            coord_table[asm][contig] = [[(coord,coord+length)],[strand]]
+                            coord_table[asm][contig] = [[(coord,coord+length)],[node_id],[strand]]
                         else:
                             coord_table[asm][contig][0].append((coord,coord+length))
                             coord_table[asm][contig][1].append(node_id)
                             coord_table[asm][contig][2].append(strand)
+                            
+                for dup_coord in asm_coord_dup.split(","):
+                    part = dup_coord.split("|")
+                    asm = part[0]
+                    if asm not in dup_coord_table:
+                        dup_coord_table[asm] = {}
+                    for i in range(1, len(part)):
+                        contig, coord, strand = part[i].split(":")
+                        coord = int(coord)
+                        if contig not in dup_coord_table[asm]:
+                            dup_coord_table[asm][contig] = {node_id:[[(coord,coord+length)],[strand]]}
+                        else:
+                            if node_id not in dup_coord_table[asm][contig]:
+                                dup_coord_table[asm][contig][node_id] = [[(coord,coord+length)],[strand]]
+                            else:
+                                # we have duplicated dup entries, so have to filter that out
+                                # TODO fix the walks file
+                                if any(coord == t[0] for t in dup_coord_table[asm][contig][node_id][0]):
+                                    continue
+                                else:
+                                    dup_coord_table[asm][contig][node_id][0].append((coord,coord+length))
+                                    dup_coord_table[asm][contig][node_id][1].append(strand)
+                        
             gfa_w_walk.write(line)
         elif line[0] == "L" or line[0] == "H":
             gfa_w_walk.write(line)
         # we don't record anything else other than the H, S and L lines
         else:
             continue
+    if dup_coord_table == {}:
+        print("no duplicated node")
+    print(dup_coord_table)
         
     # use the coord_table to generate walks lines
     for asm in coord_table:
@@ -220,28 +262,60 @@ def GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_w
             node_ids = coord_table[asm][contig][1]
             strands = coord_table[asm][contig][2]
             
-            # 1. Pair each coordinate with its node_id, then sort by start position
+            # add dup coords back to the regular coord lists
+            min_coord = min(t[0] for t in coords)
+            max_coord = max(t[-1] for t in coords)
+            if asm in dup_coord_table and contig in dup_coord_table[asm]:
+                for node_id in dup_coord_table[asm][contig]:
+                    # DEBUG
+                    capture = 0 
+                    for i in range(0, len(dup_coord_table[asm][contig][node_id][0])):
+                        # if more than 1 coordinate of the same asm, same contig, same node is
+                        # added, we assume that this happened in the original walks file
+                        # TODO need further check on this
+                        node_coord = dup_coord_table[asm][contig][node_id][0][i]
+                        strand = dup_coord_table[asm][contig][node_id][1][i]
+                        if node_coord[0] >= min_coord and node_coord[1] <= max_coord:
+                            coords.append(node_coord)
+                            node_ids.append(node_id)
+                            strands.append(strand)
+                            capture += 1
+                    if capture > 1:
+                        print(f"in this region, we added 2 coordinates from node {node_id} into the walk line of assembly {asm_contig}")
+                
+            # Pair each coordinate with its node_id, then sort by start position
             paired = sorted(zip(coords, node_ids, strands), key=lambda x: x[0])
 
             sorted_coords = [p[0] for p in paired]
             sorted_node_ids = [p[1] for p in paired]
             sorted_strands = [p[2] for p in paired]
+            sorted_coords_final = []
+            sorted_node_ids_final = []
+            sorted_strands_final = []
 
-            # 2. Walk through consecutive intervals and check prev_end vs curr_start
+            # Walk through consecutive intervals and check prev_end vs curr_start
+            start_index = 0
             for i in range(1, len(sorted_coords)):
                 prev_end = sorted_coords[i - 1][1]
                 curr_start = sorted_coords[i][0]
                 if curr_start != prev_end:
-                    print(f"gaps between node {sorted_node_ids[i - 1]} and {sorted_node_ids[i - 1]} in assembly {asm_contig}")
+                    sorted_coords_final.append(sorted_coords[start_index:i])
+                    sorted_node_ids_final.append(sorted_node_ids[start_index:i])
+                    sorted_strands_final.append(sorted_strands[start_index:i])
+                    start_index = i
+                    print(f"gaps between node {sorted_node_ids[i - 1]} and {sorted_node_ids[i]} in assembly {asm_contig} is {prev_end-curr_start}")
+            sorted_coords_final.append(sorted_coords[start_index:])
+            sorted_node_ids_final.append(sorted_node_ids[start_index:])
+            sorted_strands_final.append(sorted_strands[start_index:])
             
-            write_walk = ""
-            for j in range(0, len(sorted_node_ids)):
-                write_walk += f"{strand_translation[sorted_strands[j]]}{sorted_node_ids[j]}"
-            walk_start = sorted_coords[0][0]
-            walk_end = sorted_coords[-1][1]
-            gfa_w_walk.write(f"W\t{sample}\t{haplo}\t{contig}\t{walk_start}\t{walk_end}\t{write_walk}\n")
+            for q in range(0, len(sorted_node_ids_final)):
+                write_walk = ""
+                for j in range(0, len(sorted_node_ids_final[q])):
+                    write_walk += f"{strand_translation[sorted_strands_final[q][j]]}{sorted_node_ids_final[q][j]}"
+                walk_start = sorted_coords_final[q][0][0]
+                walk_end = sorted_coords_final[q][-1][1]
+                gfa_w_walk.write(f"W\t{sample}\t{haplo}\t{contig}\t{walk_start}\t{walk_end}\t{write_walk}\n")
             
-
 def SeqTubeGfaProcessor(preprocess_gfa_subgraph, postprocess_gfa_subgraph, pathnumoption):
     """
     rewrite gfa to fit the input requirements of sequence tube map. Output of this function is 
@@ -300,7 +374,6 @@ def SeqTubeGfaProcessor(preprocess_gfa_subgraph, postprocess_gfa_subgraph, pathn
 
     return
 
-
 def ConvertGfaToVg(gfa_file, vg_file):
     """
     convert .gfa to .vg with vg convert
@@ -323,7 +396,6 @@ def ConvertGfaToVg(gfa_file, vg_file):
         proc = subprocess.run(cmd, stdout=out)
     return proc.returncode == 0
     
-    
 def ConvertVgToJson(vg_file, json_file):
     """
     convert .vg to .json with vg view
@@ -344,10 +416,7 @@ def ConvertVgToJson(vg_file, json_file):
     cmd = ["vg", "view", "-j", vg_file]
     with open(json_file, "wb") as out:
         proc = subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE)
-    print("ConvertVgToJson returncode:", proc.returncode)
-    print("ConvertVgToJson stderr:", proc.stderr.decode())
     return proc.returncode == 0
-
 
 def GenerateSeqTubeMapSvg(json_file, svg_file, start, end, nodewidthoption, pclai_color_scheme = None):
     """
@@ -367,14 +436,19 @@ def GenerateSeqTubeMapSvg(json_file, svg_file, start, end, nodewidthoption, pcla
     passed : bool
         True if we were able to create the .svg file
     """
-    cmd = ["node", str(generate_svg_js_script), str(json_file), str(svg_file), str(start), str(end), nodewidthoption]
+    cmd = [
+        "node", 
+        "--max-old-space-size=8192",
+        str(generate_svg_js_script), 
+        str(json_file), 
+        str(svg_file), 
+        str(start), 
+        str(end), 
+        nodewidthoption
+    ]
     if pclai_color_scheme is not None:
         cmd.append(json.dumps(pclai_color_scheme))
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    
-    print("stdout:", proc.stdout.decode())
-    print("stderr:", proc.stderr.decode())
-    print("returncode:", proc.returncode)
 
     return proc.returncode == 0
 
@@ -579,8 +653,11 @@ async def seqtubemap(
         else:
             log.error(f"Invalid graph version {version}(valid versions: \"v1\" or \"v2\")")
     
+    print("SeqTubeGfaProcessor:", flush=True)
     SeqTubeGfaProcessor(preprocess_gfa_subgraph_w_walk, postprocess_gfa_subgraph, pathnumoption)
+    print("ConvertGfaToVg:", flush=True)
     ConvertGfaToVg(postprocess_gfa_subgraph, vg_subgraph)
+    print("ConvertVgToJson:", flush=True)
     ConvertVgToJson(vg_subgraph, json_subgraph)
     
     pclai_color_scheme = None
@@ -590,9 +667,10 @@ async def seqtubemap(
             pclai_color_scheme = None
         elif version == "v2":
             pclai_color_scheme = GetPclaiColorScheme(minigraphnode, minigraph_walks_v2_updated, log)
+    print("GenerateSeqTubeMapSvg:", flush=True)
     GenerateSeqTubeMapSvg(json_subgraph, seqtubemap_svg, start, end, nodewidthoption, pclai_color_scheme)
     
-    background_tasks.add_task(delete_files, [postprocess_gfa_subgraph, vg_subgraph, json_subgraph, seqtubemap_svg])
+    # background_tasks.add_task(delete_files, [postprocess_gfa_subgraph, vg_subgraph, json_subgraph, seqtubemap_svg])
     return FileResponse(seqtubemap_svg, media_type="image/svg+xml")
 
 
