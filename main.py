@@ -217,28 +217,29 @@ def GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_w
                             coord_table[asm][contig][0].append((coord,coord+length))
                             coord_table[asm][contig][1].append(node_id)
                             coord_table[asm][contig][2].append(strand)
-                            
-                for dup_coord in asm_coord_dup.split(","):
-                    part = dup_coord.split("|")
-                    asm = part[0]
-                    if asm not in dup_coord_table:
-                        dup_coord_table[asm] = {}
-                    for i in range(1, len(part)):
-                        contig, coord, strand = part[i].split(":")
-                        coord = int(coord)
-                        if contig not in dup_coord_table[asm]:
-                            dup_coord_table[asm][contig] = {node_id:[[(coord,coord+length)],[strand]]}
-                        else:
-                            if node_id not in dup_coord_table[asm][contig]:
-                                dup_coord_table[asm][contig][node_id] = [[(coord,coord+length)],[strand]]
+                
+                if asm_coord_dup != ".":
+                    for dup_coord in asm_coord_dup.split(","):
+                        part = dup_coord.split("|")
+                        asm = part[0]
+                        if asm not in dup_coord_table:
+                            dup_coord_table[asm] = {}
+                        for i in range(1, len(part)):
+                            contig, coord, strand = part[i].split(":")
+                            coord = int(coord)
+                            if contig not in dup_coord_table[asm]:
+                                dup_coord_table[asm][contig] = {node_id:[[(coord,coord+length)],[strand]]}
                             else:
-                                # we have duplicated dup entries, so have to filter that out
-                                # TODO fix the walks file
-                                if any(coord == t[0] for t in dup_coord_table[asm][contig][node_id][0]):
-                                    continue
+                                if node_id not in dup_coord_table[asm][contig]:
+                                    dup_coord_table[asm][contig][node_id] = [[(coord,coord+length)],[strand]]
                                 else:
-                                    dup_coord_table[asm][contig][node_id][0].append((coord,coord+length))
-                                    dup_coord_table[asm][contig][node_id][1].append(strand)
+                                    # we have duplicated dup entries, so have to filter that out
+                                    # TODO fix the walks file
+                                    if any(coord == t[0] for t in dup_coord_table[asm][contig][node_id][0]):
+                                        continue
+                                    else:
+                                        dup_coord_table[asm][contig][node_id][0].append((coord,coord+length))
+                                        dup_coord_table[asm][contig][node_id][1].append(strand)
                         
             gfa_w_walk.write(line)
         elif line[0] == "L" or line[0] == "H":
@@ -627,7 +628,7 @@ async def seqtubemap(
     start: int = Query(25251923, description="Start coordinate"),
     end: int = Query(25252095, description="End coordinate"),
     version: str = Query("v2", description='pangenome release version: `"v1"` or `"v2"`'),
-    pathnumoption: str = Query("compressed", description='options for the number of path: `"compressed"`(compress same path as one single path) or `"normal"` (show each path seperately)'),
+    pathnumoption: str = Query("normal", description='options for the number of path: `"compressed"`(compress same path as one single path) or `"normal"` (show each path seperately)'),
     nodewidthoption: str = Query("compressed", description='Options for the width of sequence nodes:`"compressed"`(scale node width with log2 of number of bp) or `"normal"`(scale node width linearly with number of bp)'),
     minigraphnode: int = Query(None, description="If the queried region is based on a minigraph node, record the node ID to enable Point Cloud Local Ancestry Inference coloring")
 ):
@@ -653,11 +654,9 @@ async def seqtubemap(
         else:
             log.error(f"Invalid graph version {version}(valid versions: \"v1\" or \"v2\")")
     
-    print("SeqTubeGfaProcessor:", flush=True)
+    # TODO update SeqTubeGfaProcessor; pathnumoption = compressed is currently not supported
     SeqTubeGfaProcessor(preprocess_gfa_subgraph_w_walk, postprocess_gfa_subgraph, pathnumoption)
-    print("ConvertGfaToVg:", flush=True)
-    ConvertGfaToVg(postprocess_gfa_subgraph, vg_subgraph)
-    print("ConvertVgToJson:", flush=True)
+    ConvertGfaToVg(preprocess_gfa_subgraph_w_walk, vg_subgraph)
     ConvertVgToJson(vg_subgraph, json_subgraph)
     
     pclai_color_scheme = None
@@ -667,10 +666,10 @@ async def seqtubemap(
             pclai_color_scheme = None
         elif version == "v2":
             pclai_color_scheme = GetPclaiColorScheme(minigraphnode, minigraph_walks_v2_updated, log)
-    print("GenerateSeqTubeMapSvg:", flush=True)
+
     GenerateSeqTubeMapSvg(json_subgraph, seqtubemap_svg, start, end, nodewidthoption, pclai_color_scheme)
     
-    # background_tasks.add_task(delete_files, [postprocess_gfa_subgraph, vg_subgraph, json_subgraph, seqtubemap_svg])
+    background_tasks.add_task(delete_files, [postprocess_gfa_subgraph, vg_subgraph, json_subgraph, seqtubemap_svg])
     return FileResponse(seqtubemap_svg, media_type="image/svg+xml")
 
 

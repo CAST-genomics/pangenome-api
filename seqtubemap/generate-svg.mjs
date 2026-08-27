@@ -36,7 +36,7 @@ dom.window.SVGElement.prototype.getComputedTextLength = function() {
 };
 
 // 3. Import TubeMap
-const { create, vgExtractNodes, vgExtractTracks, getImageCoordinates } = await import("./tubemap.js");
+const { create, vgExtractNodes, vgExtractTracks, getImageCoordinates, reorderTracksForLayout } = await import("./tubemap.js");
 
 // 4. Load vg JSON
 const inputFile  = process.argv[2];
@@ -55,7 +55,17 @@ const vgJson = JSON.parse(readFileSync(inputFile, "utf8"));
 
 // 5. Convert to TubeMap format
 const nodes  = vgExtractNodes(vgJson);
-const tracks = vgExtractTracks(vgJson, 0, 1);
+let tracks = vgExtractTracks(vgJson, 0, 1);
+tracks = reorderTracksForLayout(tracks);
+
+
+// DEBUGGING
+setInterval(() => {
+  const m = process.memoryUsage();
+  console.error(`[mem] rss=${(m.rss/1e6).toFixed(0)}MB heapUsed=${(m.heapUsed/1e6).toFixed(0)}MB heapTotal=${(m.heapTotal/1e6).toFixed(0)}MB`);
+}, 500).unref();
+
+console.error("tracks[0].name:", tracks[0].name, "length:", tracks[0].sequence.length);
 
 // 6. Render
 create({

@@ -311,6 +311,14 @@ export function setSoftClipsFlag(value) {
 // main
 function createTubeMap() {
   console.log("Recreating tube map in", svgID);
+  const START = Date.now();
+  const t = (label) => {
+    const m = process.memoryUsage();
+    console.error(
+      `[time] ${label}: ${Date.now() - START}ms, tracks=${tracks ? tracks.length : "?"}, nodes=${nodes ? nodes.length : "?"}, ` +
+      `rss=${(m.rss/1e6).toFixed(0)}MB heapUsed=${(m.heapUsed/1e6).toFixed(0)}MB heapTotal=${(m.heapTotal/1e6).toFixed(0)}MB`
+    );
+  };
   trackRectangles = [];
   trackCurves = [];
   trackCorners = [];
@@ -330,10 +338,13 @@ function createTubeMap() {
   // changed before any graph has been rendered
   if (inputNodes.length === 0 || inputTracks.length === 0) return;
 
+  t("init");
   straightenTrack(0);
+  t("straightenTrack");
   nodes = deepCopy(inputNodes); // deep copy (can add stuff to copy and leave original unchanged)
   tracks = deepCopy(inputTracks);
   reads = deepCopy(inputReads);
+  t("deepCopy");
 
   reads = filterReads(reads);
 
@@ -352,38 +363,51 @@ function createTubeMap() {
   }
   if (tracks.length === 0) return;
 
+  t("type/hidden loop");
   nodeMap = generateNodeMap(nodes);
   generateTrackIndexSequences(tracks);
+  t("generateTrackIndexSequences #1");
   if (reads && config.showReads) generateTrackIndexSequences(reads);
   generateNodeWidth();
+  t("generateNodeWidth #1");
 
   if (config.mergeNodesFlag) {
     generateNodeSuccessors(); // requires indexSequence
+    t("generateNodeSuccessors #1");
     generateNodeOrder(); // requires successors
+    t("generateNodeOrder #1");
     if (reads && config.showReads) reverseReversedReads();
     mergeNodes();
+    t("mergeNodes");
     nodeMap = generateNodeMap(nodes);
     generateNodeWidth();
     generateTrackIndexSequences(tracks);
     if (reads && config.showReads) generateTrackIndexSequences(reads);
+    t("post-merge regen");
   }
 
   numberOfNodes = nodes.length;
   numberOfTracks = tracks.length;
   generateNodeSuccessors();
+  t("generateNodeSuccessors #2");
   generateNodeDegree();
+  t("generateNodeDegree");
   if (DEBUG) console.log(`${numberOfNodes} nodes.`);
   generateNodeOrder();
+  t("generateNodeOrder #2");
   maxOrder = getMaxOrder();
 
   // can cause problems when there is a reversed single track node
   // OTOH, can solve problems with complex inversion patterns
   switchNodeOrientation();
+  t("switchNodeOrientation");
   generateNodeOrder(nodes, tracks);
+  t("generateNodeOrder #3");
   maxOrder = getMaxOrder();
 
   calculateTrackWidth(tracks);
   generateLaneAssignment();
+  t("generateLaneAssignment");
 
   if (config.showExonsFlag === true && bed !== null) addTrackFeatures();
 
@@ -403,8 +427,10 @@ function createTubeMap() {
   }
 
   generateNodeXCoords();
+  t("generateNodeXCoords");
 
   generateSVGShapesFromPath(nodes, tracks);
+  t("generateSVGShapesFromPath");
   if (DEBUG) {
     console.log("Tracks:");
     console.log(tracks);
@@ -414,17 +440,22 @@ function createTubeMap() {
     console.log(assignments);
   }
   getImageDimensions();
+  t("getImageDimensions");
 
   // all drawn tracks are grouped
+  console.error(`[shapes] rects=${trackRectangles.length} curves=${trackCurves.length} corners=${trackCorners.length} vrects=${trackVerticalRectangles.length}`);
   let trackGroup = svg.append("g").attr("class", "track");
   drawTrackRectangles(trackRectangles, "haplotype", trackGroup);
+  t("drawTrackRectangles #1");
   drawTrackCurves("haplotype", trackGroup);
+  t("drawTrackCurves #1");
   drawReversalsByColor(
     trackCorners,
     trackVerticalRectangles,
     "haplotype",
     trackGroup
   );
+  t("drawReversalsByColor #1");
   drawTrackRectangles(trackRectanglesStep3, "haplotype", trackGroup);
   drawTrackRectangles(trackRectangles, "read", trackGroup);
   drawTrackCurves("read", trackGroup);
@@ -443,6 +474,7 @@ function createTubeMap() {
   drawNodes(dNodes, nodeGroup);
   if (config.nodeWidthOption === "normal") drawLabels(dNodes);
   if (trackForRuler !== undefined) drawRuler();
+  t("drawRuler");
   if (config.nodeWidthOption === "normal") drawMismatches(); // TODO: call this before drawLabels and fix d3 data/append/enter stuff
   if (DEBUG) {
     console.log(`number of tracks: ${numberOfTracks}`);
@@ -1624,6 +1656,7 @@ function switchNodeOrientation() {
 // References and modifies the global nodes variable.
 function switchNodeOrientationForPaths(paths, pivotPath) {
   const toSwitch = new Map();
+  const pivotSet = pivotPath ? new Set(pivotPath.sequence) : null;
   let nodeName;
   let prevNode;
   let nextNode;
@@ -1634,7 +1667,7 @@ function switchNodeOrientationForPaths(paths, pivotPath) {
       nodeName = paths[i].sequence[j];
       nodeName = forward(nodeName);
       currentNode = nodes[nodeMap.get(nodeName)];
-      if (pivotPath && pivotPath.sequence.indexOf(nodeName) === -1) {
+      if (pivotSet && !pivotSet.has(nodeName)) {
         // do not change orientation for nodes which are part of the pivot path
         if (j > 0) {
           prevNode = nodes[nodeMap.get(forward(paths[i].sequence[j - 1]))];
@@ -2480,7 +2513,8 @@ function generateTrackAlpha(track, highlight) {
 // Returns null if there's no scheme loaded, or no entry for this track.
 function getPclaiEntry(trackName) {
   if (!config.pclaiColorScheme || !trackName) return null;
-  return config.pclaiColorScheme[trackName] || null;
+  const key = truncateTrackName(trackName);
+  return config.pclaiColorScheme[key] || null;
 }
 
 // Returns [x, y] for a track. Every track gets a consistent pair: real
@@ -3754,7 +3788,7 @@ function generateNodeWidth() {
 // (sample#haplotype#contig), discarding any trailing metadata field (e.g.
 // vg's internal phase-block/fragment index) that vg appends on its own and
 // that currently carries no real information (always "0" in our pipeline).
-function truncateTrackName(name) {
+export function truncateTrackName(name) {
   if (!name) return name;
   const parts = name.split("#");
   if (parts.length <= 3) return name;
@@ -3804,13 +3838,31 @@ export function vgExtractTracks(vg, pathSourceTrackId, haplotypeSourceTrackID) {
       // This is a path
       track.sourceTrackID = pathSourceTrackId;
     }
-    if (path.hasOwnProperty("name")) track.name = truncateTrackName(path.name);
+    if (path.hasOwnProperty("name")) track.name = path.name;
     if (path.hasOwnProperty("indexOfFirstBase")) {
       track.indexOfFirstBase = Number(path.indexOfFirstBase);
     }
     result.push(track);
   });
   return result;
+}
+
+// Reorder tracks before layout so:
+//  1. GRCh38 is always first, CHM13 always second — these become the layout
+//     pivot/anchor in switchNodeOrientation() and generateNodeOrder(), so a
+//     full-length, consistent reference backbone keeps layout deterministic
+//     regardless of what order vg happens to emit paths in.
+//  2. All walks belonging to the same assembly+haplotype+contig (e.g. multiple
+//     W-line fragments of one contig) sit directly next to each other, so
+//     they get threaded into the layout against each other rather than
+//     against unrelated tracks in between.
+//  3. Everything else is ordered by total sequence length, longest first —
+//     a longer anchor produces fewer synthetic "no node" filler segments
+//     in generateLaneAssignment(), which is what drives shape-count blowup.
+export function reorderTracksForLayout(tracks) {
+  const sorted = [...tracks].sort((a, b) => b.sequence.length - a.sequence.length);
+  sorted.forEach((track, i) => { track.id = i; });
+  return sorted;
 }
 
 // remove redundant nodes
