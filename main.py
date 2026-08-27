@@ -10,8 +10,9 @@ data_path = subprocess.check_output(
 
 sys.path.append(tool_path)
 
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 import logging
+import time
 import signal
 import ssl
 import traceback
@@ -621,6 +622,22 @@ def GetPclaiColorScheme(minigraph_node, minigraph_walk, log):
         pclai_color_scheme = None
     return pclai_color_scheme
         
+@contextmanager
+def stage_timing(stages, name):
+    """
+    Record the wall time of one pipeline stage into `stages`.
+
+    Used to attribute request latency across the seqtubemap pipeline. Timings are
+    emitted as a single `[stage-timing]` log line per request, so the breakdown can
+    be pulled out of the logs with a grep.
+    """
+    t0 = time.perf_counter()
+    try:
+        yield
+    finally:
+        stages[name] = round(time.perf_counter() - t0, 3)
+
+
 @app.get("/seqtubemap")
 async def seqtubemap(
     background_tasks: BackgroundTasks,
@@ -642,33 +659,54 @@ async def seqtubemap(
     vg_subgraph = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_path{pathnumoption}_{version}.vg")
     json_subgraph = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_path{pathnumoption}_{version}.json")
     seqtubemap_svg = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_path{pathnumoption}_{version}.svg")
-    
-    if not preprocess_gfa_subgraph_w_walk.exists():
-        if version == "v1":
-            log.error("version 1 is currently unavailable for minigraph cactus")
-            # SubgraphMC(query_region, preprocess_gfa_subgraph, mc_hg38_gbz_v1, log)
-        elif version == "v2":
-            SubgraphMC(query_region, preprocess_gfa_subgraph_no_walk, mc_hg38_gbz_v2, log)
-            GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_walk, mc_mapped_walks_v2, log)   
-            background_tasks.add_task(delete_files, [preprocess_gfa_subgraph_no_walk])
-        else:
-            log.error(f"Invalid graph version {version}(valid versions: \"v1\" or \"v2\")")
+      
+    stages = {}
+    subgraph_cached = preprocess_gfa_subgraph.exists()
+
+    with stage_timing(stages, "subgraph_extract"):
+        if not subgraph_cached:
+            if version == "v1":
+                log.error("version 1 is currently unavailable for minigraph cactus")
+                # SubgraphMC(query_region, preprocess_gfa_subgraph, mc_hg38_gbz_v1, log)
+            elif version == "v2":
+                SubgraphMC(query_region, preprocess_gfa_subgraph, mc_hg38_gbz_v2, log)
+                GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_walk, mc_mapped_walks_v2, log)   
+                background_tasks.add_task(delete_files, [preprocess_gfa_subgraph_no_walk])
+            else:
+                log.error(f"Invalid graph version {version}(valid versions: \"v1\" or \"v2\")")
     
     # TODO update SeqTubeGfaProcessor; pathnumoption = compressed is currently not supported
-    SeqTubeGfaProcessor(preprocess_gfa_subgraph_w_walk, postprocess_gfa_subgraph, pathnumoption)
-    ConvertGfaToVg(preprocess_gfa_subgraph_w_walk, vg_subgraph)
-    ConvertVgToJson(vg_subgraph, json_subgraph)
+    # with stage_timing(stages, "gfa_process"):
+        # SeqTubeGfaProcessor(preprocess_gfa_subgraph, postprocess_gfa_subgraph, pathnumoption)
+    with stage_timing(stages, "gfa_to_vg"):
+        ConvertGfaToVg(preprocess_gfa_subgraph_w_walk, vg_subgraph)
+    with stage_timing(stages, "vg_to_json"):
+        ConvertVgToJson(vg_subgraph, json_subgraph)
     
-    pclai_color_scheme = None
-    if minigraphnode is not None:
-        if version == "v1":
-            # TODO
-            pclai_color_scheme = None
-        elif version == "v2":
-            pclai_color_scheme = GetPclaiColorScheme(minigraphnode, minigraph_walks_v2_updated, log)
+    with stage_timing(stages, "get_pclai_color_scheme"):
+        pclai_color_scheme = None
+        if minigraphnode is not None:
+            if version == "v1":
+                # TODO
+                pclai_color_scheme = None
+            elif version == "v2":
+                pclai_color_scheme = GetPclaiColorScheme(minigraphnode, minigraph_walks_v2_updated, log)
+            
+    with stage_timing(stages, "generate_svg"):
+        GenerateSeqTubeMapSvg(json_subgraph, seqtubemap_svg, start, end, nodewidthoption, pclai_color_scheme)
 
-    GenerateSeqTubeMapSvg(json_subgraph, seqtubemap_svg, start, end, nodewidthoption, pclai_color_scheme)
-    
+    def size_mb(path):
+        return round(path.stat().st_size / 1048576, 2) if path.exists() else None
+
+    total = round(sum(stages.values()), 3)
+    breakdown = " ".join(f"{name}={secs}s" for name, secs in stages.items())
+    log.info(
+        f"[stage-timing] {chrom}:{start}-{end} span={end - start}bp {version} "
+        f"path={pathnumoption} width={nodewidthoption} cached={subgraph_cached} "
+        f"total={total}s {breakdown} "
+        f"json_mb={size_mb(json_subgraph)} svg_mb={size_mb(seqtubemap_svg)}"
+    )
+
     background_tasks.add_task(delete_files, [postprocess_gfa_subgraph, vg_subgraph, json_subgraph, seqtubemap_svg])
     return FileResponse(seqtubemap_svg, media_type="image/svg+xml")
 
