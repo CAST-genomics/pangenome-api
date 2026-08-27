@@ -97,7 +97,16 @@ def _install_panct_stub() -> None:
     data = types.ModuleType("panCT.panct.data")
     data.Region = Region
     logging_module = types.ModuleType("panCT.panct.logging")
-    logging_module.getLogger = __import__("logging").getLogger
+
+    def getLogger(name=None, level="ERROR"):
+        """panCT's signature: a name and a level, both keyword-friendly."""
+        import logging
+
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
+        return logger
+
+    logging_module.getLogger = getLogger
 
     sys.modules.update(
         {
@@ -190,4 +199,20 @@ def vg() -> str:
     binary = shutil.which("vg")
     if binary is None:
         _skip_or_fail("vg is not installed on this machine")
+    return binary
+
+
+@pytest.fixture(scope="session")
+def node_stage() -> str:
+    """The Node stage's prerequisites, skipping the test when they are absent.
+
+    `GenerateSeqTubeMapSvg` shells out to `node seqtubemap/generate-svg.mjs`,
+    which imports `jsdom` and `canvas` from the repository's `node_modules`.
+    A checkout that has never had `npm ci` run in it cannot render a tube map.
+    """
+    binary = shutil.which("node")
+    if binary is None:
+        _skip_or_fail("node is not installed on this machine")
+    if not (REPO_ROOT / "node_modules" / "jsdom").is_dir():
+        _skip_or_fail("node_modules is not installed — run `npm ci`")
     return binary
