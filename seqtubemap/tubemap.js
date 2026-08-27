@@ -1,3 +1,46 @@
+/*
+ * VENDORED FORK — this file is not ours, and it is no longer upstream's either.
+ *
+ * Upstream:  vgteam/sequenceTubeMap — https://github.com/vgteam/sequenceTubeMap
+ * File:      src/util/tubemap.js
+ * Taken at:  commit 33b7a7e5df9f8052974ef8e6c689a031dac6e2c9 (2025-08-21). It is
+ *            still the tip of upstream's `master`, and so was also the tip when
+ *            this file was vendored here on 2026-06-10 (commit 11fd871,
+ *            "implement sequence tube map").
+ * Licence:   MIT, Copyright (c) 2017 Wolfgang Beyer. See upstream LICENSE.txt.
+ *
+ * The sibling files `common.mjs` and `config-global.mjs` came from the same
+ * upstream commit and are still byte-identical to it; `config-client.js` is
+ * deliberately empty here. This file is not: it arrived with ~1,180 upstream
+ * lines removed and 20 added (upstream's interactive browser half — mouse and
+ * click handlers, zoom, legend drawing, visibility toggles, the `vg` read
+ * extraction entry point) and adapted for headless use, and has been edited
+ * further since. Read *layout* was kept; only the UI around it went.
+ *
+ * One consequence of that trim is live: `createTubeMap()` still calls
+ * `drawLegend()`, which no longer exists here. Nothing throws only because
+ * `generate-svg.mjs` passes `hideLegend: true` on every call.
+ *
+ * THIS IS A FORK. IT DOES NOT TRACK UPSTREAM, AND IT WILL NOT BE RE-SYNCED.
+ * Edit it freely; do not treat a divergence from upstream as a defect, and do
+ * not try to merge upstream changes back in.
+ *
+ * Why: this project uses the module as a server-side layout engine, not as the
+ * browser application upstream ships. Increment B of the /seqtubemap rework
+ * will go further and remove the DOM sink outright — the layout's output is to
+ * be captured as band data and the SVG emitted from that, so the jsdom/canvas
+ * rendering upstream is built around stops existing in this copy. (That has not
+ * landed yet: this file still calls `d3.select` and reaches for
+ * `document.getElementById`.) The divergence is structural, not a patch set.
+ * The decision is `docs/adr/0001-additive-band-format.md` — see its final
+ * "Consequences" bullet for this file, and `docs/perf/seqtubemap-plan.md` for
+ * the increment. The README's "The vendored tube map layout" section records
+ * the same provenance.
+ *
+ * The `eslint` directives below are upstream's, kept as upstream left them.
+ * This repo runs no linter.
+ */
+
 /* eslint no-param-reassign: "off" */
 /* eslint no-lonely-if: "off" */
 /* eslint no-prototype-builtins: "off" */

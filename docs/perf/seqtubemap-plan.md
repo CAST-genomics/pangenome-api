@@ -271,7 +271,7 @@ defect, and ADR 0001 records why it is not carried onto the band route.
 ### Two things to do alongside
 
 **Declare the fork.** `seqtubemap/tubemap.js` is an unmarked 4,000-line vendored copy of
-`vgteam/sequence-tube-map`, carrying upstream's eslint header and no provenance, version, or
+`vgteam/sequenceTubeMap`, carrying upstream's eslint header and no provenance, version, or
 README note. B removes its DOM sink, so the re-sync option is gone in fact; a header comment
 naming upstream and the commit makes it gone on paper. This is the single most
 duct-taped-feeling artifact in the repo and one comment fixes the feeling as well as the
