@@ -1,7 +1,8 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node --test \"tests/node/**/*.test.mjs\""
+    "test": "node --test \"tests/node/**/*.test.mjs\"",
+    "baseline:golden": "node tests/node/baseline-golden.mjs"
   },
   "dependencies": {
     "canvas": "^3.2.3",
