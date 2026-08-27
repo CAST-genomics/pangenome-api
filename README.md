@@ -41,7 +41,8 @@ data; anything that genuinely needs a missing dependency skips and says so.
 
 ```
 pip install -r requirements-test.txt
-pytest                 # Python: boots the app and exercises the vg seam
+npm ci                 # the Python endpoint test renders through the Node stage
+pytest                 # Python: boots the app and exercises the endpoint seam
 npm test               # Node: drives the sequence tube map generator
 ```
 
@@ -49,7 +50,9 @@ Neither suite needs graph data: the Python tests stand in tiny files for the
 `.walk.gz` derivatives and stub the two natively-compiled layout libraries, and
 the Node tests read a committed vg JSON fixture. panCT is used for real if you
 have it — from the `tools.path` Step 5 sets, or from `PANCT_PATH` — and stubbed
-if you do not. Tests that shell out to `vg` skip when it is not installed.
+if you do not. Tests that shell out to `vg` skip when it is not installed, and
+so does the `/seqtubemap` endpoint test when `node_modules` is not installed —
+it renders a real tube map, which reaches Node through `jsdom` and `canvas`.
 
 Both suites run in CI on every pull request (`.github/workflows/ci.yml`), where
 `vg` and panCT are installed and a skip is turned into a failure.

@@ -61,6 +61,15 @@ they are the two that matter most for increment **B** — and the 4.2 kb region 
 of graph into 13.56 MB of XML is the whole argument of
 [ADR 0001](../../../docs/adr/0001-additive-band-format.md) in one row.
 
+## Standing in for the graph at the cache path
+
+`tests/python/test_seqtubemap_endpoint.py` copies the 90 bp `.gfa` into
+`cache/seqtubemap/mc/` under a temporary working directory and requests that region.
+The endpoint skips extraction when that file is present (`main.py:665-676`), so the rest
+of the pipeline runs with no `.gbz` anywhere — which is why the filenames here must stay
+exactly as the server wrote them: the endpoint rebuilds the name from the query
+parameters, and a renamed fixture is a cache miss.
+
 ## The `.json` beside each `.gfa`
 
 Each `.gfa` now has a matching `.json` — the same subgraph in the shape the Node stage
