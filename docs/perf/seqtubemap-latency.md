@@ -57,11 +57,16 @@ the size of the real 3,000 bp response — the entire Node stage completes in **
                        total 1441.7ms
 ```
 
-The server spent **35.3 s** producing a *smaller* graph than this. So the SVG generation
-stage is roughly **1–2 seconds of it**, and on the order of **34 seconds sits upstream** —
-in `gbz-base` subgraph extraction, `SeqTubeGfaProcessor`, `vg convert`, and `vg view -j`.
+The server spent **35.3 s** producing a *smaller* graph than this, so most of the time had
+to sit upstream of SVG generation — in `gbz-base` subgraph extraction, `GenerateWalksMC`,
+`vg convert`, and `vg view -j`. That reasoning was right about *where*, and wrong about *how
+much*.
 
-> This split is **inferred by subtraction, not directly measured.** See §6.
+> **Superseded by direct measurement.** §6 now carries server-side stage timings. Upstream
+> is **30.1 s of a 38.9 s 10 kb request** — close to the 34 s inferred here. But SVG
+> generation is **8.2 s**, not the 1–2 s this harness predicts, so the subtraction was
+> absorbing SVG time into the upstream figure. Trust §6 over this section: the local
+> harness understates the server's Node stage by 4–8x, and the gap widens with size.
 
 Note the first three lines: **722 ms is fixed cost** — booting JSDOM, node-canvas, and
 importing 130 KB of `tubemap.js` — paid on every request no matter how small the region.
@@ -178,39 +183,87 @@ SPINES=40,150,600 HAPS=464 ALT=0.08 node perf/cross.mjs
 
 `perf/fixtures/` is gitignored — the sweeps generate hundreds of MB.
 
-## 6. The one gap, and how to close it
+## 6. The gap, closed — server-side stage timings
 
-The ~34 s upstream figure in §2 is **inferred by subtraction**. Everything else in this
-document is a direct observation.
+*Measured 2026-08-27 on the live server. Instrumentation is `stage_timing()` in `main.py`
+(PR #12), deployed and exercised by a colleague with server access; the request procedure is
+[`deploy-request.md`](./deploy-request.md), the raw log is
+`pangenome-api-sequence-tube-map-logs/seqtubmap-log.txt`.*
 
-> **Still true as of §9.** Sections 7-9 added three more direct measurements and closed the
-> layout-vs-DOM question, but none of them touches the upstream stage. This remains the one
-> number in the document that nobody has watched a clock for, and it is the only thing
-> gating increment **D** in [ADR 0001](../adr/0001-additive-band-format.md).
+Three fresh regions, all `cached=False`, plus one `cached=True` request that arrived in the
+same log and turned out to be the most informative line in it.
 
-Server-side stage timers are now in place (`stage_timing()` in `main.py`, wrapping all five
-pipeline calls). Each request emits one greppable line:
+| region | span | nodes | `subgraph_extract` | `gfa_to_vg` | `vg_to_json` | `generate_svg` | total | JSON |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| chr8:78900000-78900090 | 90 bp | 13 | **0.851 s** (23%) | 0.179 | 0.032 | **2.648 s** (71%) | 3.71 s | 0.43 MB |
+| chr8:78910000-78913000 | 3 kb | 118 | **7.729 s** (63%) | 0.031 | 0.174 | 4.282 s (35%) | 12.22 s | 3.64 MB |
+| chr8:78920000-78930000 | 10 kb | 381 | **30.077 s** (77%) | 0.071 | 0.563 | 8.176 s (21%) | 38.89 s | 11.59 MB |
+| chr1:25200904-25236799 *(cached)* | 35.9 kb | — | 0.0 (skipped) | 0.352 | 1.710 | **90.952 s** (97%) | 93.56 s | 41.0 MB |
+
+The stage timers sum to `total` exactly in every line. Nothing is hiding between them.
+
+### The slow stage is `GenerateWalksMC`, not `gbz-base`
+
+`subgraph_extract` wraps two calls (`main.py:666-673`): `SubgraphMC`, the gbz-base query,
+and `GenerateWalksMC`, which adds W lines. `SubgraphMC` prints its own timing, and the log
+carries it on the line directly above each `[stage-timing]`:
 
 ```
-[stage-timing] chr8:78771162-78781162 span=10000bp v2 path=normal width=compressed
-cached=False total=118.442s subgraph_extract=94.1s gfa_process=12.3s gfa_to_vg=4.8s
-vg_to_json=6.1s generate_svg=1.2s json_mb=42.7 svg_mb=9.6
+Subgraph contains 381 nodes and 464 paths
+Used 0.042 seconds
 ```
 
-*(Illustrative values — the real ones are what we're after.)*
+**0.042 s of the 30.077 s.** Essentially the whole upstream cost is `GenerateWalksMC` — a
+pure-Python loop doing one `pysam` tabix `fetch` per `S` line and assembling coordinate
+tables across 464 haplotypes. It is cleanly linear in node count:
 
-```sh
-grep '\[stage-timing\]' <logfile>
-```
+| nodes | `subgraph_extract` | per node |
+| ---: | ---: | ---: |
+| 13 | 0.851 s | 65 ms |
+| 118 | 7.729 s | 65 ms |
+| 381 | 30.077 s | 79 ms |
 
-`cached=` reports whether `preprocess_gfa_subgraph` already existed, which is what caused
-the 1000 bp-faster-than-300 bp inversion above; without it the numbers are uninterpretable.
-`json_mb`/`svg_mb` are captured before the background delete task fires.
+A flat per-node constant of that size is a per-iteration fixed cost, not an algorithmic
+one — which makes it the most tractable win on the server, and it is in our own Python
+rather than in `gbz-base` or `vg`.
 
-Capture a spread — 90 bp, 3 kb, 10 kb — each against a **fresh region** so `cached=False`,
-because the cached path skips the stage most likely to dominate. That result either confirms
-the ~34 s upstream inference or overturns it, and tells you whether the first real fix
-belongs in `gbz-base` extraction or the `vg` conversion hop.
+### The `vg` round trip costs nothing
+
+`gfa_to_vg` + `vg_to_json` is 0.21 s / 0.21 s / 0.63 s — **1.6% of the 10 kb request**.
+Removing the two subprocess spawns and two temp files buys back six tenths of a second out
+of thirty-nine.
+
+This does not kill increment **D**; it re-files it. D is an architecture and provenance
+change — one fewer toolchain dependency, two fewer temp files, no `vg` binary to provision —
+and it should be argued and scheduled on those terms. It is not a latency fix, and the
+measurement this section was written to obtain retires the gate rather than passing it.
+
+### `generate_svg` is superlinear and takes over at scale
+
+2.6 → 4.3 → 8.2 → 91.0 s against 0.43 → 3.64 → 11.59 → 41.0 MB of JSON. From 11.6 MB to
+41 MB, **3.5x the data costs 11x the time.** The cached 35.9 kb request is the proof case:
+extraction skipped entirely, and it still took 93.6 s, 97% of it in SVG generation. Caching
+buys nothing at large spans, because the stage it skips is not the one that dominates there.
+
+This strengthens increments **A-C** rather than weakening them. The argument for publishing
+numbers instead of emulating a browser is larger than §2 estimated, and it grows with region
+size — exactly the direction the fetch ceiling in §7 lives.
+
+### A ~2.5 s floor
+
+A 13-node, 90 bp region spends 2.648 s in `generate_svg`. That is JSDOM boot, node-canvas,
+and the `tubemap.js` import — §2's 722 ms of fixed cost, measured on server hardware at
+roughly 3.5x. No region is served faster than this while the browser emulation stands.
+
+### Two notes on the instrumentation itself
+
+- `gfa_process` was commented out before deploy (`main.py:679-680`), so there is no
+  `gfa_process` figure; the emitted line carries `get_pclai_color_scheme` in its place
+  (0.0 s on all three fresh requests, 0.547 s on the cached chr1 one). The line shape
+  documented in earlier drafts of this section and in
+  [`after-timings.md`](./after-timings.md) does not match what shipped.
+- `cached=` reports whether `preprocess_gfa_subgraph_w_walk` already existed, and explains
+  the 1,000 bp-faster-than-300 bp inversion in §1.
 
 ## 7. Where the memory goes — the DOM, not the layout
 
