@@ -17,7 +17,7 @@ Written 2026-08-27, at the end of the diagnosis phase.
 
 | | |
 | --- | --- |
-| Branch | `perf/seqtubemap-diagnosis`, PR [#12](https://github.com/CAST-genomics/PangenomeAPI/pull/12) open |
+| Branch | `perf/seqtubemap-diagnosis` merged to `main` via PR [#12](https://github.com/CAST-genomics/PangenomeAPI/pull/12) |
 | Diagnosis | Complete. One gap remains: the upstream stage (see Step 0) |
 | Grilling | Complete, 2026-08-27. Produced [`CONTEXT.md`](../../CONTEXT.md) and [ADR 0001](../adr/0001-additive-band-format.md) |
 | Built | Local harness (`perf/`), server-side stage timers (`main.py`) |
@@ -80,17 +80,18 @@ Verification at the end measures against these. All from the live API, 2026-08-2
 
 ---
 
-## Step 0 — Push, and start the timers
+## Step 0 — Deploy, and start the timers
 
 **Skill:** none. Plain git and a deploy.
 
-Push `perf/seqtubemap-diagnosis` and get the `[stage-timing]` instrumentation onto the
-server. Capture three requests — roughly 90 bp, 3 kb, 10 kb — each against a **fresh
-region** so `cached=False`, because the cached path skips the stage most likely to dominate.
+The `[stage-timing]` instrumentation is merged (PR #12, on `main`); what remains is getting
+it onto the server and capturing three requests — roughly 90 bp, 3 kb, 10 kb — each against
+a **fresh region** so `cached=False`, because the cached path skips the stage most likely to
+dominate.
 
-```sh
-grep '\[stage-timing\]' <logfile>
-```
+That deploy is somebody else's machine, so the steps are written up for them in
+[`deploy-request.md`](./deploy-request.md); the parsing notes for the log that comes back
+are in [`after-timings.md`](./after-timings.md).
 
 **Why first:** the ~34 s upstream figure is inferred by subtraction. Everything downstream
 of here is ranked on that inference. One deploy converts it to fact and may reorder the
