@@ -61,6 +61,69 @@ they are the two that matter most for increment **B** — and the 4.2 kb region 
 of graph into 13.56 MB of XML is the whole argument of
 [ADR 0001](../../../docs/adr/0001-additive-band-format.md) in one row.
 
+## The `.json` beside each `.gfa`
+
+Each `.gfa` now has a matching `.json` — the same subgraph in the shape the Node stage
+eats, so the layout can be driven on a machine with no `vg` binary and no Python. The
+whole of increments B and C then runs from a checkout:
+
+```
+node seqtubemap/generate-svg.mjs \
+  tests/fixtures/seqtubemap/subgraph_chr8_78771162_78771252_v2_with_walk.json \
+  /tmp/out.svg 78771162 78771252 normal
+```
+
+**These were not produced by `vg`.** The server reaches this shape as
+`vg convert -g | vg view -j` (`main.py:396-421`), and both binaries are Linux-only in
+practice. These were produced instead by [`perf/gfa-to-vg-json.mjs`](../../../perf/gfa-to-vg-json.mjs),
+which reads the GFA directly. Regenerate them with:
+
+```
+for f in tests/fixtures/seqtubemap/*.gfa; do
+  node perf/gfa-to-vg-json.mjs "$f" "${f%.gfa}.json"
+done
+```
+
+Only the fields the layout reads are emitted — `vgExtractNodes` (`seqtubemap/tubemap.js:3760`)
+reads `node.id` and `node.sequence`; `vgExtractTracks` (`:3842`) reads `path.name`,
+`path.freq` and `path.mapping[].position.{node_id,is_reverse}`. `L` lines are dropped: the
+paths already describe the edges they use, and nothing in the layout looks at them. `freq`
+is absent, as it is for W-line paths out of `vg`.
+
+**What is verified.** Node and path counts match this file's `S` and walk columns exactly,
+across all five. Every walk's node ids resolve into the node set. For the 90 bp fixture, the
+464 strand names the layout emits are identical — as a set — to the 464 in its golden
+document.
+
+**What is not.** Nobody has diffed these against real `vg view -j` output, because nobody
+here can run `vg`. Treat them as a development convenience, not as the wire truth, until
+somebody with the binary confirms them.
+
+## Two conventions — the goldens disagree with each other
+
+While checking the naming above, the five golden documents in `pgb` turned out **not to be
+one homogeneous set**:
+
+| golden | strand names | form |
+| --- | ---: | --- |
+| `stm-chr8-78771162-78771252.svg` (90 bp) | 463 of 464 suffixed | `sample#hap#contig#N` |
+| the other four | 0 suffixed | `sample#hap#contig` |
+
+The suffixed form is the newer one — it is what "allow multiple walks per asm" (`0f69615`)
+produces, and the 90 bp document is the most recently captured. So four of the five goldens
+predate a change in how this pipeline names strands.
+
+The geometry differs too, and by more than naming. Rendering the 90 bp fixture through
+`generate-svg.mjs` gives 82 `<path>` and 517 `<rect>` against the golden's 291 and 726, and
+a viewBox 3,795 wide against 4,717 — the golden's graph carries about two more segments per
+strand than the `.gfa` committed here for the same region does.
+
+**This matters for increment B**, which plans to use these pairs as an end-to-end oracle:
+feed the `.gfa` in, expect the golden out. That does not hold today for the pair anyone
+would reach for first. Either the goldens need recapturing from the current server, or the
+`.gfa` inputs do. `perf/gfa-to-vg-json.mjs --names=bare` reproduces the older naming if the
+older documents turn out to be the ones worth keeping.
+
 ## A note on `.gitignore`
 
 The repository ignores `*.gfa*` (`.gitignore:4`) — subgraphs are normally transient cache
