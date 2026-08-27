@@ -638,8 +638,11 @@ def stage_timing(stages, name):
         stages[name] = round(time.perf_counter() - t0, 3)
 
 
+# Synchronous on purpose: this handler blocks, so it belongs in FastAPI's
+# threadpool rather than on the event loop. The argument is written out in
+# tests/python/test_endpoints_do_not_block_the_event_loop.py.
 @app.get("/seqtubemap")
-async def seqtubemap(
+def seqtubemap(
     background_tasks: BackgroundTasks,
     chrom: str = Query("chr1", description='Chromosome, e.g. `"chr5, chrX"`'),
     start: int = Query(25251923, description="Start coordinate"),
@@ -711,8 +714,11 @@ async def seqtubemap(
     return FileResponse(seqtubemap_svg, media_type="image/svg+xml")
 
 
+# Synchronous on purpose: this handler blocks, so it belongs in FastAPI's
+# threadpool rather than on the event loop. The argument is written out in
+# tests/python/test_endpoints_do_not_block_the_event_loop.py.
 @app.get("/json")
-async def bandage(
+def bandage(
     chrom: str = Query(..., description='Chromosome, e.g. `"chr5, chrX"`'),
     start: int = Query(..., description="Start coordinate"),
     end: int = Query(..., description="End coordinate"),

@@ -2,7 +2,7 @@
 
 The endpoint normally extracts its subgraph from a multi-gigabyte `.gbz` that
 no developer machine has. It does not have to: the pipeline already skips
-extraction when the extracted subgraph is present (`main.py:665-676`), an
+extraction when the extracted subgraph is present (`main.py:666-679`), an
 existing production branch rather than a test hook. Placing one of the
 committed golden subgraphs at that cache path makes everything downstream of
 extraction runnable from a checkout.
