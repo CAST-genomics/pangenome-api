@@ -89,7 +89,7 @@ Prefactoring. Make the change easy, then make the easy change.
 ### [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15) — Declare the fork
 
 `seqtubemap/tubemap.js` is an unmarked ~4,000-line vendored copy of
-`vgteam/sequence-tube-map`, carrying upstream's eslint header and no provenance, version, or
+`vgteam/sequenceTubeMap`, carrying upstream's eslint header and no provenance, version, or
 note. [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) removes its DOM sink, so
 the re-sync option is gone in fact; a header comment makes it gone on paper. Land it before
 anyone edits the file.

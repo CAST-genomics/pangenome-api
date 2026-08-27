@@ -54,6 +54,41 @@ if you do not. Tests that shell out to `vg` skip when it is not installed.
 Both suites run in CI on every pull request (`.github/workflows/ci.yml`), where
 `vg` and panCT are installed and a skip is turned into a failure.
 
+## The vendored tube map layout
+
+`seqtubemap/` holds a **vendored fork** of the sequence tube map layout, not a
+dependency. It was copied from [`vgteam/sequenceTubeMap`](https://github.com/vgteam/sequenceTubeMap)
+at commit
+[`33b7a7e`](https://github.com/vgteam/sequenceTubeMap/commit/33b7a7e5df9f8052974ef8e6c689a031dac6e2c9)
+(2025-08-21 — still the tip of upstream's `master`, and so also the tip when the
+copy was taken on 2026-06-10), and is MIT licensed — Copyright (c) 2017
+Wolfgang Beyer.
+
+| file | upstream origin | state |
+| --- | --- | --- |
+| `seqtubemap/tubemap.js` | `src/util/tubemap.js` | forked — trimmed and edited |
+| `seqtubemap/common.mjs` | `src/common.mjs` | unmodified |
+| `seqtubemap/config-global.mjs` | `src/config-global.mjs` | unmodified |
+| `seqtubemap/config-client.js` | `src/config-client.js` | emptied |
+| `seqtubemap/generate-svg.mjs` | — | ours |
+
+**`tubemap.js` is a fork and does not track upstream.** It arrived already
+trimmed of upstream's interactive browser half (mouse handlers, zoom, legend
+drawing, visibility toggles, the `vg` read extraction entry point — read layout
+itself was kept) and adapted to run headless, and
+it has been edited since. Increment B of the `/seqtubemap` rework will remove
+its DOM sink outright — not yet landed — which puts the divergence beyond
+anything a merge could reconcile. Edit it freely; do not attempt to re-sync it
+with upstream, and do not read a difference from upstream as a bug.
+
+The decision is
+[`docs/adr/0001-additive-band-format.md`](docs/adr/0001-additive-band-format.md)
+(its closing "Consequences" bullet is the one about this file), and the
+increment that acts on it is
+[`docs/perf/seqtubemap-plan.md`](docs/perf/seqtubemap-plan.md). The same
+provenance is repeated in the header comment of `seqtubemap/tubemap.js` for
+anyone who opens the file directly.
+
 ## How to Use:
 In the pangenome-api folder, run:
 ```

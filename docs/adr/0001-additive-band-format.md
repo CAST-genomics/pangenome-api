@@ -142,6 +142,6 @@ new format is how dead code becomes permanent.
   committed at [`tests/fixtures/seqtubemap/`](../../tests/fixtures/seqtubemap/), matched to
   their outputs on strand count. **B's oracle is end-to-end.**
 - **`seqtubemap/tubemap.js` is declared a fork.** It is an unmarked 4,000-line vendored copy
-  of `vgteam/sequence-tube-map`, carrying upstream's eslint header and no provenance. B
+  of `vgteam/sequenceTubeMap`, carrying upstream's eslint header and no provenance. B
   removes its DOM sink, so the re-sync option is gone in fact; the header comment makes it
   gone on paper too.
