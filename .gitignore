@@ -8,6 +8,7 @@
 *.pem*
 *.cnf*
 *.JSON*
+*.env*
 
 #walk files
 *.walk.gz
@@ -26,3 +27,5 @@ node_modules/
 
 # environment variables
 .env
+
+.ipynb_checkpoints
