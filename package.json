@@ -1,8 +1,9 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node --test \"tests/node/**/*.test.mjs\"",
-    "baseline:golden": "node tests/node/baseline-golden.mjs"
+    "test": "node --max-old-space-size=8192 --test \"tests/node/**/*.test.mjs\"",
+    "baseline:golden": "node tests/node/baseline-golden.mjs",
+    "baseline:bands": "node --max-old-space-size=8192 tests/node/baseline-bands.mjs"
   },
   "dependencies": {
     "canvas": "^3.2.3",

@@ -123,6 +123,97 @@ agreement.
 So: a development convenience, not the wire truth. Anything asserting a cross-repo contract
 should run on `.json` a real `vg` produced.
 
+## The `.pclai.json` beside each `.gfa`
+
+A render takes **three** inputs, not two: the subgraph, the region, and the PCLAI colour
+scheme. The scheme takes over strand colour entirely when it is present
+(`seqtubemap/tubemap.js:2503`), and production passes one whenever `minigraphnode` is set
+(`main.py:767`) — which is every request that produces one of these five. A fixture with
+only the first two inputs can therefore only ever be rendered down a branch production does
+not take.
+
+Unlike the other two inputs, the scheme is not a file anybody here can produce: the
+endpoint builds it from a minigraph walks file on the server (`GetPclaiColorScheme`,
+`main.py:673`). What it *can* be read back out of is a document rendered with it, because
+the generator writes every entry onto the elements it draws — the colour as `color`, and
+the placement as `pclaiX`, `pclaiY` and `pclaiScore`. That is what these files are:
+
+```
+node perf/pclai-from-document.mjs <pgb-golden.svg> tests/fixtures/seqtubemap/<name>.pclai.json
+```
+
+recovered on 2026-08-28 from the five golden documents in `pgb`'s
+`src/tubemap/__tests__/fixtures/`, one per fixture, keyed by the
+`sample#haplotype#contig` triple the layout looks a strand up by. The shape is exactly what
+`main.py` builds — `[[r, g, b], [x, y], score]`, with the score a string, because some of
+them are not numbers — `"impainted"` appears in four of the five.
+
+| fixture | placed strands | of | size |
+| --- | ---: | ---: | ---: |
+| chr8 90 bp | 452 | 464 | 28 KB |
+| chr1 600 bp | 362 | 369 | 23 KB |
+| chr8 1.4 kb | 451 | 463 | 28 KB |
+| chr1 8.0 kb | 373 | 378 | 24 KB |
+| chr1 4.2 kb | 364 | 464 | 23 KB |
+
+**Every key is a strand of its own fixture, and no key is anything else** — checked across
+all five, and now held there: `real-subgraph.band.test.mjs` asserts the exact set of keys
+that found a strand, so a scheme and a subgraph that drift apart fail rather than quietly
+colouring less. That is the evidence that these schemes are about these regions rather than
+about the documents they were read out of: the two repositories' walks moved on between
+capture and now (the 4.2 kb region's extra 100 strands are `0f69615`'s multiple walks per
+assembly), but nothing in the scheme names a strand this subgraph does not contain.
+
+**A strand with no placement is omitted, not written as grey.** The endpoint distinguishes
+two cases that a document cannot: an entry whose `x_coord` is `"."` gets an explicit grey
+no-coordinate row (`main.py:684`), and a strand the walks file never mentions gets no row
+and falls back to the same light grey (`tubemap.js:2509`). Both draw identically, so a
+document is no evidence about which one produced it. Omitting claims less and renders the
+same picture, which is the property the baselines below rely on. The synthetic
+`small-pclai` golden next door covers both shapes explicitly, so neither branch is
+untested.
+
+## The `.band.json.gz` beside each `.gfa` — the baseline
+
+The **band data** each subgraph produces, which is what this repository actually pins
+against. `tests/node/real-subgraph.band.test.mjs` renders all three inputs, compares the
+band data to the baseline, and then rebuilds the document from that band data and checks it
+in full.
+
+Band data rather than a document because
+[`docs/adr/0001`](../../../docs/adr/0001-additive-band-format.md) makes the band data
+canonical and the document derived from it. A baselined document would pin the derived
+artifact — a weaker guarantee, at ten times the size — and would have to be captured from a
+server, which is what the two tests at the fetch ceiling spent their skipped life waiting
+for.
+
+Re-baseline deliberately, as part of an increment meant to change the layout's output:
+
+```
+npm run baseline:bands
+```
+
+### On-disk cost
+
+They are committed. Gzip is what makes that reasonable: 18.02 MB of JSON compresses to
+2.33 MB, and the fixture directory was already 19.9 MB of `.gfa` and `.json`.
+
+| fixture | strands | bands | band JSON | committed (gz) | the document it rebuilds |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| chr8 90 bp | 464 | 592 | 0.12 MB | 15 KB | 0.17 MB |
+| chr1 600 bp | 369 | 8,089 | 1.43 MB | 186 KB | 2.83 MB |
+| chr8 1.4 kb | 463 | 13,246 | 2.26 MB | 291 KB | 4.55 MB |
+| **chr1 8.0 kb** | 383 | 35,020 | 6.26 MB | 800 KB | 12.48 MB |
+| **chr1 4.2 kb** | 1,201 | 44,795 | 7.94 MB | 1,038 KB | 15.81 MB |
+| | | | **18.02 MB** | **2.33 MB** | **35.84 MB** |
+
+The last column is the reason the baselines are the band data: committing the documents
+these rebuild would have cost 35.84 MB, and pinned less. *strands* here is band-data rows,
+which is one per `W` line rather than one per strand — hence 1,201 on the 4.2 kb fixture.
+
+The test compares the **decompressed** text, so nothing about zlib's output is pinned; a
+different zlib would produce different bytes on disk and the same green.
+
 ## How these relate to `pgb`'s golden documents — checked, 2026-08-28
 
 An earlier version of this file claimed the five golden documents disagreed with each
@@ -175,15 +266,18 @@ so, not the naming:
 | **chr1 4.2 kb** (node 5520) | **1201** | 464 | 464 |
 
 The last two carry `0f69615`'s multiple-walks-per-assembly output; their goldens come from
-the one-walk-per-assembly era that preceded it. Those are the two whose tests are skipped
-in `tests/node/generate-svg.golden.test.mjs`.
+the one-walk-per-assembly era that preceded it. Those are the two that were, until #41
+landed, waiting on a recaptured document that was never coming. They are now pinned like
+the other three — by band data baselined here, from all three of their own inputs.
 
 **These goldens are not this repository's oracle.** They were captured from `pgb`, at
 various dates, from at least three different states of this pipeline — and
 `docs/adr/0001-additive-band-format.md` makes the band data canonical and the document
 derived. The table above is a dated cross-check that the two repositories agreed at a
-point in time, which is the useful thing a captured document can say. The pin that runs in
-CI is self-baselined band data in this repository. See #41.
+point in time, which is the useful thing a captured document can say — and they said one
+more, which #41 took them up on: the PCLAI colour scheme each region was rendered with is
+written on their elements, and is now recovered into the `.pclai.json` files above. The pin
+that runs in CI is self-baselined band data in this repository.
 
 ## A note on `.gitignore`
 

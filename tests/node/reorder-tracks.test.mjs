@@ -14,13 +14,10 @@
 // rather than in the other repository.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 
 import { assertDenseStrandIds } from "../../seqtubemap/band-data.mjs";
-import { repoRoot } from "./golden-cases.mjs";
-
-const fixtureDir = join(repoRoot, "tests", "fixtures", "seqtubemap");
+import { inputPath, realCases } from "./real-cases.mjs";
 
 /**
  * The layout, loaded the way `render.mjs` loads it: config first, then a window,
@@ -49,12 +46,15 @@ async function layout() {
 /** Every committed real subgraph, as the strands the layout would be handed. */
 async function realSubgraphs() {
   const { vgExtractTracks } = await layout();
-  return readdirSync(fixtureDir)
-    .filter((name) => name.endsWith(".json"))
-    .map((name) => ({
-      name: name.replace(/^subgraph_|_v2_with_walk\.json$/g, ""),
-      strands: vgExtractTracks(JSON.parse(readFileSync(join(fixtureDir, name), "utf8")), 0, 1),
-    }));
+  // `realCases` rather than everything in the directory: a fixture now carries
+  // several `.json` files — the subgraph and its PCLAI colour scheme — and a glob
+  // that catches the scheme feeds the layout something that is not a subgraph.
+  // That list is where a sixth subgraph gets added, and every test over the real
+  // fixtures picks it up from there.
+  return realCases.map((name) => ({
+    name: name.replace(/^subgraph_|_v2_with_walk$/g, ""),
+    strands: vgExtractTracks(JSON.parse(readFileSync(inputPath(name), "utf8")), 0, 1),
+  }));
 }
 
 /** The `sample#haplotype#contig` triple, which is the whole of a strand's identity. */
