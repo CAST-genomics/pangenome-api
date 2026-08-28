@@ -3,6 +3,9 @@
 Hi Cici — one thing to set up, and I think it's about 20 minutes. Nothing here touches the
 live server.
 
+- Rendered version, which is the one to send her: <https://claude.ai/code/artifact/ccfbbb63-c362-4cab-977d-78664278a6df>
+- Source of the rendered version: [`test-deployment-request.html`](./test-deployment-request.html)
+
 Anywhere below that says `<something>`, that's a placeholder for a real value on your end.
 If a step doesn't work, stop and ping me rather than digging.
 
