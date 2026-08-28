@@ -30,9 +30,10 @@ Phase 0 and increment **A** are merged. **B** is half done.
 | | |
 | --- | --- |
 | Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21) |
-| Frontier | **[#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22)** — its only blocker, #21, is closed. **[#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46)** is unblocked and should go first; see below |
+| On `fix/reorder-tracks-pivot-strand`, not yet merged | [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46), [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) |
+| Frontier | **[#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22)** — its only blocker, #21, is closed |
 | Live | **Nothing.** The server follows `release`, so merging is not shipping; `git log release..main` is what is waiting |
-| Coverage gaps worth closing first | [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46) *(human)*, then [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40) and [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) *(both agent)* — see *Before #22* below |
+| Coverage gaps worth closing first | [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40) *(agent)* — see *Before #22* below |
 | Housekeeping, unblocked, no document changes | [#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45) *(agent)* |
 
 ---
@@ -245,7 +246,7 @@ which is how #46 sat undetected. They cover the mechanism; they do not cover the
 Three gaps, all ticketed — and the order among them matters, because one of them moves the
 documents the other two would baseline.
 
-- **[#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46) — the reorder is wrong *(ready-for-human, take this first)*.**
+- **[#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46) — the reorder is wrong *(landed on `fix/reorder-tracks-pivot-strand`)*.**
   `reorderTracksForLayout` arrived in `0f69615` inside a commit about walk generation, with a
   three-point comment and a one-line body implementing one of the three. It decides which
   strand is the **pivot strand** — `createTubeMap` straightens `tracks[0]` and orients
@@ -262,8 +263,8 @@ documents the other two would baseline.
   whenever `minigraphnode` is set — produces output nothing pins. #21 added band-data coverage
   for it, not a golden document. Small, mechanical, and it closes a real hole under B.
 
-- **[#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) — the fetch-ceiling regime *(ready-for-agent, blocked by #46)*.** The two
-  skipped cases in `generate-svg.golden.test.mjs` want the regime that actually fails to be
+- **[#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) — the fetch-ceiling regime *(landed on `fix/reorder-tracks-pivot-strand`)*.** The two
+  skipped cases in `generate-svg.golden.test.mjs` wanted the regime that actually fails to be
   the regime under test. **This ticket was rewritten on 2026-08-28**; the version that asked
   for a naming decision, server access and a 12 MB commit rested on two claims that were then
   measured and found false.
@@ -280,6 +281,14 @@ documents the other two would baseline.
   So the pin is **self-baselined band data in this repository**, which is what ADR 0001 makes
   canonical anyway — no server access, no 12 MB, and no decision left to make. The full
   measurement is in `tests/fixtures/seqtubemap/README.md` and in the comment on the issue.
+
+  What landed: `tests/node/real-subgraph.band.test.mjs` renders all five real subgraphs,
+  compares their band data to `<name>.band.json.gz` baselines beside each subgraph, and
+  rebuilds each document from the committed baseline in full — 15.81 MB of XML for the
+  largest, accounted for byte by byte. The skip mechanism is gone. Each fixture also gained a
+  `.pclai.json`, so the real subgraphs are rendered with all three of a real request's
+  inputs: the PCLAI colour scheme each region was rendered with turned out to be recoverable
+  from `pgb`'s goldens, where the generator writes every entry onto the elements it draws.
 
 > **Do not reach for `perf/gfa-to-vg-json.mjs --names=bare`.** The old #41 offered it as the
 > lever for "restoring the older naming convention". On the 90 bp fixture the suffixed names

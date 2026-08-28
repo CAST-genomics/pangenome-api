@@ -17,20 +17,16 @@
 // committed, and the generator reads nothing else.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 
 import {
   caseNamed,
   cases,
-  goldenDir,
   goldenPath,
   inputBytes,
   inputPath,
   pclaiColorSchemeText,
-  render,
   renderCase,
-  repoRoot,
 } from "./golden-cases.mjs";
 
 for (const testCase of cases) {
@@ -168,35 +164,10 @@ function describeDifference(actual, expected, golden) {
   );
 }
 
-// The synthetic cases above stand in for real inputs, which is what #18 asks for
-// "until real inputs arrive". The two real subgraphs at `pgb`'s fetch ceiling —
-// the regime that actually fails — are already committed next door, but the
-// golden documents that match them are not: `pgb`'s five predate a change in how
-// strands are named, and do not line up with these inputs today (see
-// tests/fixtures/seqtubemap/README.md, "Two conventions").
-//
-// So the test is written against them now and skips with a stated reason, rather
-// than being deferred. Drop a document at the path below and it starts running.
-const FETCH_CEILING_FIXTURES = [
-  "subgraph_chr1_25301271_25309238_v2_with_walk",
-  "subgraph_chr1_25331646_25335796_v2_with_walk",
-];
-
-for (const name of FETCH_CEILING_FIXTURES) {
-  const input = join(repoRoot, "tests", "fixtures", "seqtubemap", `${name}.json`);
-  const golden = join(goldenDir, "real", `${name}.svg`);
-
-  test(`${name} renders byte-identically to its golden document`, { skip: skipReason(golden) }, () => {
-    // The region comes from the filename because that is where the endpoint gets
-    // it too: it rebuilds the cache path from the query parameters, so the
-    // coordinates in the name are the coordinates of the request.
-    const [, start, end] = name.match(/_(\d+)_(\d+)_v2_/).map(Number);
-    const actual = render(input, "compressed", { region: { start, end } });
-    assert.ok(actual.equals(readFileSync(golden)), describeDifference(actual, readFileSync(golden), golden));
-  });
-}
-
-function skipReason(golden) {
-  if (existsSync(golden)) return false;
-  return `no golden document at ${golden} — pgb's documents predate a strand-naming change and do not match these inputs (see tests/fixtures/seqtubemap/README.md)`;
-}
+// The five real subgraphs are covered next door, in
+// `real-subgraph.band.test.mjs`. They are pinned by their **band data** rather
+// than by a document: `docs/adr/0001-additive-band-format.md` makes the band data
+// canonical and the document derived from it, so a baselined document would buy a
+// weaker guarantee at ten times the size. That test rebuilds each document from
+// the baseline and checks it in full, which is the same claim this file makes
+// about the synthetic cases, made where the layout actually costs something.

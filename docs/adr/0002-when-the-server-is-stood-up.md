@@ -108,11 +108,19 @@ increment, not once per commit.
   of suspects rather than one assumed cause.
 - **The fixtures have to be kept honest, because they are load-bearing.** Where a fixture is
   missing its oracle, that is a gap in the default rung and should be closed there rather
-  than deferred to a deploy. The two skipped real-input golden cases in
-  `tests/node/generate-svg.golden.test.mjs` are the current instance.
+  than deferred to a deploy. The instance this ADR named — the two skipped real-input golden
+  cases in `tests/node/generate-svg.golden.test.mjs`, waiting on a document recaptured from a
+  server — was closed by [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41)
+  exactly that way: the oracle is now band data baselined in this repository
+  (`tests/node/real-subgraph.band.test.mjs`), and the third input those fixtures were missing,
+  the PCLAI colour scheme, was recovered from `pgb`'s captured documents rather than fetched.
+  Nothing in the suite is waiting on a deploy.
 - **Watch for an oracle that degenerates.** `tests/node/band-data.test.mjs` proves the band
   data can rebuild the document by comparing the reconstruction against the render. After
   increment B the document *is* emitted from the band data, so that comparison becomes a
-  tautology that still passes. The golden documents are what survive it.
+  tautology that still passes. The golden documents are what survive it — and, for the real
+  subgraphs, the committed band-data baselines: `real-subgraph.band.test.mjs` rebuilds each
+  document from the bytes on disk rather than from the render it just performed, which is the
+  one arrangement of the three that increment B cannot turn into a tautology.
 - **`vg` remains a real dependency of the default rung** until increment D removes the round
   trip. Locally its absence skips; in CI it does not.

@@ -121,11 +121,12 @@ export function regionFor(vgJson) {
  * Bytes, not a string: "byte-identical" is the bar this whole test exists to
  * hold, and comparing decoded strings would compare UTF-16 code units instead.
  */
-export function render(input, nodeWidthOption, { region, colorSchemeText } = {}) {
-  // A synthetic input carries no coordinates, so its region is derived from the
-  // reference strand's length. A real one is named for the region it came from,
-  // and the caller passes those coordinates through as the endpoint does.
-  const { start, end } = region ?? regionFor(JSON.parse(readFileSync(input, "utf8")));
+export function render(input, nodeWidthOption, { colorSchemeText } = {}) {
+  // A synthetic input carries no coordinates of its own, so its region is derived
+  // from the reference strand's length. The real subgraphs are named for the
+  // region they came from and are rendered in-process instead; see
+  // real-cases.mjs.
+  const { start, end } = regionFor(JSON.parse(readFileSync(input, "utf8")));
   const outDir = mkdtempSync(join(tmpdir(), "tubemap-golden-"));
   try {
     const outFile = join(outDir, "tubemap.svg");

@@ -69,33 +69,31 @@ parameters live in [`tests/node/golden-cases.mjs`](../../node/golden-cases.mjs),
 and the test re-derives each input from them and checks it against the committed
 bytes, so a fixture nobody can rebuild fails the suite.
 
-Synthetic because the real inputs are not available: the five `.gfa` subgraphs in
-[`../seqtubemap/`](../seqtubemap/README.md) came off the live server, but their
-matching golden documents live in `pgb` and were captured before a change in how
-strands are named — the pair does not line up today (see that README's last
-section). When they do, these cases should be joined by, or replaced with, cases
-built on real inputs.
+Synthetic because they are meant to be: seeded, small enough to read in a diff,
+and rebuildable by anyone from the parameters alone. The real subgraphs are
+covered too, but not from here — see the next section.
 
-## The real inputs, and `real/`
+## The real inputs, and where they are pinned
 
-Two tests in the suite are written against the **real** subgraphs at `pgb`'s fetch
-ceiling — `chr1:25,331,646-25,335,796` and `chr1:25,301,271-25,309,238`, committed in
-[`../seqtubemap/`](../seqtubemap/README.md) — because those are the regime that
-actually fails, and the synthetic cases only stand in for them. They **skip with a
-stated reason** rather than being deferred, and start running the moment a document
-appears at `real/<fixture-name>.svg`.
+The five real `.gfa` subgraphs in [`../seqtubemap/`](../seqtubemap/README.md) — including
+the two at `pgb`'s fetch ceiling, which are the regime that actually fails and the reason
+the synthetic cases are not enough — are pinned by
+[`tests/node/real-subgraph.band.test.mjs`](../../node/real-subgraph.band.test.mjs), against
+**band data** baselined beside each subgraph as `<name>.band.json.gz`.
 
-Nothing is there today, for two reasons. `pgb`'s five golden documents predate a
-change in how strands are named and do not line up with these inputs (that
-README's "Two conventions" section). And a self-baselined document for either
-region is roughly **12 MB** — measured, not estimated — which is not a thing to
-commit. When the naming mismatch is resolved on one side or the other, this is
-where the resulting documents go.
+Not a golden document, and nothing lives in this directory for them. Two tests here used to
+be written against a recaptured SVG from the server and skipped with a stated reason
+waiting for one to appear at `real/<name>.svg`. That was the wrong artifact to wait for:
+[`docs/adr/0001`](../../../docs/adr/0001-additive-band-format.md) makes the band data
+canonical and the document derived from it, so a baselined document pins the derived
+artifact — a weaker guarantee, at 35.84 MB across the five against 2.33 MB of gzipped
+numbers. The documents are still checked, but as something *rebuilt from* the baseline and
+compared in full, which is a stronger claim than byte-identity against a capture.
 
-Unlike the synthetic cases, the real ones take their region from the fixture's
-filename. That is where the endpoint gets it too: it rebuilds the cache path from
-the query parameters, so the coordinates in the name are the coordinates of the
-request.
+That test also renders all three inputs a real request carries, the PCLAI colour scheme
+included, which the synthetic `small-pclai` case covers only in miniature. See
+[`../seqtubemap/README.md`](../seqtubemap/README.md) for where each input came from and what
+the baselines cost on disk.
 
 ## Re-baselining
 
@@ -110,6 +108,10 @@ the diff in the working tree. Review it as part of that increment — the whole
 point of the test is that a golden document changing in a commit which claimed
 not to change behaviour is visible in the diff.
 
+The real subgraphs' band data has its own script, `npm run baseline:bands`, because
+the two cost different things: the synthetic goldens re-render in about a second,
+and the five real ones take minutes and want a large heap.
+
 Never re-baseline to make a red test go green. A byte difference is either a
 change the increment intended, in which case the diff is evidence for the review,
 or it is the regression this test exists to catch.
@@ -119,6 +121,11 @@ or it is the regression this test exists to catch.
 Nothing. No `vg`, no graph data, no network — the inputs are committed and the
 generator reads nothing else. `npm ci` for `jsdom` and `canvas` is the only
 prerequisite, and that goes away with increment B.
+
+Memory is the one real requirement, and it comes from the real subgraphs rather
+than from these: laying out the 4.2 kb region peaks around 2.3 GB, so `npm test`
+raises the heap explicitly instead of relying on Node's default. Increment B is
+what removes the emulated document that most of it is.
 
 ## A note on `.gitignore`
 
