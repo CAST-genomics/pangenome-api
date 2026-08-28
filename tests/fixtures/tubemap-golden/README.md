@@ -1,15 +1,17 @@
 # Golden tube map documents
 
-Two synthetic subgraphs and the exact documents the sequence tube map generator
-produces from them. `tests/node/generate-svg.golden.test.mjs` renders each input
-and asserts the result is **byte-identical** to the committed document.
+Two synthetic subgraphs, one of them rendered twice, and the exact documents the
+sequence tube map generator produces from them.
+`tests/node/generate-svg.golden.test.mjs` renders each case and asserts the result
+is **byte-identical** to the committed document.
 
-| case | strands | spine segments | input | golden |
-| --- | ---: | ---: | ---: | ---: |
-| `small` | 7 | 12 | 4.9 KB | 25 KB |
-| `large` | 121 | 40 | 231 KB | 774 KB |
+| case | input | strands | spine segments | golden |
+| --- | --- | ---: | ---: | ---: |
+| `small` | `small.vg.json` | 7 | 12 | 25 KB |
+| `large` | `large.vg.json` | 121 | 40 | 774 KB |
+| `small-pclai` | `small.vg.json` + `pclai-color-scheme.json` | 7 | 12 | 26 KB |
 
-Both are rendered with `nodeWidthOption=compressed`, the endpoint's own default
+All three are rendered with `nodeWidthOption=compressed`, the endpoint's own default
 (`main.py:720`). It is also the only width mode that can be goldened: `normal`
 sizes each segment by measuring its label with the platform's fonts, so its bytes
 differ between a developer's machine and CI. The smoke test next door covers
@@ -27,9 +29,40 @@ strands would go on passing if strand layout or ordering collapsed; 121 is the
 same order of magnitude as a real subgraph's 369–464, at a size still reasonable
 to commit.
 
+## The PCLAI colour scheme case
+
+The generator takes an optional sixth argument, a PCLAI colour scheme as JSON
+(`seqtubemap/generate-svg.mjs`). Production passes it whenever `minigraphnode` is
+set (`main.py:767`), and when it is present it takes over strand colour entirely —
+each strand is drawn in its scheme colour, or light grey if the scheme does not
+mention it (`seqtubemap/tubemap.js:2503`). It also puts the scheme's coordinates
+and confidence score on every strand element as `pclaiX`, `pclaiY` and
+`pclaiScore`.
+
+`small-pclai` renders **the same input as `small`** through that argument, with
+the scheme committed beside the fixtures as `pclai-color-scheme.json` rather than
+inlined in the case list, so the generator's actual input is a file a reader can
+open. Sharing `small`'s input is the point: the two documents differ only by the
+scheme, so any difference in strand colour is the scheme's doing. That is what
+makes [#13](https://github.com/CAST-genomics/PangenomeAPI/issues/13)'s claim that
+strand colour "passes through untouched" through increments B and C checkable
+rather than asserted — recolouring is explicitly out of scope there, and a golden
+is how out-of-scope becomes enforced.
+
+Because the input is borrowed, `small-pclai` has no seed of its own: re-baselining
+writes `small.vg.json` once, from `small`.
+
+The scheme carries all three shapes an entry can take: strands with a PCLAI
+colour, one with the grey no-coordinate entry the endpoint emits when
+`x_coord == "."` (`main.py:684`), and strands the scheme does not mention, which
+fall back to light grey. The last two are the *same* grey, so colour alone cannot
+show that both are covered — the `pclaiX`, `pclaiY` and `pclaiScore` attributes
+can, and a second test checks those. Between them, a scheme that quietly stopped
+being applied fails loudly rather than just re-baselining.
+
 ## These are synthetic, and reproducible
 
-Both inputs come from the seeded generator in
+The two inputs come from the seeded generator in
 [`perf/gen-vg-json.mjs`](../../../perf/gen-vg-json.mjs) — a reference spine with
 bubbles hanging off it and haplotypes choosing an allele at each. The seeds and
 parameters live in [`tests/node/golden-cases.mjs`](../../node/golden-cases.mjs),

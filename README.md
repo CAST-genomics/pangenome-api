@@ -60,10 +60,12 @@ Both suites run in CI on every pull request (`.github/workflows/ci.yml`), where
 
 ### Golden tube map documents
 
-`npm test` includes a golden test: two committed subgraphs are rendered through
-the sequence tube map generator and the output is compared **byte for byte**
-against committed documents. It is the safety net for the `/seqtubemap` rework,
-whose increments each claim the output is unchanged.
+`npm test` includes a golden test: committed subgraphs are rendered through the
+sequence tube map generator and the output is compared **byte for byte** against
+committed documents. It is the safety net for the `/seqtubemap` rework, whose
+increments each claim the output is unchanged. One case renders with a PCLAI
+colour scheme, the optional argument production passes whenever `minigraphnode`
+is set, so strand colour is pinned on that path too.
 
 When a change is *meant* to alter the output, re-baseline deliberately with
 `npm run baseline:golden` and review the resulting diff as part of that change.
