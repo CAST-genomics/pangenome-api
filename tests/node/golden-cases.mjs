@@ -26,13 +26,23 @@ const generator = join(repoRoot, "seqtubemap", "generate-svg.mjs");
 // measures the segment's label with the platform's fonts, so its bytes differ between
 // a developer's machine and CI and cannot be goldened; the smoke test covers that
 // mode without asserting on bytes.
+//
+// The third case renders the *same* input as `small` through the generator's
+// optional sixth argument, the PCLAI colour scheme. Production passes it whenever
+// `minigraphnode` is set (main.py:767), and it takes over strand colour entirely
+// (tubemap.js:2503), so without a case carrying one that branch produces bytes
+// nothing pins. Sharing `small`'s input is the point: the two documents differ
+// only by the scheme, which is what makes "strand colour passes through
+// untouched" checkable rather than asserted.
+const small = {
+  name: "small",
+  // 7 strands over a 12-segment spine.
+  params: { spineNodes: 12, haplotypes: 6, seqLen: 8, seed: 1 },
+  nodeWidthOption: "compressed",
+};
+
 export const cases = [
-  {
-    name: "small",
-    // 7 strands over a 12-segment spine.
-    params: { spineNodes: 12, haplotypes: 6, seqLen: 8, seed: 1 },
-    nodeWidthOption: "compressed",
-  },
+  small,
   {
     name: "large",
     // 121 strands — the same order of magnitude as a real subgraph's 369–464,
@@ -40,10 +50,37 @@ export const cases = [
     params: { spineNodes: 40, haplotypes: 120, seqLen: 12, seed: 7 },
     nodeWidthOption: "compressed",
   },
+  {
+    ...small,
+    name: "small-pclai",
+    inputName: small.name,
+    // Committed next door rather than inlined, so the generator's actual input is
+    // a file a reader can open. It carries all three shapes an entry can take:
+    // strands with a PCLAI colour, one with the grey no-coordinate entry the
+    // endpoint emits for `x_coord == "."` (main.py:684), and strands the scheme
+    // does not mention, which fall back to light grey. The last two are the same
+    // grey, so only the pclaiX/Y/Score attributes tell them apart — which is why
+    // the golden test checks those as well as the colours.
+    pclaiColorScheme: "pclai-color-scheme.json",
+  },
 ];
 
+/**
+ * The PCLAI colour scheme a case is rendered with, or null if it has none.
+ *
+ * The text, because that is what the generator takes: the argument crosses a
+ * process boundary as JSON, and re-serializing a parsed copy would render from
+ * bytes the fixture does not contain. Callers rendering in-process parse it.
+ */
+export function pclaiColorSchemeText(testCase) {
+  if (!testCase.pclaiColorScheme) return null;
+  return readFileSync(join(goldenDir, testCase.pclaiColorScheme), "utf8");
+}
+
+// Cases may share an input — `small-pclai` renders `small`'s — so that the only
+// difference between their documents is the argument under test.
 export function inputPath(testCase) {
-  return join(goldenDir, `${testCase.name}.vg.json`);
+  return join(goldenDir, `${testCase.inputName ?? testCase.name}.vg.json`);
 }
 
 export function goldenPath(testCase) {
@@ -55,7 +92,13 @@ export function inputBytes(testCase) {
   return JSON.stringify(generate(testCase.params));
 }
 
+/**
+ * Write a case's input from its seed. A case that borrows another's input has
+ * none of its own: writing it would let a copied case silently redefine the
+ * input its original is goldened against.
+ */
 export function writeInput(testCase) {
+  if (testCase.inputName) return;
   writeFileSync(inputPath(testCase), inputBytes(testCase), "utf8");
 }
 
@@ -78,7 +121,7 @@ export function regionFor(vgJson) {
  * Bytes, not a string: "byte-identical" is the bar this whole test exists to
  * hold, and comparing decoded strings would compare UTF-16 code units instead.
  */
-export function render(input, nodeWidthOption, region) {
+export function render(input, nodeWidthOption, { region, colorSchemeText } = {}) {
   // A synthetic input carries no coordinates, so its region is derived from the
   // reference strand's length. A real one is named for the region it came from,
   // and the caller passes those coordinates through as the endpoint does.
@@ -86,9 +129,14 @@ export function render(input, nodeWidthOption, region) {
   const outDir = mkdtempSync(join(tmpdir(), "tubemap-golden-"));
   try {
     const outFile = join(outDir, "tubemap.svg");
+    const args = [generator, input, outFile, String(start), String(end), nodeWidthOption];
+    // Appended, not passed as an empty string: the generator distinguishes an
+    // absent sixth argument from any value, and the no-scheme cases must keep
+    // invoking the five-argument form production uses when `minigraphnode` is unset.
+    if (colorSchemeText !== null) args.push(colorSchemeText);
     execFileSync(
       process.execPath,
-      [generator, input, outFile, String(start), String(end), nodeWidthOption],
+      args,
       { cwd: repoRoot, stdio: ["ignore", "ignore", "pipe"] },
     );
     return readFileSync(outFile);
@@ -99,5 +147,14 @@ export function render(input, nodeWidthOption, region) {
 
 /** Run the generator over a case's committed input. */
 export function renderCase(testCase) {
-  return render(inputPath(testCase), testCase.nodeWidthOption);
+  return render(inputPath(testCase), testCase.nodeWidthOption, {
+    colorSchemeText: pclaiColorSchemeText(testCase),
+  });
+}
+
+/** The case of that name, so a test can name the one it is about. */
+export function caseNamed(name) {
+  const testCase = cases.find((candidate) => candidate.name === name);
+  if (!testCase) throw new Error(`no golden case named ${name}`);
+  return testCase;
 }

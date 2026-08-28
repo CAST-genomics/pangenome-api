@@ -19,7 +19,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { renderTubeMap } from "../../seqtubemap/render.mjs";
-import { cases, goldenPath, inputPath, regionFor, repoRoot } from "./golden-cases.mjs";
+import {
+  cases,
+  goldenPath,
+  inputPath,
+  pclaiColorSchemeText,
+  regionFor,
+  repoRoot,
+} from "./golden-cases.mjs";
 import { reconstructDocument } from "./reconstruct-document.mjs";
 
 // The smallest of the committed real subgraphs, named for the region it was
@@ -29,14 +36,21 @@ const REAL_SUBGRAPH = "subgraph_chr8_78771162_78771252_v2_with_walk";
 
 // One render per case, in this process — the same render the CLI performs, and
 // the only way to reach the band data, which is held in memory rather than
-// written anywhere.
+// written anywhere. A case's PCLAI colour scheme goes in too, or the render would
+// not be the one its golden document was baselined from.
 const rendered = new Map();
 for (const testCase of cases) {
   const inputFile = inputPath(testCase);
   const { start, end } = regionFor(JSON.parse(readFileSync(inputFile, "utf8")));
   rendered.set(
     testCase.name,
-    await renderTubeMap({ inputFile, start, end, nodeWidthOption: testCase.nodeWidthOption }),
+    await renderTubeMap({
+      inputFile,
+      start,
+      end,
+      nodeWidthOption: testCase.nodeWidthOption,
+      pclaiColorScheme: JSON.parse(pclaiColorSchemeText(testCase)),
+    }),
   );
 }
 

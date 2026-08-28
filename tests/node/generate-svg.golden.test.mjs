@@ -21,11 +21,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  caseNamed,
   cases,
   goldenDir,
   goldenPath,
   inputBytes,
   inputPath,
+  pclaiColorSchemeText,
   render,
   renderCase,
   repoRoot,
@@ -42,7 +44,9 @@ for (const testCase of cases) {
     assert.ok(actual.equals(expected), describeDifference(actual, expected, goldenPath(testCase)));
   });
 
-  test(`the ${testCase.name} fixture regenerates byte-identically from its seed`, () => {
+  // A case that borrows another's input has no seed of its own to check — the
+  // case it borrows from covers those bytes.
+  test(`the ${testCase.name} fixture regenerates byte-identically from its seed`, { skip: testCase.inputName && `renders ${testCase.inputName}'s input` }, () => {
     // The committed input is a convenience, not a secret: the same seed and
     // parameters must reproduce it exactly, or the goldens above pin an input
     // nobody can rebuild.
@@ -53,11 +57,99 @@ for (const testCase of cases) {
   });
 }
 
+// Byte-identity alone cannot say *which* branch produced the bytes, and this case
+// exists precisely to pin the branch. `small` and `small-pclai` render the same
+// input, so every difference between their documents is the scheme's doing — which
+// is what will make #13's claim that strand colour "passes through untouched"
+// through increments B and C checkable rather than asserted. See the case list in
+// golden-cases.mjs for why the case is shaped this way.
+test("the PCLAI golden is coloured by its scheme, not by the default palette", () => {
+  const plain = strandColors(readFileSync(goldenPath(caseNamed("small")), "utf8"));
+  const coloured = strandColors(readFileSync(goldenPath(caseNamed("small-pclai")), "utf8"));
+  const scheme = pclaiScheme();
+
+  assert.deepEqual([...coloured.keys()].sort(), [...plain.keys()].sort(), "same strands either way");
+  for (const [name, color] of coloured) {
+    assert.notEqual(color, plain.get(name), `${name} kept its default palette colour`);
+  }
+
+  for (const [name, [[r, g, b]]] of Object.entries(scheme)) {
+    assert.equal(coloured.get(name), `rgb(${r}, ${g}, ${b})`, `${name} is not its scheme colour`);
+  }
+  const unlisted = [...coloured.keys()].filter((name) => !(name in scheme));
+  assert.ok(unlisted.length > 0, "no strand is missing from the scheme, so the fallback is untested");
+  for (const name of unlisted) {
+    assert.equal(coloured.get(name), "rgb(211, 211, 211)", `${name} is not the light-grey fallback`);
+  }
+});
+
+test("the PCLAI golden carries the scheme's coordinates and scores", () => {
+  // Not a second colour test: the grey no-coordinate entry and a strand the scheme
+  // never mentions are the *same* grey, so colour alone cannot tell the fixture is
+  // covering both. The coordinates and score, which ride on the same elements, can.
+  const svg = readFileSync(goldenPath(caseNamed("small-pclai")), "utf8");
+
+  for (const [name, [, [x, y], score]] of Object.entries(pclaiScheme())) {
+    const attributes = pclaiAttributes(svg, name);
+    assert.equal(attributes.pclaiX, absentAsNone(x), `${name} pclaiX`);
+    assert.equal(attributes.pclaiY, absentAsNone(y), `${name} pclaiY`);
+    assert.equal(attributes.pclaiScore, absentAsNone(score), `${name} pclaiScore`);
+  }
+});
+
+/** The very scheme the case was rendered with, read back as a value. */
+function pclaiScheme() {
+  return JSON.parse(pclaiColorSchemeText(caseNamed("small-pclai")));
+}
+
+/** The document writes an absent coordinate or score as the literal "None". */
+function absentAsNone(value) {
+  return value === null ? "None" : String(value);
+}
+
+/** Strand name -> the fill colour every one of its elements carries. */
+function strandColors(svg) {
+  const colors = new Map();
+  for (const [, fill, name] of svg.matchAll(
+    /style="fill: ([^;]+);[^"]*"[^>]*trackName="([^"]+)"/g,
+  )) {
+    const seen = colors.get(name);
+    assert.ok(seen === undefined || seen === fill, `${name} is drawn in two colours`);
+    colors.set(name, fill);
+  }
+  assert.ok(colors.size > 0, "no strands found in the document");
+  return colors;
+}
+
+/**
+ * The PCLAI attributes on one strand's elements, which must agree across them.
+ *
+ * `trackName` is the tube map's own spelling, and stops at the attribute name.
+ */
+function pclaiAttributes(svg, strandName) {
+  const elements = [
+    ...svg.matchAll(new RegExp(`<rect [^>]*trackName="${strandName}"[^>]*>`, "g")),
+  ].map(([element]) => element);
+  assert.ok(elements.length > 0, `no elements for ${strandName}`);
+
+  const found = {};
+  for (const element of elements) {
+    for (const key of ["pclaiX", "pclaiY", "pclaiScore"]) {
+      const attribute = element.match(new RegExp(`${key}="([^"]*)"`));
+      assert.ok(attribute, `${strandName} has an element with no ${key}`);
+      const value = attribute[1];
+      assert.ok(found[key] === undefined || found[key] === value, `${strandName} ${key} disagrees`);
+      found[key] = value;
+    }
+  }
+  return found;
+}
+
 test("the large fixture exercises many strands", () => {
   // A golden document only guards what it contains. The small case would pass
   // just as happily if strand layout collapsed to one strand, so one case has to
   // carry enough of them for that to show.
-  const svg = readFileSync(goldenPath(cases.find((c) => c.name === "large")), "utf8");
+  const svg = readFileSync(goldenPath(caseNamed("large")), "utf8");
   const strandNames = new Set([...svg.matchAll(/trackName="([^"]+)"/g)].map((m) => m[1]));
   assert.ok(strandNames.size >= 100, `only ${strandNames.size} strands in the large golden`);
 });
@@ -99,7 +191,7 @@ for (const name of FETCH_CEILING_FIXTURES) {
     // it too: it rebuilds the cache path from the query parameters, so the
     // coordinates in the name are the coordinates of the request.
     const [, start, end] = name.match(/_(\d+)_(\d+)_v2_/).map(Number);
-    const actual = render(input, "compressed", { start, end });
+    const actual = render(input, "compressed", { region: { start, end } });
     assert.ok(actual.equals(readFileSync(golden)), describeDifference(actual, readFileSync(golden), golden));
   });
 }
