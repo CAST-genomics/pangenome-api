@@ -1,6 +1,6 @@
 # `/seqtubemap` rework — the roadmap
 
-The execution sequence for the `/seqtubemap` plumbing work: fourteen tickets, what each
+The execution sequence for the `/seqtubemap` plumbing work: sixteen tickets, what each
 delivers, what gates it, and what has to be true before it is called done.
 
 This is the **build** document. Its companions:
@@ -10,11 +10,24 @@ This is the **build** document. Its companions:
 | [`CONTEXT.md`](../CONTEXT.md) | the vocabulary — **strand**, **segment**, **band**, **node** |
 | [`docs/adr/0001`](./adr/0001-additive-band-format.md) | the decision, and the alternatives that were rejected |
 | [`docs/perf/seqtubemap-latency.md`](./perf/seqtubemap-latency.md) | the measurements, §1-9 |
+| [`docs/adr/0002`](./adr/0002-when-the-server-is-stood-up.md) | when the server gets stood up, and when it does not |
 | [`docs/perf/seqtubemap-plan.md`](./perf/seqtubemap-plan.md) | which skill drives each phase |
-| [`docs/perf/deploy-request.md`](./perf/deploy-request.md) | the ask that unblocks [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16) |
+| [`docs/releasing.md`](./releasing.md) | why merging is not shipping |
+| [`docs/perf/deploy-request.md`](./perf/deploy-request.md) | the ask that unblocked [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16) — a record now, not a procedure |
 | [#13](https://github.com/CAST-genomics/PangenomeAPI/issues/13) | the spec these tickets decompose |
 
-Written 2026-08-27, at the end of the grilling and ticketing phase.
+Written 2026-08-27 at the end of the grilling and ticketing phase; updated 2026-08-28.
+
+## Where this stands
+
+Phase 0 and increment **A** are merged. **B** is half done.
+
+| | |
+| --- | --- |
+| Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21) |
+| Frontier | **[#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22)** — its only blocker, #21, is closed |
+| Live | **Nothing.** The server follows `release`, so merging is not shipping; `git log release..main` is what is waiting |
+| Coverage gaps worth closing first | [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40) *(agent)*, [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) *(human)* — see *Before #22* below |
 
 ---
 
@@ -48,35 +61,38 @@ only consumer, can parse the XML back into the numbers the layout already held i
 ## The dependency graph
 
 ```
-#14 test runner + CI ──┬── #17 endpoint seam ──── #20 threadpool
-                       │
-                       ├── #18 golden test ──┬── #21 capture ── #22 delete jsdom
-                       │                     │                        │
-                       │                     │                        └── #23 floats ── #24 ?format=bands ── #25 contract test
-                       │                     │
-                       │                     └── #26 delete vg ── #27 no disk
-                       │
-                       └── #19 lazy tabix
+#14 test runner + CI ✅─┬── #17 endpoint seam ✅── #20 threadpool ✅
+                        │
+                        ├── #18 golden test ✅─┬── #21 capture ✅── #22 delete jsdom ◀── HERE
+                        │                      │                         │
+                        │                      │                         └── #23 floats ── #24 ?format=bands ── #25 contract test
+                        │                      │
+                        │                      ├── #40 pclai golden        (ready-for-agent)
+                        │                      ├── #41 real-input goldens  (ready-for-human)
+                        │                      │
+                        │                      └── #26 delete vg ── #27 no disk
+                        │
+                        └── #19 lazy tabix ✅
 
-#15 declare the fork ──────── #21
-#16 timings + fixtures ────── #26          (ready-for-human)
+#15 declare the fork ✅────── #21
+#16 timings + fixtures ✅──── #26
+#E  batch GenerateWalksMC — no ticket yet, no ADR behind it
 ```
 
-**The frontier is [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14),
-[#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15),
-[#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16)** — three independent starts.
-Edges are GitHub's native issue dependencies, so a ticket whose blockers are all closed is
-grabbable without consulting this document.
+**The frontier is [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22)**, and nothing blocks it. Edges are GitHub's native issue
+dependencies, so a ticket whose blockers are all closed is grabbable without consulting this
+document — which is why the two coverage tickets hanging off #18 are worth reading before
+grabbing #22 rather than after.
 
 ---
 
 ## Phase 0 — Foundation
 
-Nothing can be asserted until something can run assertions. **This repository has no tests
-and no CI**: no test files, no runner configuration, no workflows. Every seam below is a new
-seam.
+**Done — all three.** Nothing could be asserted until something could run assertions, and
+when this was written the repository had no tests, no runner configuration and no workflows.
+It now has two suites and CI that runs both on every pull request.
 
-### [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14) — Test runner and CI
+### [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14) — Test runner and CI ✅
 
 A Python runner, a Node runner, a workflow running both on every pull request, and one smoke
 test per runner proving the setup works end to end. CI also carries the `vg` binary, because
@@ -86,7 +102,7 @@ stays runnable on a machine that has none.
 
 Prefactoring. Make the change easy, then make the easy change.
 
-### [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15) — Declare the fork
+### [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15) — Declare the fork ✅
 
 `seqtubemap/tubemap.js` is an unmarked ~4,000-line vendored copy of
 `vgteam/sequenceTubeMap`, carrying upstream's eslint header and no provenance, version, or
@@ -94,14 +110,18 @@ note. [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) removes its
 the re-sync option is gone in fact; a header comment makes it gone on paper. Land it before
 anyone edits the file.
 
-### [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16) — Timings and fixtures *(human)*
+### [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16) — Timings and fixtures ✅ *(human)*
 
 Two artifacts off one deploy: stage timings for three uncached regions, and the pipeline
 intermediates for the five regions `pgb` already holds golden outputs for. The full request
 is in [`deploy-request.md`](./perf/deploy-request.md).
 
-Start it now — it is a conversation with a colleague, and it gates
-[#26](https://github.com/CAST-genomics/PangenomeAPI/issues/26) only.
+**It reported, and it re-ranked the roadmap.** `subgraph_extract` is **77% of a 10 kb
+request** — but the cost is `GenerateWalksMC`'s per-node tabix loop, not `gbz-base`, whose own
+query prints 0.042 s. The `vg` round trip is **1.6%**, which demotes increment D out of
+performance entirely and adds **E** below. `generate_svg` also turned out larger than
+estimated: 8.2 s at 10 kb, and 91 s of a 93.6 s *cached* 35.9 kb request, which strengthens B
+and C rather than weakening them.
 
 ---
 
@@ -139,20 +159,20 @@ before and after, and diff the recovered arrays.
 Highest priority, smallest diff, and it improves `/json` for free — which also makes it the
 easiest thing in the programme for a reviewer to say yes to.
 
-### [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17) — Endpoint seam
+### [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17) — Endpoint seam ✅
 
 The tracer bullet for Seam 2: request a small region with no graph data present, get a real
 document back, assert it contains bands and segment boxes rather than merely that bytes
 arrived.
 
-### [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20) — Threadpool
+### [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20) — Threadpool ✅
 
-**The fix is deleting the word `async` twice** (`main.py:470`, `:527`). Neither endpoint
-awaits anything; FastAPI runs a plain `def` endpoint in a threadpool automatically. The
-ticket exists for the *test* — issue a slow request and a fast one concurrently, assert the
-fast one does not wait.
+**The fix was deleting the word `async` twice.** Neither endpoint awaits anything; FastAPI
+runs a plain `def` endpoint in a threadpool automatically. The ticket existed for the *test* —
+issue a slow request and a fast one concurrently, assert the fast one does not wait. Merged,
+and **not yet live**: it is in `release..main` with everything else.
 
-### [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19) — Lazy tabix opens
+### [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19) — Lazy tabix opens ✅
 
 Done. The `.walk.gz` derivatives used to be opened at module scope, so the app could not boot
 unless all of them were present — even for a request touching none of them. They are
@@ -167,14 +187,17 @@ to run the server. Each is now opened the first time something reads it (`WalkDe
 Where the ceiling moves. This is the increment that makes large nodes *fetchable*, not merely
 faster.
 
-### [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21) — Capture
+### [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21) — Capture ✅
 
 The expand half. At `tubemap.js:3599` the geometry is bound as `(d) => d.path` — **already a
 finished string, before any element exists**. jsdom's entire contribution is to hold it and
 hand it back. Make that data reachable; keep building the document exactly as before.
 
-Deliberately not demoable on its own. Its acceptance criterion is *the golden test passes with
+Deliberately not demoable on its own. Its acceptance criterion was *the golden test passes with
 no re-baselining* — the only meaningful thing to assert about a change that changes nothing.
+Delivered as `getBandData()` plus `seqtubemap/band-data.mjs`, with sufficiency *demonstrated*:
+`tests/node/reconstruct-document.mjs` rebuilds the document from the band data alone and is
+compared byte for byte, including against a real 464-strand subgraph.
 
 ### [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) — Delete jsdom
 
@@ -192,6 +215,32 @@ in production: a bad deploy surfaces as an error card, not as a diff nobody ran.
 
 > **If the compatibility constraint cannot be held, stop and escalate.** Do not work around
 > it. The no-client-change property is the entire reason B is safe to ship alone.
+
+### Before #22 — the goldens are the only thing that crosses the boundary
+
+#22 re-baselines the golden documents deliberately, and its acceptance criterion is that
+**the diff is only those three removals**. That is a claim about a diff, so it is worth
+asking what the left-hand side covers before making it — because a golden created *after* the
+change cannot police the change, and after B nothing else in the repository pins output
+against what the jsdom pipeline produced.
+
+Two gaps, both already ticketed:
+
+- **[#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40) — PCLAI colour scheme *(ready-for-agent)*.** Every committed golden invokes
+  the five-argument form of the generator, so the colour scheme branch — live in production
+  whenever `minigraphnode` is set — produces output nothing pins. #21 added band-data coverage
+  for it, not a golden document. Small, mechanical, and it closes a real hole under B.
+- **[#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) — real-input goldens *(ready-for-human)*.** The two skipped cases in
+  `generate-svg.golden.test.mjs` want documents for the fetch-ceiling regions. It is
+  human-labelled for three reasons that have not changed: it needs a decision about which
+  strand-naming convention is canonical, server access to recapture whichever side loses, and
+  a call on repository weight — a self-baselined fetch-ceiling document measures **~12 MB**.
+
+A cheaper third option exists and is *not* #41: self-baselining the two **small** real
+subgraphs — `chr8_78771162` at 0.16 MB and `chr1_25331046` at 2.61 MB — with the current
+pre-B generator. That pins B against real strand names and 8,000 bands without claiming
+anything about `pgb`'s documents, so it needs neither the decision nor the access. It does
+not close #41.
 
 ---
 
@@ -228,10 +277,11 @@ agree is precisely the failure mode this whole effort exists to remove.
 
 ## Increment D — delete the `vg` round trip
 
-**Do not start [#26](https://github.com/CAST-genomics/PangenomeAPI/issues/26) until
-[#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16) reports.** It sits *upstream*
-of layout, untouched by A-C, and if `subgraph_extract` dominates the request it is not worth
-doing at all. The measurement decides.
+**The measurement reported, and it demoted this.** `gfa_to_vg` + `vg_to_json` is **0.63 s of a
+38.9 s request — 1.6%**. D is no longer a performance item and should not be sold as one. The
+standing case survives on its own terms, none of which are latency: two subprocess spawns, two
+temp files, a **13×** intermediate inflation, and a `vg` binary that CI and every developer
+machine has to carry. Do it when the provisioning cost is worth paying down, not for speed.
 
 ### [#26](https://github.com/CAST-genomics/PangenomeAPI/issues/26) — Graph JSON in-process
 
@@ -247,6 +297,19 @@ Success is *demonstrated*, not asserted: the Seam 1 golden tests pass with `vg` 
 Stages pass bytes rather than filenames; the response stops being written to disk purely to
 be read back. **The subgraph cache stays** — it is a deliberate optimisation, it is what makes
 a repeated region fast, and Seam 2 depends on it to run without graph data.
+
+---
+
+## Increment E — where the time actually is
+
+**No ticket yet, and no ADR behind it.** It comes from Step 0's numbers rather than from the
+grilling, and it is the largest single cost in the pipeline: `GenerateWalksMC` is a Python
+loop doing one tabix `fetch` per node across 464 strands, at a flat **65-79 ms per node**, and
+it is most of `subgraph_extract`'s 30.1 s of a 38.9 s request.
+
+The open question is whether that per-node fetch can be batched. It is the difference between
+E being a half-day and a rewrite, and nothing else is blocked on the answer — A, B and C are
+correct wherever the upstream time lives.
 
 ---
 
@@ -275,9 +338,10 @@ shared vocabulary with the PCLAI chart and the 3D graph.
 
 ## Still open
 
-- **Does `subgraph_extract` dominate?** The last inferred number in the effort. Gates
-  [#26](https://github.com/CAST-genomics/PangenomeAPI/issues/26) alone — A, B and C are
-  correct wherever that time lives.
+- ~~**Does `subgraph_extract` dominate?**~~ **Answered 2026-08-27: yes, 77%** — and the cost
+  is `GenerateWalksMC`, not `gbz-base` and not the `vg` round trip. See increment E.
+- **Can `GenerateWalksMC`'s per-node tabix fetch be batched?** The question that now most
+  changes the plan.
 - **Does anything depend on the intermediate `.gfa` / `.vg` / `.json` files existing on
   disk?** They are deleted after every response, which suggests purely internal. Confirm with
   Cici before [#27](https://github.com/CAST-genomics/PangenomeAPI/issues/27).
