@@ -12,9 +12,11 @@
 // a recaptured SVG from the server and skipped waiting for one to appear. That
 // was the wrong artifact to wait for: `docs/adr/0001-additive-band-format.md`
 // makes the band data canonical and the document derived from it, so pinning the
-// document buys a weaker guarantee at ten times the size — 15.81 MB of XML against
-// 1.04 MB of gzipped numbers for the largest fixture. The document is still checked,
-// but as something rebuilt *from* the baseline rather than as the baseline.
+// document buys a weaker guarantee at ten times the size — 13.19 MB of XML against
+// 1.04 MB of gzipped numbers for the largest fixture. Since #22 that is literally
+// true of the running code: the document is written from this data, so the
+// baseline pins the bytes the endpoint serves as surely as a golden document
+// would, and the document is checked here as what the baseline writes out.
 //
 // When an increment is meant to change the layout's output, re-baseline
 // deliberately and review the diff as part of it:
@@ -27,7 +29,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { strandIdentity } from "../../seqtubemap/strand.mjs";
-import { reconstructDocument } from "./reconstruct-document.mjs";
+import { assertParseableByPgb } from "./pgb-parser.mjs";
+import { emitDocument } from "../../seqtubemap/emit-document.mjs";
 import {
   baselinePath,
   pclaiPath,
@@ -55,15 +58,20 @@ for (const name of realCases) {
       assert.ok(actual === baseline, describeDifference(actual, baseline, baselinePath(name)));
     });
 
-    await t.test("has a document that the baseline rebuilds, in full", () => {
-      // Rebuilt from the *committed baseline*, not from the render above, so this
-      // says what the documentation says it says: these bytes on disk are enough to
-      // draw this picture. A real subgraph carries no ruler — which is what
-      // production documents look like — so the reconstruction accounts for every
-      // byte of the document rather than for its leading ones.
-      const rebuilt = reconstructDocument(JSON.parse(baseline));
-      assert.ok(document.startsWith(rebuilt), describeReconstruction(document, rebuilt));
-      assert.equal(document.slice(rebuilt.length), "</svg>");
+    await t.test("has the document the committed baseline writes out", () => {
+      // Written from the *committed baseline*, not from the render above, so the
+      // claim is about the bytes on disk: this is the document the endpoint
+      // serves for this region, accounted for in full rather than in prefix.
+      const rebuilt = emitDocument(JSON.parse(baseline));
+      assert.ok(document === rebuilt, describeReconstruction(document, rebuilt));
+    });
+
+    await t.test("has a document `pgb`'s parser can read", () => {
+      // The constraint #22 ships under: the browser emulation went, and the
+      // client did not change. `document-conformance.test.mjs` is where that
+      // contract is written down; this is it applied to a real 464-strand
+      // document, which is the regime that actually reaches the client.
+      assertParseableByPgb(document, bandData);
     });
 
     await t.test("is coloured by its PCLAI scheme", () => {
@@ -123,8 +131,8 @@ function describeDifference(actual, expected, baseline) {
 
 function describeReconstruction(document, rebuilt) {
   return (
-    `the reconstruction diverges from the document ${locate(rebuilt, document)}` +
-    "The band data is missing something the document says, or says it differently."
+    `the baseline writes a different document ${locate(rebuilt, document)}` +
+    "The render and the committed band data disagree about the picture."
   );
 }
 

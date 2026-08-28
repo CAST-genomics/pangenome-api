@@ -10,6 +10,7 @@ This is the **build** document. Its companions:
 | [`CONTEXT.md`](../CONTEXT.md) | the vocabulary — **strand**, **segment**, **band**, **node** |
 | [`docs/adr/0001`](./adr/0001-additive-band-format.md) | the decision, and the alternatives that were rejected |
 | [`docs/perf/seqtubemap-latency.md`](./perf/seqtubemap-latency.md) | the measurements, §1-9 |
+| [`docs/perf/increment-b.md`](./perf/increment-b.md) | what **B** actually bought, before and after |
 | [`docs/adr/0002`](./adr/0002-when-the-server-is-stood-up.md) | when the server gets stood up, and when it does not |
 | [`docs/perf/seqtubemap-plan.md`](./perf/seqtubemap-plan.md) | which skill drives each phase |
 | [`docs/releasing.md`](./releasing.md) | why merging is not shipping |
@@ -17,22 +18,26 @@ This is the **build** document. Its companions:
 | [`tests/fixtures/seqtubemap/README.md`](../tests/fixtures/seqtubemap/README.md) | the five real subgraphs, and what they do and do not pin |
 | [#13](https://github.com/CAST-genomics/PangenomeAPI/issues/13) | the spec these tickets decompose |
 
-Written 2026-08-27 at the end of the grilling and ticketing phase; updated 2026-08-28, twice
-— the second time after a grilling session on [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41)
-measured its premises and found them false. That re-sequenced the coverage work ahead of
-[#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) and added two tickets; see
-*Before #22*.
+Written 2026-08-27 at the end of the grilling and ticketing phase; revised through
+2026-08-28, the substantive revision being a grilling session on
+[#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) that measured its premises and
+found them false. That re-sequenced the coverage work ahead of
+[#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) and added two tickets — all
+three of which have since merged; see *Before #22*.
 
 ## Where this stands
 
-Phase 0 and increment **A** are merged. **B** is half done.
+Phase 0, increment **A** and increment **B** are merged. The browser emulation is gone: the
+document is written from the layout's own numbers, `jsdom` and `canvas` have left the
+dependency tree, and the ceiling moved — a region that died with `heap out of memory` at a
+1 GB heap now renders in under a second. The figures are in
+[`increment-b.md`](./perf/increment-b.md). **C** is next, and nothing blocks it.
 
 | | |
 | --- | --- |
-| Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21), [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46), [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) |
-| Frontier | **[#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22)** — its only blocker, #21, is closed |
-| Live | **Nothing.** The server follows `release`, so merging is not shipping; `git log release..main` is what is waiting |
-| Coverage gaps worth closing first | [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40) *(agent)* — see *Before #22* below |
+| Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21), [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46), [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41), [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40), [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) |
+| Frontier | **[#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23)** — increment C, unblocked by #22 |
+| Live | **Nothing.** The server follows `release`, so merging is not shipping; `git log release..main` — 31 commits — is what is waiting |
 | Housekeeping, unblocked, no document changes | [#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45) *(agent)* |
 
 ---
@@ -57,6 +62,9 @@ One cause sits under all three symptoms. The server computes the geometry, then 
 headless browser, builds a jsdom document, and serializes it to XML — so that `pgb`, the
 only consumer, can parse the XML back into the numbers the layout already held in memory.
 
+*Every row of this table is now past tense; [`increment-b.md`](./perf/increment-b.md) has
+what each became.*
+
 | measured | |
 | --- | ---: |
 | of the render's retained memory is the jsdom document | **93.7%** |
@@ -69,14 +77,13 @@ only consumer, can parse the XML back into the numbers the layout already held i
 ```
 #14 test runner + CI ✅─┬── #17 endpoint seam ✅── #20 threadpool ✅
                         │
-                        ├── #18 golden test ✅─┬── #21 capture ✅── #22 delete jsdom ◀── HERE
+                        ├── #18 golden test ✅─┬── #21 capture ✅── #22 delete jsdom ✅
                         │                      │                         │
-                        │                      │                         └── #23 floats ── #24 ?format=bands ── #25 contract test
+                        │                      │                         └── #23 floats ◀── HERE ── #24 ?format=bands ── #25 contract test
                         │                      │
-                        │                      ├── #40 pclai golden        (ready-for-agent)
+                        │                      ├── #40 pclai golden ✅
                         │                      │
-                        │                      ├── #46 fix the reorder ── #41 fetch-ceiling band data
-                        │                      │   (ready-for-human)       (ready-for-agent)
+                        │                      ├── #46 fix the reorder ✅── #41 fetch-ceiling band data ✅
                         │                      │
                         │                      └── #26 delete vg ── #27 no disk
                         │
@@ -88,15 +95,16 @@ only consumer, can parse the XML back into the numbers the layout already held i
 #E  batch GenerateWalksMC — no ticket yet, no ADR behind it
 ```
 
-**The frontier is [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22)**, and nothing blocks it. Edges are GitHub's native issue
+**The frontier is [#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23)**, and nothing blocks it. Edges are GitHub's native issue
 dependencies, so a ticket whose blockers are all closed is grabbable without consulting this
-document — which is why the coverage tickets hanging off #18 are worth reading before
-grabbing #22 rather than after.
+document.
 
-**[#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46) is also unblocked, and it is the one to take first.** It is not on #22's
-critical path, but it changes the arrangement of every real document the server produces, so
-anything baselined before it lands is baselined against a layout that is about to move. #41
-is blocked on it for exactly that reason.
+The three coverage tickets hanging off #18 — #46, #41 and #40 — were worth closing before #22
+re-baselined the goldens, and all three did; *Before #22* below records what each one added,
+and is history rather than a queue. The other unblocked ticket,
+[#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45), is housekeeping and touches no
+document — and it is smaller than it was, since #22 took the `getComputedTextLength` patch and
+the DOM boot out from under it.
 
 ---
 
@@ -210,25 +218,51 @@ hand it back. Make that data reachable; keep building the document exactly as be
 Deliberately not demoable on its own. Its acceptance criterion was *the golden test passes with
 no re-baselining* — the only meaningful thing to assert about a change that changes nothing.
 Delivered as `getBandData()` plus `seqtubemap/band-data.mjs`, with sufficiency *demonstrated*:
-`tests/node/reconstruct-document.mjs` rebuilds the document from the band data alone and is
-compared byte for byte, including against a real 464-strand subgraph.
+`tests/node/reconstruct-document.mjs` rebuilt the document from the band data alone and was
+compared byte for byte, including against a real 464-strand subgraph. #22 promoted that file
+to `seqtubemap/emit-document.mjs` and deleted the thing it was demonstrating against, so the
+demonstration is now the implementation.
 
-### [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) — Delete jsdom
+### [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) — Delete jsdom ✅
 
-The contract half, and the payoff: **~15× on the ceiling, −722 ms fixed, −16.6% bytes**, and
-`jsdom` and `canvas` — two of five dependencies — gone.
+The contract half, and the payoff. Every draw function now collects what it was about to
+draw (`seqtubemap/band-data.mjs`) and `seqtubemap/emit-document.mjs` writes the document from
+that. `jsdom` and `canvas` — two of five dependencies — are gone, and so is the
+`getComputedTextLength` they existed for: a monospace label's width is its glyph count times
+one advance, which also makes `nodeWidthOption=normal` deterministic across machines for the
+first time.
 
-**Held byte-compatible with `pgb`'s existing parser as a deliberate constraint.**
+**Measured, on `perf/fixtures/split-400.json` and the committed fixtures — the full record is
+[`increment-b.md`](./perf/increment-b.md):**
+
+| | before | after |
+| --- | ---: | ---: |
+| retained by `create()` | 1,851.4 MB, 95.0% of it DOM | **94.9 MB, all of it layout** |
+| peak RSS | 2,446.5 MB | **472.5 MB** |
+| `cross.json` at production's own 8 GB heap | `heap out of memory`, 35.1 s | **renders, 6.4 s** |
+| the smallest possible request, warm | 0.56 s | **0.13 s** |
+| the 4.2 kb document | 15.81 MB | **13.19 MB** (−16.6%) |
+
+The ceiling row is the one that matters: an input that could not be rendered at all now
+renders, at the heap the server actually gives the generator (`main.py:509`).
+
+**It held byte-compatible with `pgb`'s existing parser, which was the constraint.**
 `parseBands.ts` requires `style="fill: rgb(R, G, B); fill-opacity: 1;" trackID="N"
 trackName="…"` contiguous and in that order, and counts `<rect>` + `<path>` in `g.track`.
-What may go, because the client ignores all of it: `color=` (duplicating the rgb already in
-`style=`), `class="track{id}"` (duplicating `trackID`), and the empty `<title>` on every band.
+What went, because the client ignores all of it: `color=` (duplicating the rgb already in
+`style=`), `class="track{id}"` (duplicating `trackID`), and the empty `<title>` on every
+band. The diff was *shown* to be only those three: every golden and all five real subgraphs
+matched their old bytes character for character with exactly those deleted — including
+`nodeWidthOption=normal`, the one mode whose geometry could have moved, since it is what the
+deleted `canvas` was measuring labels with. It now measures them arithmetically, which agrees
+exactly on a host that resolves Courier New and is deterministic on one that does not; that
+mode has its first golden, `small-normal.svg`, as a result.
 
-So **this ships against an unchanged `pgb`**, and the frontend becomes its conformance test
-in production: a bad deploy surfaces as an error card, not as a diff nobody ran.
-
-> **If the compatibility constraint cannot be held, stop and escalate.** Do not work around
-> it. The no-client-change property is the entire reason B is safe to ship alone.
+So **this ships against an unchanged `pgb`**, and the frontend is its conformance test in
+production: a bad deploy surfaces as an error card, not as a diff nobody ran. On this side
+the same contract is written down in `tests/node/pgb-parser.mjs` and checked by
+`tests/node/document-conformance.test.mjs`, including the drawable counts as they stood
+before the increment.
 
 ### Before #22 — what the left-hand side of the diff actually covers
 
@@ -238,29 +272,48 @@ asking what the left-hand side covers before making it — because a golden crea
 change cannot police the change, and after B nothing else in the repository pins output
 against what the jsdom pipeline produced.
 
-The answer, as of 2026-08-28: less than it looks. The committed goldens are synthetic, and
-they pass byte-identically **through a change that reorders every strand in the picture** —
-which is how #46 sat undetected. They cover the mechanism; they do not cover the regime.
+The answer, when this was asked: less than it looks. The committed goldens were synthetic, and
+they passed byte-identically **through a change that reorders every strand in the picture** —
+which is how #46 sat undetected. They covered the mechanism; they did not cover the regime.
 
-Three gaps, all ticketed — and the order among them matters, because one of them moves the
-documents the other two would baseline.
+Three gaps, all ticketed, and the order among them mattered because one of them moved the
+documents the other two would baseline. **All three have since merged**, in that order, so
+what follows is the record of what the left-hand side now covers.
 
 - **[#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46) — the reorder is wrong *(merged, PR #47)*.**
   `reorderTracksForLayout` arrived in `0f69615` inside a commit about walk generation, with a
   three-point comment and a one-line body implementing one of the three. It decides which
   strand is the **pivot strand** — `createTubeMap` straightens `tracks[0]` and orients
-  everything else against it — and today that is decided by a stable-sort tiebreak on
-  sequence length. Measured: CHM13 lands at index **455 of 464** where the comment promises
-  second, and GRCh38 leads only because it happens to tie for longest.
+  everything else against it — and that was being decided by a stable-sort tiebreak on
+  sequence length. Measured: CHM13 landed at index **455 of 464** where the comment promised
+  second, and GRCh38 led only because it happened to tie for longest.
 
-  It is human-labelled because it changes the arrangement of every real document the server
-  emits. It does *not* re-baseline the synthetic goldens — those pass byte-identically either
+  What landed: GRCh38's walks first and CHM13's second, by group rather than by index, since a
+  reference contig can itself be fragmented; all walks of one strand together, keyed on the
+  `sample#haplotype#contig` triple with `vg`'s phase-block and subrange tail stripped; the rest
+  longest first, every tie broken on something in the data. The same subgraph now lays out
+  identically however `vg` emitted it. `assertDenseStrandIds` came with it, turning `pgb`'s
+  dense-`trackID` requirement into an invariant checked on this side.
+
+  **It cost shapes, and the numbers are the ones to baseline against.** Grouping plus a
+  pivot-first constraint claw back most of what the length sort bought: the 4.2 kb fixture goes
+  from 34,937 bands to 44,795, and the 1.4 kb from 11,586 to 13,246. Determinism was the point
+  and a picture that does not move is worth the payload.
+
+  It was human-labelled because it changes the arrangement of every real document the server
+  emits. It did *not* re-baseline the synthetic goldens — those pass byte-identically either
   way, which is a useful signal about how little of the real regime they cover.
 
-- **[#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40) — PCLAI colour scheme *(ready-for-agent)*.** Every committed golden invokes
+- **[#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40) — PCLAI colour scheme *(merged, PR #44)*.** Every committed golden invoked
   the five-argument form of the generator, so the colour scheme branch — live in production
-  whenever `minigraphnode` is set — produces output nothing pins. #21 added band-data coverage
-  for it, not a golden document. Small, mechanical, and it closes a real hole under B.
+  whenever `minigraphnode` is set — produced output nothing pinned. #21 had added band-data
+  coverage for it, not a golden document.
+
+  What landed: a `small-pclai` case rendering `small`'s input through the six-argument form
+  against `pclai-color-scheme.json`, pinned by `small-pclai.svg`. The scheme deliberately
+  mixes strands carrying a colour with the grey no-coordinate entry, whose fill is the same
+  grey as an uncoloured strand — so only the `pclaiX`/`pclaiY`/`pclaiScore` attributes tell
+  them apart, which is exactly the distinction a byte comparison has to be able to see.
 
 - **[#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) — the fetch-ceiling regime *(merged, PR #48)*.** The two
   skipped cases in `generate-svg.golden.test.mjs` wanted the regime that actually fails to be
@@ -284,7 +337,9 @@ documents the other two would baseline.
   What landed: `tests/node/real-subgraph.band.test.mjs` renders all five real subgraphs,
   compares their band data to `<name>.band.json.gz` baselines beside each subgraph, and
   rebuilds each document from the committed baseline in full — 15.81 MB of XML for the
-  largest, accounted for byte by byte. The skip mechanism is gone. Each fixture also gained a
+  largest at the time, 13.19 MB since #22, accounted for byte by byte. Both fetch-ceiling skips are gone — the one `skip` left
+  in `generate-svg.golden.test.mjs` is #40's, on the `small-pclai` case, which shares `small`'s
+  input and so has no seed of its own to regenerate. Each fixture also gained a
   `.pclai.json`, so the real subgraphs are rendered with all three of a real request's
   inputs: the PCLAI colour scheme each region was rendered with turned out to be recoverable
   from `pgb`'s goldens, where the generator writes every entry onto the elements it draws.
@@ -457,10 +512,15 @@ node --expose-gc --max-old-space-size=8192 perf/rss-split.mjs \
   perf/fixtures/split-400.json 0 8000 compressed
 ```
 
-`rss-split.mjs` is the one that matters after [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22):
-it should report the DOM share at or near **zero**, because there should no longer be a DOM.
-Its `--expose-gc` requirement is not optional — retained-memory numbers taken without a forced
-collection measure garbage rather than retention.
+`rss-split.mjs` was the one that mattered for [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22),
+and it has reported: the DOM share is **zero**, because there is no longer a DOM, and peak RSS
+on `split-400.json` fell from 2,446.5 MB to 472.5 MB. Its `--expose-gc` requirement is not
+optional — retained-memory numbers taken without a forced collection measure garbage rather
+than retention.
+
+The TTFB and payload rows above are still *before* figures. They are server measurements, and
+`release..main` is what is waiting to be deployed; nothing in this repository can move them
+until it is.
 
 Then update the rendered report **by passing its URL**
 (`https://claude.ai/code/artifact/71539dd1-fb13-44d0-8468-a3a96e726114`); publishing without it

@@ -1,7 +1,7 @@
 // CLI over the sequence tube map renderer: vg JSON in, one SVG document out.
-// This is the process `/seqtubemap` spawns. The render itself — including the
-// browser emulation it still needs — lives in `render.mjs`, so that a caller
-// inside Node can render without spawning anything.
+// This is the process `/seqtubemap` spawns. The render itself lives in
+// `render.mjs`, so that a caller inside Node can render without spawning
+// anything.
 import { writeFileSync } from "fs";
 
 import { renderTubeMap } from "./render.mjs";

@@ -1,5 +1,11 @@
-// Runs ONE tube map render, mirroring seqtubemap/generate-svg.mjs stage for stage,
-// but timing each stage and measuring the output. Emits a single JSON line on stdout.
+// Runs ONE tube map render, mirroring seqtubemap/render.mjs stage for stage, but
+// timing each stage and measuring the output. Emits a single JSON line on stdout.
+//
+// The `import:jsdom+canvas` and `jsdom:construct-dom` stages this used to report —
+// 437.6 ms and 109.0 ms of the 722 ms fixed floor measured in
+// docs/perf/seqtubemap-latency.md §2 — are gone, because #22 deleted what they
+// were timing. `serialize:outerHTML` is now `serialize:emit-document`: the same
+// bytes, written from the band data rather than walked out of a DOM.
 //
 // Runs as its own process on purpose: tubemap.js keeps module-level layout state,
 // so a fresh process per render is both the only way to get clean numbers and
@@ -23,33 +29,11 @@ function mark(name) {
 const processStart = performance.now();
 const [inputFile, outputFile, start, end, nodeWidthOption] = process.argv.slice(2);
 
-const { JSDOM } = await import("jsdom");
-const { createCanvas } = await import("canvas");
-mark("import:jsdom+canvas");
+const { installLayoutConfig } = await import("../seqtubemap/layout-config.mjs");
+installLayoutConfig();
 
-globalThis["__sequence_tube_map_config"] = {
-  defaultHaplotypeColorPalette: { mainPalette: "reds", auxPalette: "blues" },
-  defaultReadColorPalette: { mainPalette: "reds", auxPalette: "blues" },
-  defaultGraphColorPalette: { mainPalette: "reds", auxPalette: "blues" },
-  nodeIntervalThreshold: 150,
-  coloredNodes: [], DATA_SOURCES: [], BACKEND_URL: "",
-};
-
-const dom = new JSDOM(`<!DOCTYPE html><body><svg id="mysvg"></svg></body>`, {
-  resources: "usable",
-  pretendToBeVisual: true,
-});
-globalThis.window = dom.window;
-globalThis.document = dom.window.document;
-const canvas = createCanvas(200, 200);
-const ctx = canvas.getContext("2d");
-ctx.font = '14px "Courier New"';
-dom.window.SVGElement.prototype.getComputedTextLength = function () {
-  return ctx.measureText(this.textContent).width;
-};
-mark("jsdom:construct-dom");
-
-const { create, vgExtractNodes, vgExtractTracks, getImageCoordinates } =
+const { emitDocument } = await import("../seqtubemap/emit-document.mjs");
+const { create, vgExtractNodes, vgExtractTracks, reorderTracksForLayout, getBandData } =
   await import("../seqtubemap/tubemap.js");
 mark("import:tubemap.js");
 
@@ -59,33 +43,28 @@ mark("io:read-input");
 const vgJson = JSON.parse(raw);
 mark("parse:JSON.parse");
 
-const nodes = vgExtractNodes(vgJson);
+// The layout's own vocabulary either side of the call: its `nodes` are this
+// codebase's segments and its `tracks` are its strands (CONTEXT.md).
+const segments = vgExtractNodes(vgJson);
 mark("convert:vgExtractNodes");
 
-const tracks = vgExtractTracks(vgJson, 0, 1);
+const strands = reorderTracksForLayout(vgExtractTracks(vgJson, 0, 1));
 mark("convert:vgExtractTracks");
 
 create({
-  svgID: "#mysvg",
-  nodes, tracks, reads: null,
+  nodes: segments, tracks: strands, reads: null,
   region: [0, Number(end) - Number(start) - 1],
   hideLegend: true,
   nodeWidthOption,
 });
 mark("render:create()");
 
-const { maxXCoordinate, maxYCoordinate, minYCoordinate } = getImageCoordinates();
-const svgElement = dom.window.document.getElementById("mysvg");
-const width = maxXCoordinate + 50;
-const height = maxYCoordinate - minYCoordinate + 50;
-svgElement.setAttribute("viewBox", `0 ${minYCoordinate - 20} ${width} ${height}`);
-svgElement.setAttribute("width", width);
-svgElement.setAttribute("height", height);
-svgElement.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-mark("render:fix-dimensions");
+const bandData = getBandData();
+const { width, height } = bandData.document;
+mark("render:band-data");
 
-const svg = svgElement.outerHTML;
-mark("serialize:outerHTML");
+const svg = emitDocument(bandData);
+mark("serialize:emit-document");
 
 writeFileSync(outputFile, svg, "utf8");
 mark("io:write-svg");

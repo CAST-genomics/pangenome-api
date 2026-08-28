@@ -1,17 +1,18 @@
 // The band data a sequence tube map render produces: the numbers the layout
 // computed, before anything turned them into attribute strings.
 //
-// Today the layout binds those numbers to elements in an emulated browser
-// document and the document is what `/seqtubemap` returns. That document is
-// 93.7% of the render's retained memory (docs/adr/0001-additive-band-format.md),
-// and it exists only so the result can be serialized to text and parsed straight
-// back into numbers by the client. Removing it means first making the numbers
-// reachable, which is what this collector is for.
+// The layout used to bind those numbers to elements in an emulated browser
+// document, and that document was what `/seqtubemap` returned — 93.7% of the
+// render's retained memory (docs/adr/0001-additive-band-format.md), existing
+// only so the result could be serialized to text and parsed straight back into
+// numbers by the client. #21 made the numbers reachable through this collector;
+// #22 deleted the document and pointed `emit-document.mjs` at the collector
+// instead.
 //
-// The collector is not a second sink alongside the document. Each draw function
-// collects what it is about to draw and then binds *the collected bands* as its
-// d3 data, so the two cannot describe different pictures: band order is document
-// order because it is the same list, in the same order, read twice.
+// So this is not a sink alongside the document — it is the only description of
+// the picture there is. Each draw function collects what it draws and draws
+// nothing else, which is why band order is document order: the emitter walks
+// this list, in this order.
 //
 // Shape of the data:
 //
@@ -31,6 +32,14 @@
 //             than of the strand, which is why opacity sits on the band while
 //             colour sits on the strand.
 //   segments  one entry per drawn segment box, in document order.
+//   overlays  the handful of elements a document carries besides its bands and
+//             segment boxes - the ruler's axis, ticks and labels, and the
+//             segment sequence labels "normal" width mode draws. One entry per
+//             element, in document order, each an element name and its
+//             attributes as an ordered list of pairs, because attribute order
+//             is part of the bytes. Production documents contain none of these:
+//             a real subgraph carries no reference offset, so it gets no ruler
+//             (docs/adr/0001-additive-band-format.md).
 //   document  the picture's dimensions, including the viewBox string.
 //
 // Strand ids are dense and positional. A strand's `id` is the position the
@@ -82,6 +91,7 @@ export class BandCollector {
     this.strands = [];
     this.bands = [];
     this.segments = [];
+    this.overlays = [];
     // The extent a render that draws nothing has, so that an empty render still
     // reports the dimensions its document would be given.
     this.document = documentDimensions({
@@ -137,6 +147,25 @@ export class BandCollector {
     return segment;
   }
 
+  /**
+   * Collect one overlay element.
+   *
+   * `attributes` is a list of pairs rather than an object because the document
+   * writes them in the order they were set, and that order is part of the
+   * bytes. Values are stringified here, so a collected overlay survives a round
+   * trip through JSON as the very text the document will carry.
+   */
+  overlay({ element, attributes, text, title }) {
+    this.overlays.push(
+      present({
+        element,
+        attributes: attributes.map(([name, value]) => [name, String(value)]),
+        text: text === undefined ? undefined : String(text),
+        title: title === undefined ? undefined : String(title),
+      }),
+    );
+  }
+
   setExtent(extent) {
     this.document = documentDimensions(extent);
   }
@@ -148,6 +177,7 @@ export class BandCollector {
       strands: this.strands,
       bands: this.bands,
       segments: this.segments,
+      overlays: this.overlays,
       document: this.document,
     };
   }

@@ -27,10 +27,16 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 import { strandIdentity } from "../seqtubemap/strand.mjs";
 
-// `color` rather than the `style` fill: both carry the strand's colour, and this
-// one is a bare `rgb(...)` with nothing else in the attribute.
-const ELEMENT =
-  /trackName="([^"]*)"[^>]*?color="rgb\((\d+), (\d+), (\d+)\)" pclaiX="([^"]*)" pclaiY="([^"]*)" pclaiScore="([^"]*)"/g;
+// One drawable element at a time, with the attributes pulled out of it
+// individually rather than by one regex over the whole run. Documents come from
+// two eras: the ones `pgb` captured from the live server carry the colour twice,
+// once in `style` and once in a bare `color=`, while a document this repository
+// emits since #22 carries it only in `style`. The colour is the same either way,
+// so read whichever spelling is there.
+const ELEMENT = /<(?:rect|path)\b[^>]*\btrackName="[^"]*"[^>]*>/g;
+const ATTRIBUTE = (name) => new RegExp(`\\b${name}="([^"]*)"`);
+const COLOR = /\bcolor="rgb\((\d+), (\d+), (\d+)\)"/;
+const STYLE_FILL = /\bstyle="fill: rgb\((\d+), (\d+), (\d+)\);/;
 
 /**
  * The scheme a document was rendered with, as a value.
@@ -41,9 +47,14 @@ const ELEMENT =
  */
 export function pclaiSchemeFromDocument(svg) {
   const scheme = {};
-  for (const [, name, r, g, b, x, y, score] of svg.matchAll(ELEMENT)) {
-    if (x === "None") continue; // no placement — see the note above
-    const key = strandIdentity(name);
+  for (const [element] of svg.matchAll(ELEMENT)) {
+    const x = attributeOf(element, "pclaiX");
+    if (x === undefined || x === "None") continue; // no placement — see the note above
+    const y = attributeOf(element, "pclaiY");
+    const score = attributeOf(element, "pclaiScore");
+    const [, r, g, b] = COLOR.exec(element) ?? STYLE_FILL.exec(element) ?? [];
+    if (r === undefined) throw new Error(`an element carries no colour: ${element.slice(0, 160)}`);
+    const key = strandIdentity(attributeOf(element, "trackName"));
     const entry = [[Number(r), Number(g), Number(b)], [Number(x), Number(y)], score];
     const seen = scheme[key];
     if (seen && JSON.stringify(seen) !== JSON.stringify(entry)) {
@@ -52,6 +63,10 @@ export function pclaiSchemeFromDocument(svg) {
     scheme[key] = entry;
   }
   return scheme;
+}
+
+function attributeOf(element, name) {
+  return ATTRIBUTE(name).exec(element)?.[1];
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

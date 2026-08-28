@@ -198,18 +198,22 @@ npm run baseline:bands
 They are committed. Gzip is what makes that reasonable: 18.02 MB of JSON compresses to
 2.33 MB, and the fixture directory was already 19.9 MB of `.gfa` and `.json`.
 
-| fixture | strands | bands | band JSON | committed (gz) | the document it rebuilds |
+| fixture | strands | bands | band JSON | committed (gz) | the document it writes |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| chr8 90 bp | 464 | 592 | 0.12 MB | 15 KB | 0.17 MB |
-| chr1 600 bp | 369 | 8,089 | 1.43 MB | 186 KB | 2.83 MB |
-| chr8 1.4 kb | 463 | 13,246 | 2.26 MB | 291 KB | 4.55 MB |
-| **chr1 8.0 kb** | 383 | 35,020 | 6.26 MB | 800 KB | 12.48 MB |
-| **chr1 4.2 kb** | 1,201 | 44,795 | 7.94 MB | 1,038 KB | 15.81 MB |
-| | | | **18.02 MB** | **2.33 MB** | **35.84 MB** |
+| chr8 90 bp | 464 | 592 | 0.12 MB | 15 KB | 0.14 MB |
+| chr1 600 bp | 369 | 8,089 | 1.43 MB | 186 KB | 2.36 MB |
+| chr8 1.4 kb | 463 | 13,246 | 2.26 MB | 291 KB | 3.78 MB |
+| **chr1 8.0 kb** | 383 | 35,020 | 6.26 MB | 800 KB | 10.46 MB |
+| **chr1 4.2 kb** | 1,201 | 44,795 | 7.94 MB | 1,038 KB | 13.19 MB |
+| | | | **18.02 MB** | **2.33 MB** | **29.93 MB** |
 
 The last column is the reason the baselines are the band data: committing the documents
-these rebuild would have cost 35.84 MB, and pinned less. *strands* here is band-data rows,
+these write would have cost 29.93 MB, and pinned less. *strands* here is band-data rows,
 which is one per `W` line rather than one per strand — hence 1,201 on the 4.2 kb fixture.
+
+The document column shrank by 16-20% at #22, which deleted the `color=`, `class="track{id}"`
+and empty `<title>` that the client never read. The band counts did not move: the same
+picture, said in fewer bytes.
 
 The test compares the **decompressed** text, so nothing about zlib's output is pinned; a
 different zlib would produce different bytes on disk and the same green.

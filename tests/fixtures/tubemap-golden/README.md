@@ -1,21 +1,29 @@
 # Golden tube map documents
 
-Two synthetic subgraphs, one of them rendered twice, and the exact documents the
-sequence tube map generator produces from them.
+Two synthetic subgraphs, one of them rendered three times, and the exact documents
+the sequence tube map generator produces from them.
 `tests/node/generate-svg.golden.test.mjs` renders each case and asserts the result
 is **byte-identical** to the committed document.
 
 | case | input | strands | spine segments | golden |
 | --- | --- | ---: | ---: | ---: |
-| `small` | `small.vg.json` | 7 | 12 | 25 KB |
-| `large` | `large.vg.json` | 121 | 40 | 774 KB |
-| `small-pclai` | `small.vg.json` + `pclai-color-scheme.json` | 7 | 12 | 26 KB |
+| `small` | `small.vg.json` | 7 | 12 | 22 KB |
+| `large` | `large.vg.json` | 121 | 40 | 656 KB |
+| `small-normal` | `small.vg.json`, at `nodeWidthOption=normal` | 7 | 12 | 27 KB |
+| `small-pclai` | `small.vg.json` + `pclai-color-scheme.json` | 7 | 12 | 22 KB |
 
-All three are rendered with `nodeWidthOption=compressed`, the endpoint's own default
-(`main.py:720`). It is also the only width mode that can be goldened: `normal`
-sizes each segment by measuring its label with the platform's fonts, so its bytes
-differ between a developer's machine and CI. The smoke test next door covers
-`normal` without asserting on bytes.
+All but `small-normal` are rendered with `nodeWidthOption=compressed`, the
+endpoint's own default (`main.py:720`).
+
+`normal` is a live value of the same query parameter, and until
+[#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) it could not be
+goldened at all: it sized each segment by writing the label into the emulated
+browser document and asking for `getComputedTextLength`, so the bytes depended on
+which fonts the host had. #22 deleted the browser, and with it the measurement —
+the label is monospace, so its width is its glyph count times one advance. That
+makes the mode deterministic, and `small-normal` is what now pins it. It is also
+the only golden carrying segment labels and the finer 20 bp ruler, because
+`normal` is the only mode that draws either.
 
 Byte-identity is the bar because the increments this test guards
 ([#13](https://github.com/CAST-genomics/PangenomeAPI/issues/13) B, C and D)
@@ -119,13 +127,15 @@ or it is the regression this test exists to catch.
 ## What it needs to run
 
 Nothing. No `vg`, no graph data, no network — the inputs are committed and the
-generator reads nothing else. `npm ci` for `jsdom` and `canvas` is the only
-prerequisite, and that goes away with increment B.
+generator reads nothing else. `npm ci` is the only prerequisite, and since
+increment B it installs two packages rather than five: `jsdom` and `canvas` left
+with the emulated document.
 
-Memory is the one real requirement, and it comes from the real subgraphs rather
-than from these: laying out the 4.2 kb region peaks around 2.3 GB, so `npm test`
-raises the heap explicitly instead of relying on Node's default. Increment B is
-what removes the emulated document that most of it is.
+Memory used to be the one real requirement, and it came from the real subgraphs
+rather than from these. It no longer dominates: a 4.2 kb layout that peaked
+around 2.3 GB now peaks around 466 MB, of which none is a document. `npm test`
+still raises the heap, because the layout itself is the remaining cost and the
+default is 4 GB on some hosts and less on others.
 
 ## A note on `.gitignore`
 

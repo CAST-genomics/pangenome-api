@@ -206,12 +206,14 @@ def node_stage() -> str:
     """The Node stage's prerequisites, skipping the test when they are absent.
 
     `GenerateSeqTubeMapSvg` shells out to `node seqtubemap/generate-svg.mjs`,
-    which imports `jsdom` and `canvas` from the repository's `node_modules`.
-    A checkout that has never had `npm ci` run in it cannot render a tube map.
+    which imports `d3` from the repository's `node_modules`. A checkout that has
+    never had `npm ci` run in it cannot render a tube map. (`jsdom` and `canvas`
+    used to be the packages this looked for; #22 removed the browser emulation
+    and they are no longer dependencies at all.)
     """
     binary = shutil.which("node")
     if binary is None:
         _skip_or_fail("node is not installed on this machine")
-    if not (REPO_ROOT / "node_modules" / "jsdom").is_dir():
+    if not (REPO_ROOT / "node_modules" / "d3").is_dir():
         _skip_or_fail("node_modules is not installed — run `npm ci`")
     return binary

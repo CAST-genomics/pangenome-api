@@ -11,6 +11,15 @@ live service at `pangenome-api.ucsd.edu:8000`, plus a local stage-timing harness
 **Headline:** a 10 kb region takes **120 seconds** and returns a **10 MB SVG** — and while
 it does, it takes the entire API down for every other caller.
 
+> **This is a dated measurement, not a description of the current code.** It is what the
+> service did on 2026-08-27, and it is the baseline everything since is read against. Two
+> increments have landed on `main` and neither is deployed, so the live numbers above are
+> still the live numbers: **A** made the endpoints synchronous, so one slow request no longer
+> stalls the others, and **B** deleted the browser emulation this document diagnoses — the
+> `import:jsdom+canvas`, `jsdom:construct-dom` and `serialize:outerHTML` stages below no
+> longer exist. What B changed, measured the same way, is in
+> [`increment-b.md`](./increment-b.md).
+
 ---
 
 ## 1. What the live API actually does
