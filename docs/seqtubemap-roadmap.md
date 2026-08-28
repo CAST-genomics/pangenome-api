@@ -11,6 +11,7 @@ This is the **build** document. Its companions:
 | [`docs/adr/0001`](./adr/0001-additive-band-format.md) | the decision, and the alternatives that were rejected |
 | [`docs/perf/seqtubemap-latency.md`](./perf/seqtubemap-latency.md) | the measurements, §1-9 |
 | [`docs/perf/increment-b.md`](./perf/increment-b.md) | what **B** actually bought, before and after |
+| [`docs/perf/local-endpoint-harness.md`](./perf/local-endpoint-harness.md) | how to drive `/seqtubemap` on a machine with no graph data and no `vg` |
 | [`docs/adr/0002`](./adr/0002-when-the-server-is-stood-up.md) | when the server gets stood up, and when it does not |
 | [`docs/perf/seqtubemap-plan.md`](./perf/seqtubemap-plan.md) | which skill drives each phase |
 | [`docs/releasing.md`](./releasing.md) | why merging is not shipping |
