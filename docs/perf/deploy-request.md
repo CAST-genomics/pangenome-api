@@ -1,5 +1,11 @@
 # What I need from the server
 
+> **Done, 2026-08-27 — kept for the record.** Both tasks below were carried out; the
+> readings are in [§6 of the findings](./seqtubemap-latency.md). Do not follow the steps
+> here again: they predate the `release` branch and say `git checkout main`, which is no
+> longer where the server lives. The standing procedure is
+> [`docs/releasing.md`](../releasing.md).
+
 Hi Cici — two things, and they both come off the same deploy. Probably 15 minutes.
 
 Anywhere below that says `<something>`, that's a placeholder for a real value on your end.

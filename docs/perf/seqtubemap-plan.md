@@ -21,7 +21,8 @@ Written 2026-08-27, at the end of the diagnosis phase.
 | Diagnosis | Complete. The upstream stage was measured 2026-08-27 (see Step 0) |
 | Grilling | Complete, 2026-08-27. Produced [`CONTEXT.md`](../../CONTEXT.md) and [ADR 0001](../adr/0001-additive-band-format.md) |
 | Built | Local harness (`perf/`), server-side stage timers (`main.py`) |
-| Changed in production behaviour | Nothing yet |
+| Changed on `main` | Increment A (PRs [#37](https://github.com/CAST-genomics/PangenomeAPI/pull/37), [#38](https://github.com/CAST-genomics/PangenomeAPI/pull/38)), the two test suites and CI, and #21's band capture |
+| Changed in production behaviour | **Nothing yet.** The server follows `release` ([`docs/releasing.md`](../releasing.md)), so none of the above is live until it is promoted. `git log release..main` is what is waiting |
 
 **The shape of the work is now settled.** Steps 0, 1 and 2 below are done; what remains is
 Step 3 (the build). The increments are A-E under *The roadmap*; A-D come from ADR 0001, and
