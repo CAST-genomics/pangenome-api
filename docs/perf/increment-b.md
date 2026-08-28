@@ -130,9 +130,66 @@ What changed is what happens on a host that resolves the font differently, which
 mode had no golden before. It has one now: `small-normal.svg`, the only golden that carries
 segment labels and the finer 20 bp ruler.
 
+## Over HTTP, through the real endpoint
+
+Everything above is measured below HTTP. The same before-and-after was then run through two
+isolated API instances on ports 8100 and 8101 — real FastAPI handler, real caching branch,
+real Node subprocess — serving the five committed subgraphs. The method, and the one stand-in
+that limits what it proves, are in
+[`local-endpoint-harness.md`](./local-endpoint-harness.md).
+
+| region | TTFB before | TTFB after | speedup | bytes before | bytes after | change |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 90 bp | 0.646 s | **0.213 s** | 3.0× | 166,675 | 138,340 | −17.0% |
+| 600 bp | 0.982 s | **0.278 s** | 3.5× | 2,738,884 | 2,352,410 | −14.1% |
+| 1.4 kb | 1.226 s | **0.331 s** | 3.7× | 4,391,887 | 3,757,885 | −14.4% |
+| 8.0 kb | 2.376 s | **0.735 s** | 3.2× | 12,090,267 | 10,408,507 | −13.9% |
+| 4.2 kb | 2.561 s | **0.589 s** | 4.3× | 15,285,418 | 13,122,049 | −14.2% |
+
+All five response bodies are byte-identical to the pre-#22 ones once the three removals are
+deleted, with unchanged drawable counts, and all five satisfy `pgb`'s parsing contract. The
+endpoint's own stage timer puts the whole saving in `generate_svg` — every other stage is
+unchanged.
+
+The reductions are ~14% rather than ~16.6% because these requests carry no `minigraphnode`, so
+every PCLAI attribute is the short literal `None`.
+
+## Checked against `pgb`'s own parser
+
+Everything above tests the document against *this* repository's statement of what `pgb`
+requires. On 2026-08-28 that statement was replaced by the real thing: `pgb` is checked out
+alongside, and `src/tubemap/parseBands.ts` and `parseSegmentBoxes.ts` were run directly over
+the five real subgraphs rendered by both the pre- and post-#22 code.
+
+**All five accepted, before and after.** And more than accepted — `pgb` recovers *bit-identical
+arrays* from the two sides:
+
+| fixture | bands | strands | geometry floats | recovered arrays |
+| --- | ---: | ---: | ---: | --- |
+| chr8 90 bp | 592 | 464 | 3,552 | identical |
+| chr1 600 bp | 8,089 | 369 | 48,534 | identical |
+| chr8 1.4 kb | 13,246 | 463 | 79,476 | identical |
+| chr1 8.0 kb | 35,020 | 383 | 210,120 | identical |
+| chr1 4.2 kb | 44,795 | 1,201 | 268,770 | identical |
+
+Compared element by element: `geometry`, `strandIds`, `bandDirections`, `bandCount`,
+`strandColors`, `strandNames`, `strandPlacements`, `strandScores`, `strandCount`, `content`,
+`centre`, and the segment boxes from `parseSegmentBoxes`. This is the bar the roadmap names as
+the strongest available — *"run the client's own parser over before and after, and diff the
+recovered arrays"* — met with the client's own code rather than a description of it.
+
+Two things came out of reading that parser, both recorded rather than acted on here:
+
+- `tests/node/pgb-parser.mjs` **was looser than the real gate** and has been tightened to
+  match. It had made `fill-opacity` and `trackName` optional; `pgb` requires both, literally.
+- A reversal draws shapes `pgb` cannot read at all, and its whole-document gate then refuses
+  the document rather than degrading it. Latent — no committed fixture draws a corner — and it
+  predates #22 in both directions. Filed as
+  [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52).
+
 ## What was not measured
 
-The endpoint end to end. `generate_svg` is 8.2 s of a 38.9 s 10 kb request on the server, and
-what changed here is the part of it that is not layout; confirming the request-level number
-needs a deploy, and `release..main` is where that queue lives
+The endpoint on the server. `generate_svg` is 8.2 s of a 38.9 s 10 kb request there, against a
+graph this machine does not have and through a `vg` this machine cannot run; confirming the
+production number needs a deploy, and `release..main` is where that queue lives
 ([`releasing.md`](../releasing.md)).

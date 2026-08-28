@@ -14,11 +14,12 @@
 // `pgb` sizes its buffers from that count; if it moves, the picture moved.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { cases, goldenPath, repoRoot } from "./golden-cases.mjs";
-import { assertParseableByPgb, drawables } from "./pgb-parser.mjs";
+import { assertParseableByPgb, drawables, readBands } from "./pgb-parser.mjs";
 
 // Measured on the jsdom-era goldens, at commit 399db1e. `small-normal` had no
 // golden then — the mode was not deterministic enough to have one — so its count
@@ -114,8 +115,60 @@ test("nothing in the render path can reach the browser emulation", () => {
 test("a document that lost the run pgb matches on is caught", () => {
   // The conformance check has to be able to fail. This is the exact regression
   // the increment was most at risk of: the attributes still all present, still
-  // all correct, and no longer contiguous.
+  // all correct, and no longer contiguous. `pgb` matches the fill run with one
+  // regular expression, so an attribute inserted into the middle of it does not
+  // break one band — it breaks every band, and `pgb` refuses the document whole.
   const golden = readFileSync(goldenPath(cases[0]), "utf8");
   const reordered = golden.replace(/ trackID="(\d+)"/g, ' class="track$1" trackID="$1"');
-  assert.throws(() => assertParseableByPgb(reordered), /pgb matches on|class attribute/);
+  assert.throws(() => assertParseableByPgb(reordered), /are not bands pgb recognises/);
+});
+
+test("a reversal draws shapes pgb cannot read, and this is where that is written down", async () => {
+  // A standing incompatibility between what the layout can draw and what the
+  // client can read, filed as
+  // [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52). It predates #22
+  // — nothing in that change touched it — and it is pinned here rather than left as
+  // a comment, because a latent refusal of the *whole document* is worth having a
+  // failing example of.
+  //
+  // Three things about a reversal are off `pgb`'s grammar at once: its corners
+  // carry no `trackName`, its corners are built from quadratics where the grammar
+  // wants cubics, and neither its corners nor its vertical rectangles carry the
+  // `fill-opacity: 1;` the grammar requires. Any one of them makes the matched
+  // count disagree with the counted drawables, which `pgb` refuses outright.
+  //
+  // No committed fixture contains a reversal, so one is made here the way
+  // band-data.test.mjs makes it: by sending a single strand backwards through
+  // three segments of the smoke fixture.
+  const { renderTubeMap } = await import("../../seqtubemap/render.mjs");
+  const inputFile = join(mkdtempSync(join(tmpdir(), "tubemap-reversal-")), "inverted.json");
+  const vg = JSON.parse(readFileSync(join(repoRoot, "tests", "fixtures", "tiny-vg.json"), "utf8"));
+  const mapping = vg.path[1].mapping;
+  vg.path[1].mapping = [
+    ...mapping.slice(0, 2),
+    ...mapping.slice(2, 5).reverse().map((step) => ({ position: { ...step.position, is_reverse: true } })),
+    ...mapping.slice(5),
+  ];
+  writeFileSync(inputFile, JSON.stringify(vg), "utf8");
+
+  const { document, bandData } = await renderTubeMap({
+    inputFile,
+    start: 0,
+    end: 69,
+    nodeWidthOption: "compressed",
+  });
+
+  // The layout really did draw the shapes in question.
+  assert.ok(
+    bandData.bands.some((band) => band.kind === "corner"),
+    "the inverted input drew no corners, so this test is no longer about anything",
+  );
+
+  // And `pgb`'s grammar cannot account for every drawable in the group.
+  const { counted, matched } = readBands(document);
+  assert.ok(
+    matched.length < counted,
+    `expected pgb's grammar to miss some of the ${counted} drawables, but it matched all of them`,
+  );
+  assert.throws(() => assertParseableByPgb(document), /are not bands pgb recognises/);
 });
