@@ -1,6 +1,6 @@
 # `/seqtubemap` rework — the roadmap
 
-The execution sequence for the `/seqtubemap` plumbing work: sixteen tickets, what each
+The execution sequence for the `/seqtubemap` plumbing work: eighteen tickets, what each
 delivers, what gates it, and what has to be true before it is called done.
 
 This is the **build** document. Its companions:
@@ -14,9 +14,14 @@ This is the **build** document. Its companions:
 | [`docs/perf/seqtubemap-plan.md`](./perf/seqtubemap-plan.md) | which skill drives each phase |
 | [`docs/releasing.md`](./releasing.md) | why merging is not shipping |
 | [`docs/perf/deploy-request.md`](./perf/deploy-request.md) | the ask that unblocked [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16) — a record now, not a procedure |
+| [`tests/fixtures/seqtubemap/README.md`](../tests/fixtures/seqtubemap/README.md) | the five real subgraphs, and what they do and do not pin |
 | [#13](https://github.com/CAST-genomics/PangenomeAPI/issues/13) | the spec these tickets decompose |
 
-Written 2026-08-27 at the end of the grilling and ticketing phase; updated 2026-08-28.
+Written 2026-08-27 at the end of the grilling and ticketing phase; updated 2026-08-28, twice
+— the second time after a grilling session on [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41)
+measured its premises and found them false. That re-sequenced the coverage work ahead of
+[#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) and added two tickets; see
+*Before #22*.
 
 ## Where this stands
 
@@ -25,9 +30,10 @@ Phase 0 and increment **A** are merged. **B** is half done.
 | | |
 | --- | --- |
 | Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21) |
-| Frontier | **[#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22)** — its only blocker, #21, is closed |
+| Frontier | **[#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22)** — its only blocker, #21, is closed. **[#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46)** is unblocked and should go first; see below |
 | Live | **Nothing.** The server follows `release`, so merging is not shipping; `git log release..main` is what is waiting |
-| Coverage gaps worth closing first | [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40) *(agent)*, [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) *(human)* — see *Before #22* below |
+| Coverage gaps worth closing first | [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46) *(human)*, then [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40) and [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) *(both agent)* — see *Before #22* below |
+| Housekeeping, unblocked, no document changes | [#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45) *(agent)* |
 
 ---
 
@@ -68,7 +74,9 @@ only consumer, can parse the XML back into the numbers the layout already held i
                         │                      │                         └── #23 floats ── #24 ?format=bands ── #25 contract test
                         │                      │
                         │                      ├── #40 pclai golden        (ready-for-agent)
-                        │                      ├── #41 real-input goldens  (ready-for-human)
+                        │                      │
+                        │                      ├── #46 fix the reorder ── #41 fetch-ceiling band data
+                        │                      │   (ready-for-human)       (ready-for-agent)
                         │                      │
                         │                      └── #26 delete vg ── #27 no disk
                         │
@@ -76,13 +84,19 @@ only consumer, can parse the XML back into the numbers the layout already held i
 
 #15 declare the fork ✅────── #21
 #16 timings + fixtures ✅──── #26
+#45 strip the debug logging — unblocked, touches no document
 #E  batch GenerateWalksMC — no ticket yet, no ADR behind it
 ```
 
 **The frontier is [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22)**, and nothing blocks it. Edges are GitHub's native issue
 dependencies, so a ticket whose blockers are all closed is grabbable without consulting this
-document — which is why the two coverage tickets hanging off #18 are worth reading before
+document — which is why the coverage tickets hanging off #18 are worth reading before
 grabbing #22 rather than after.
+
+**[#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46) is also unblocked, and it is the one to take first.** It is not on #22's
+critical path, but it changes the arrangement of every real document the server produces, so
+anything baselined before it lands is baselined against a layout that is about to move. #41
+is blocked on it for exactly that reason.
 
 ---
 
@@ -216,7 +230,7 @@ in production: a bad deploy surfaces as an error card, not as a diff nobody ran.
 > **If the compatibility constraint cannot be held, stop and escalate.** Do not work around
 > it. The no-client-change property is the entire reason B is safe to ship alone.
 
-### Before #22 — the goldens are the only thing that crosses the boundary
+### Before #22 — what the left-hand side of the diff actually covers
 
 #22 re-baselines the golden documents deliberately, and its acceptance criterion is that
 **the diff is only those three removals**. That is a claim about a diff, so it is worth
@@ -224,23 +238,57 @@ asking what the left-hand side covers before making it — because a golden crea
 change cannot police the change, and after B nothing else in the repository pins output
 against what the jsdom pipeline produced.
 
-Two gaps, both already ticketed:
+The answer, as of 2026-08-28: less than it looks. The committed goldens are synthetic, and
+they pass byte-identically **through a change that reorders every strand in the picture** —
+which is how #46 sat undetected. They cover the mechanism; they do not cover the regime.
+
+Three gaps, all ticketed — and the order among them matters, because one of them moves the
+documents the other two would baseline.
+
+- **[#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46) — the reorder is wrong *(ready-for-human, take this first)*.**
+  `reorderTracksForLayout` arrived in `0f69615` inside a commit about walk generation, with a
+  three-point comment and a one-line body implementing one of the three. It decides which
+  strand is the **pivot strand** — `createTubeMap` straightens `tracks[0]` and orients
+  everything else against it — and today that is decided by a stable-sort tiebreak on
+  sequence length. Measured: CHM13 lands at index **455 of 464** where the comment promises
+  second, and GRCh38 leads only because it happens to tie for longest.
+
+  It is human-labelled because it changes the arrangement of every real document the server
+  emits. It does *not* re-baseline the synthetic goldens — those pass byte-identically either
+  way, which is a useful signal about how little of the real regime they cover.
 
 - **[#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40) — PCLAI colour scheme *(ready-for-agent)*.** Every committed golden invokes
   the five-argument form of the generator, so the colour scheme branch — live in production
   whenever `minigraphnode` is set — produces output nothing pins. #21 added band-data coverage
   for it, not a golden document. Small, mechanical, and it closes a real hole under B.
-- **[#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) — real-input goldens *(ready-for-human)*.** The two skipped cases in
-  `generate-svg.golden.test.mjs` want documents for the fetch-ceiling regions. It is
-  human-labelled for three reasons that have not changed: it needs a decision about which
-  strand-naming convention is canonical, server access to recapture whichever side loses, and
-  a call on repository weight — a self-baselined fetch-ceiling document measures **~12 MB**.
 
-A cheaper third option exists and is *not* #41: self-baselining the two **small** real
-subgraphs — `chr8_78771162` at 0.16 MB and `chr1_25331046` at 2.61 MB — with the current
-pre-B generator. That pins B against real strand names and 8,000 bands without claiming
-anything about `pgb`'s documents, so it needs neither the decision nor the access. It does
-not close #41.
+- **[#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41) — the fetch-ceiling regime *(ready-for-agent, blocked by #46)*.** The two
+  skipped cases in `generate-svg.golden.test.mjs` want the regime that actually fails to be
+  the regime under test. **This ticket was rewritten on 2026-08-28**; the version that asked
+  for a naming decision, server access and a 12 MB commit rested on two claims that were then
+  measured and found false.
+
+  What the measurement found: the committed 90 bp `.gfa` reproduces `pgb`'s golden **exactly**
+  — 291 paths, 726 rects, identical viewBox, identical strand names — once the #46 reorder is
+  taken out, which was added after that golden was captured. The naming difference across the
+  five goldens is `vg`'s own spelling (`sample#hap#contig#phaseblock`, plus a subrange for a
+  partial walk) seen at three different dates, not a convention anyone chose. Only two
+  fixtures genuinely mismatch, and it is the walk count that says so: 383 walks for 378
+  strands, and 1,201 for 464, against goldens from before `0f69615` allowed multiple walks per
+  assembly.
+
+  So the pin is **self-baselined band data in this repository**, which is what ADR 0001 makes
+  canonical anyway — no server access, no 12 MB, and no decision left to make. The full
+  measurement is in `tests/fixtures/seqtubemap/README.md` and in the comment on the issue.
+
+> **Do not reach for `perf/gfa-to-vg-json.mjs --names=bare`.** The old #41 offered it as the
+> lever for "restoring the older naming convention". On the 90 bp fixture the suffixed names
+> are the ones that match `pgb`'s golden character for character, so it would break a pair
+> that already works.
+
+`pgb`'s five goldens are not this repository's oracle and never were captured as one. They
+pin `pgb`'s parser, which is the job they were built for. What crosses the boundary is
+[#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25)'s contract test.
 
 ---
 
@@ -313,6 +361,26 @@ correct wherever the upstream time lives.
 
 ---
 
+## Housekeeping — not an increment
+
+### [#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45) — Strip the debug instrumentation *(ready-for-agent)*
+
+`0f69615` left debugging aids in the render path and they still run on every request: a
+`setInterval` memory logger in `generate-svg.mjs`, a `tracks[0].name` line in `render.mjs`,
+and a `t(label)` stage timer calling `process.memoryUsage()` at ~20 points through
+`createTubeMap`. `main.py` pipes the child's stderr into the server log, so all of it reaches
+production.
+
+The `[stage-timing]` line from [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16)
+already does this job properly, in one line per request, from the Python side. And
+`process.memoryUsage()` is a Node global in a file that is a declared fork of a *browser*
+library.
+
+Unblocked, touches no document, and `npm test` must stay byte-identical through it — if a
+golden moves, something else went with it.
+
+---
+
 ## Closed — do not reopen
 
 Each of these cost a grilling round. Reopening costs another.
@@ -345,6 +413,17 @@ shared vocabulary with the PCLAI chart and the 3D graph.
 - **Does anything depend on the intermediate `.gfa` / `.vg` / `.json` files existing on
   disk?** They are deleted after every response, which suggests purely internal. Confirm with
   Cici before [#27](https://github.com/CAST-genomics/PangenomeAPI/issues/27).
+- **Does `perf/gfa-to-vg-json.mjs` agree with real `vg view -j`?** It is now known *not* to,
+  in at least one way: `vg` appends a subrange to a path covering part of a contig
+  (`CHM13#0#chr8#0[9659985-9661740]` in `pgb`'s 1.4 kb golden) and the shim never does. The
+  `.gfa` is the source of truth and the shim is this repository's own derivation from it, so
+  baselines taken through it pin the layout but say nothing about the wire. Confirming it
+  needs somebody who can run `vg`, and it wants its own ticket.
+- **Does a reference strand lose its PCLAI colour in a subrange region?** `truncateTrackName`
+  keeps the first three `#`-fields, so a three-field name carrying a subrange —
+  `GRCh38#0#chr8[10078919-10080674]` — passes through with the bracket attached, and
+  `getPclaiEntry` uses it as the scheme lookup key. Found while measuring #46, not confirmed
+  against a live scheme.
 - **Two documents in `pgb` make a forward claim** — that
   [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22) ships byte-compatible. Verified
   against the real regex and the real conformance gate, but describing code that does not exist

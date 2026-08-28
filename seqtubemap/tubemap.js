@@ -3970,22 +3970,110 @@ export function vgExtractTracks(vg, pathSourceTrackId, haplotypeSourceTrackID) {
   return result;
 }
 
-// Reorder tracks before layout so:
-//  1. GRCh38 is always first, CHM13 always second — these become the layout
-//     pivot/anchor in switchNodeOrientation() and generateNodeOrder(), so a
-//     full-length, consistent reference backbone keeps layout deterministic
-//     regardless of what order vg happens to emit paths in.
-//  2. All walks belonging to the same assembly+haplotype+contig (e.g. multiple
-//     W-line fragments of one contig) sit directly next to each other, so
-//     they get threaded into the layout against each other rather than
-//     against unrelated tracks in between.
-//  3. Everything else is ordered by total sequence length, longest first —
-//     a longer anchor produces fewer synthetic "no node" filler segments
-//     in generateLaneAssignment(), which is what drives shape-count blowup.
+// The `sample#haplotype#contig` triple that identifies a strand (CONTEXT.md),
+// recovered from whatever `vg` spelled the path.
+//
+// `vg` appends a phase block and a subrange of its own — a strand can arrive as
+// `HG00097#1#CM094064.1#0[9826071-9827826]`, and a reference contig as
+// `GRCh38#0#chr8[10078919-10080674]`, where the subrange rides on a three-field
+// name and so survives truncateTrackName(). Several W-line fragments of one
+// haplotype differ only in that tail, so the tail is exactly what has to come
+// off to see that they are one strand.
+function strandIdentity(name) {
+  if (!name) return "";
+  return name.split("#").slice(0, 3).join("#").split("[")[0];
+}
+
+// The strands the layout is arranged around, in the order it wants them.
+const PIVOT_SAMPLES = ["GRCh38", "CHM13"];
+
+// Reorder strands before layout so that:
+//
+//  1. GRCh38's walks come first and CHM13's second — by group, not by index: a
+//     reference contig can itself be fragmented, and GRCh38 occupies the first
+//     three positions in the 4.2 kb fixture. `createTubeMap` straightens `tracks[0]`
+//     and both switchNodeOrientation() and generateNodeOrder() arrange every
+//     other strand against it, so `tracks[0]` is the *pivot strand*
+//     (CONTEXT.md). Left to `vg`'s emission order the pivot is whichever strand
+//     happened to be written first, which means the picture a reader sees moves
+//     for reasons invisible in the data.
+//
+//  2. All walks of one strand sit together. A haplotype fragmented across the
+//     region arrives as several W lines — 1,201 walks for 464 strands in the
+//     4.2 kb fixture — and they lay out against each other rather than against
+//     unrelated strands in between.
+//
+//  3. Everything else runs by total sequence length, longest first: a longer
+//     anchor produces fewer synthetic "no node" filler segments in
+//     generateLaneAssignment(), which is what drives shape-count blowup.
+//
+//  4. Ties break on identity, not on arrival, and the walks *within* a strand
+//     run in graph order rather than arrival order. Length alone leaves the
+//     order of equal-length strands decided by `vg` — which is the
+//     non-determinism (1) exists to remove, and in a region where GRCh38 is
+//     merely *tied* for longest it is what decides whether GRCh38 is the pivot
+//     at all. Together these make the whole order a function of the subgraph,
+//     so the same subgraph lays out identically however `vg` emitted it.
+//
+// Ids are reassigned to the new positions, and this is load-bearing beyond
+// layout: a strand id reaches the client as the document's `trackID`, and the
+// client requires those to run from 0 upward with no gaps. See the invariant
+// note in band-data.mjs.
+//
+// The strand objects are the caller's, and their `id` is written in place.
 export function reorderTracksForLayout(tracks) {
-  const sorted = [...tracks].sort((a, b) => b.sequence.length - a.sequence.length);
+  const groups = new Map();
+  for (const track of tracks) {
+    const identity = strandIdentity(track.name);
+    let group = groups.get(identity);
+    if (group === undefined) {
+      group = { identity, sample: identity.split("#")[0], length: 0, tracks: [] };
+      groups.set(identity, group);
+    }
+    group.tracks.push(track);
+    group.length += track.sequence.length;
+  }
+
+  // Samples the layout wants up front sort ahead of everything else, in the
+  // order they are listed; every other sample shares the rank after them.
+  const rank = (group) => {
+    const at = PIVOT_SAMPLES.indexOf(group.sample);
+    return at === -1 ? PIVOT_SAMPLES.length : at;
+  };
+
+  const ordered = [...groups.values()].sort(
+    (a, b) =>
+      rank(a) - rank(b) ||
+      b.length - a.length ||
+      compareText(a.identity, b.identity),
+  );
+
+  // Within a strand, its walks run in graph order: the fragments of one contig
+  // enter the layout the way they lie along the graph, not the way `vg` listed
+  // them. Segment ids ascend along the reference in these graphs, so the first
+  // segment orders the fragments; the whole visit is the tiebreak, because two
+  // fragments starting at one segment still have to have an order.
+  const sorted = ordered.flatMap((group) =>
+    group.tracks.length === 1
+      ? group.tracks
+      : [...group.tracks].sort(
+          (a, b) =>
+            firstSegment(a) - firstSegment(b) ||
+            compareText(a.sequence.join(","), b.sequence.join(",")),
+        ),
+  );
   sorted.forEach((track, i) => { track.id = i; });
   return sorted;
+}
+
+/** The id of the first segment a strand visits, as a number to sort by. */
+function firstSegment(track) {
+  return Number(forward(track.sequence[0]));
+}
+
+/** A total order on two strings, so that a sort using it never has to fall through. */
+function compareText(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
 }
 
 // remove redundant nodes

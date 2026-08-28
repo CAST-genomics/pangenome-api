@@ -35,13 +35,30 @@ _Avoid_: node (this codebase's meaning), and `vg`'s "node". A GFA `S` line is a
 segment in the GFA, which is the one place the word already agrees.
 
 **strand**:
-One haplotype's route through a **sequence tube map**, named
-`sample#haplotype#contig` and coloured by its shipped PCLAI RGB.
+One haplotype's route through a **sequence tube map**, identified by the triple
+`sample#haplotype#contig` and coloured by its shipped PCLAI RGB. The triple is
+the whole of a strand's identity: one haplotype fragmented across a **region**
+contributes several GFA `W` lines but remains one strand.
 _Avoid_: track, path, walk. This one concept has five spellings across the
 pipeline — a GFA `W` line calls it a walk, a GFA `P` line and `vg` JSON call it a
 path, `tubemap.js` and the emitted `trackID`/`trackName` attributes call it a
 track, and the biology calls it a haplotype. Each is correct in its own format;
 none of them is what this codebase calls it.
+_Avoid_ also: treating `vg`'s longer spelling as the name. `vg` appends its own
+phase block and subrange to the triple — `sample#haplotype#contig#0[9659985-9661740]`
+— and that string travels the wire verbatim, because rewriting it would make this
+codebase's documents disagree with the tool that produced them. It is `vg`
+metadata riding on the identity, not part of it; the codebase truncates back to
+the triple only where it looks something up, such as a PCLAI colour.
+
+**pivot strand**:
+The **strand** the layout arranges every other strand around — it fixes segment
+order and orientation, and the rest are threaded against it. **GRCh38** where
+present. Which strand this is changes the picture, not the data: the same
+**subgraph** laid out around a different pivot draws the same **segments** and
+the same **strands** in a different arrangement, at a different size.
+_Avoid_: leaving it implicit. A pivot chosen by whatever order the strands
+happened to arrive in is a picture that moves for reasons the reader cannot see.
 
 **band**:
 The atomic drawable of a **sequence tube map**: one **strand** crossing one
@@ -68,4 +85,5 @@ the graph — one per haplotype.
 **GRCh38**:
 The linear reference the graphs are built against and every **region** is
 expressed in. Present in the graph as **strands** of its own, and treated
-specially wherever strands are merged.
+specially wherever strands are merged — and, as the **pivot strand**, wherever
+they are laid out.
