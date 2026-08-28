@@ -11,6 +11,12 @@ tools (GFA, `vg`, `tubemap.js`) spell it, that spelling is listed under _Avoid_:
 it stays correct *inside* the tool's own file format, and stops at this codebase's
 boundary.
 
+**Illustrated**: [`docs/lexicon.html`](./docs/lexicon.html) annotates one real tube
+map with **segment**, **strand**, **band**, **pivot strand**, **node** and
+**region**, so each word can be pointed at rather than only read. Rendered at
+<https://claude.ai/code/artifact/eb3ad4a1-d1cb-44b9-a3b8-7c6e7cc12726>. It is
+abridged *from* this file — where the two disagree, this file wins.
+
 ## Language
 
 **pangenome graph**:
