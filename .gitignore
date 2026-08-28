@@ -19,6 +19,9 @@ __pycache__
 # OSX
 *.DS_Store*
 
+# editors
+.idea/
+
 # directory
 cache/
 extract_svg/
