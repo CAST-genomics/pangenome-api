@@ -118,6 +118,27 @@
   .a-brace { stroke: #1A1D1A; stroke-width: .7; fill: none; }
   .a-dim { fill: #585E59; }
 
+  /* Every band gets a white seam, so two bands of the same colour that touch
+     still read as two shapes. This is what makes the count of fourteen visible. */
+  .track rect, .track path { stroke: #FFFFFF; stroke-width: 1; }
+
+  /* ---------- the band tally ---------- */
+
+  .tally { margin: 1.4rem 0 0; }
+  .tallyrow {
+    display: grid; grid-template-columns: 1.6rem 1fr auto 2.5rem;
+    align-items: center; gap: .9rem;
+    font-family: var(--grotesk); font-size: var(--s--1);
+    padding: .5rem 0; border-bottom: 1px solid var(--rule);
+  }
+  .tallyrow .sw { height: .85rem; border: 1px solid rgba(0,0,0,.25); }
+  .tallyrow .tn { color: var(--ink); font-weight: 500; }
+  .tallyrow .tb { color: var(--ink-soft); }
+  .tallyrow .tc { font-family: var(--mono); text-align: right; font-size: var(--s-0); }
+  .tallyrow.sum { border-bottom: none; border-top: 1px solid var(--ink); }
+  .tallyrow.sum .sw { border: none; }
+  .tallyrow.sum .tn, .tallyrow.sum .tc { font-weight: 600; }
+
   /* ---------- the identifier breakdown ---------- */
 
   .idfig { margin: 2.5rem 0 0; }
@@ -178,7 +199,7 @@
     <p class="eyebrow">PangenomeAPI · shared vocabulary</p>
     <h1>Seven words for one picture</h1>
     <p class="lede">Every term below names something you can point at. The drawing is real
-    output from the generator, not an illustration — six segments, four haplotypes, fourteen
+    output from the generator, not an illustration — six segments, four strands, fourteen
     bands.</p>
   </header>
 
@@ -236,18 +257,36 @@
       </svg>
     </div>
     <figcaption>
-      Six segments, four haplotypes, fourteen bands — <code>spineNodes: 6, haplotypes: 3, seed: 1</code>
-      through the real generator. Look at the third ribbon from the top: it crosses the entire
-      picture as <b>one single band</b>, because it never changes lane. The salmon one takes
-      <b>three</b> — two straight runs and the curve between them. Both are exactly one strand,
-      and that is the whole distinction.
+      Six segments, four strands, fourteen bands, straight from the generator. Look at the
+      mid-blue strand, the one that crosses the entire picture without ever changing lane: it is
+      <b>one single band</b>. The salmon one takes <b>three</b> — two straight runs and the curve
+      between them. Both are exactly one strand, and that is the whole distinction.
+    </figcaption>
+  </figure>
+
+  <figure class="tally">
+    <div class="tallyrow"><span class="sw" style="background: rgb(198, 219, 239)"></span>
+      <span class="tn">palest blue</span><span class="tb">3 straight runs + 2 curves</span><span class="tc">5</span></div>
+    <div class="tallyrow"><span class="sw" style="background: rgb(252, 187, 161)"></span>
+      <span class="tn">salmon</span><span class="tb">2 straight runs + 1 curve</span><span class="tc">3</span></div>
+    <div class="tallyrow"><span class="sw" style="background: rgb(158, 202, 225)"></span>
+      <span class="tn">mid blue</span><span class="tb">1 straight run, no curves</span><span class="tc">1</span></div>
+    <div class="tallyrow"><span class="sw" style="background: rgb(107, 174, 214)"></span>
+      <span class="tn">deep blue</span><span class="tb">3 straight runs + 2 curves</span><span class="tc">5</span></div>
+    <div class="tallyrow sum"><span class="sw"></span>
+      <span class="tn">four strands</span><span class="tb">9 straight runs + 5 curves</span><span class="tc">14</span></div>
+    <figcaption>
+      Where fourteen comes from. Four strands, counted shape by shape: a band is one straight run
+      or one curve, and the white seam in the drawing is where one ends and the next begins. Four
+      genomes, fourteen shapes — the two numbers are not the same number, and neither one is a
+      count of the other.
     </figcaption>
   </figure>
 
   <h2>A strand's name is three things</h2>
 
   <p class="col">Every strand is identified by a triple, and the triple is the whole of its identity.
-  A haplotype that appears in several fragments is still one strand.</p>
+  A haplotype drawn as several bands is still one strand.</p>
 
   <figure class="idfig">
     <div class="idrow">
@@ -340,8 +379,12 @@
   written down rather than left to context.</p>
 
   <footer>
-    Drawing: <code>spineNodes: 6, haplotypes: 3, seqLen: 8, seed: 1</code> through
-    <code>perf/gen-vg-json.mjs</code> and <code>seqtubemap/render.mjs</code>. Definitions abridged
+    Drawing: <code>perf/gen-vg-json.mjs</code> run with
+    <code>spineNodes: 6, haplotypes: 3, seqLen: 8, seed: 1</code>, then
+    <code>seqtubemap/render.mjs</code>. Those two flag names are the generator's vocabulary, not
+    this document's: its <code>spineNodes</code> are the six things we call <b>segments</b>, and
+    its <code>haplotypes</code> counts only the non-reference ones, because it always prepends
+    GRCh38 — which is why 3 there is the four strands here. Definitions abridged
     from <code>CONTEXT.md</code>, which is shared with <code>pgb</code> and is the authority.
   </footer>
 
