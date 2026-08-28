@@ -6,8 +6,15 @@ document in `src/tubemap/__tests__/fixtures/`.
 
 Until these landed, those golden documents pinned only the client side: `pgb` could check
 that its parser read a tube map correctly, but nothing could check that this repository
-produced that tube map in the first place. With the inputs committed, the pair becomes an
-end-to-end fixture — feed the `.gfa` in, expect the golden document out.
+produced that tube map in the first place.
+
+They were committed in the hope that the pair would become an end-to-end fixture — feed
+the `.gfa` in, expect the golden document out. That is not what they turned out to be, and
+the reason is worth reading before relying on them: see
+[How these relate to `pgb`'s golden documents](#how-these-relate-to-pgbs-golden-documents--checked-2026-08-28)
+below. The short version is that the inputs are sound and the goldens are snapshots of
+three different states of this pipeline, so the pin that runs in CI is self-baselined here
+rather than borrowed from the other repository.
 
 ## Provenance
 
@@ -104,34 +111,79 @@ across all five. Every walk's node ids resolve into the node set. For the 90 bp 
 464 strand names the layout emits are identical — as a set — to the 464 in its golden
 document.
 
-**What is not.** Nobody has diffed these against real `vg view -j` output, because nobody
-here can run `vg`. Treat them as a development convenience, not as the wire truth, until
-somebody with the binary confirms them.
+**What is not — and one place they are now known to differ.** Nobody has diffed these
+against real `vg view -j` output, because nobody here can run `vg`. One difference is
+already visible without running it: `vg` appends a subrange to a path that covers part of
+a contig, which is why `pgb`'s 1.4 kb golden carries
+`CHM13#0#chr8#0[9659985-9661740]`. This script never emits a subrange, and the `N` in its
+`--names=fragment` form is a fragment counter it invents rather than `vg`'s phase block.
+The two coincide on the fixtures whose walks are unfragmented, and that is luck rather than
+agreement.
 
-## Two conventions — the goldens disagree with each other
+So: a development convenience, not the wire truth. Anything asserting a cross-repo contract
+should run on `.json` a real `vg` produced.
 
-While checking the naming above, the five golden documents in `pgb` turned out **not to be
-one homogeneous set**:
+## How these relate to `pgb`'s golden documents — checked, 2026-08-28
 
-| golden | strand names | form |
-| --- | ---: | --- |
-| `stm-chr8-78771162-78771252.svg` (90 bp) | 463 of 464 suffixed | `sample#hap#contig#N` |
-| the other four | 0 suffixed | `sample#hap#contig` |
+An earlier version of this file claimed the five golden documents disagreed with each
+other about strand naming, and that the 90 bp golden's graph carried "about two more
+segments per strand" than the `.gfa` here. **Both claims were wrong**, and issue #41 was
+written on top of them. What follows is what a measurement found instead.
 
-The suffixed form is the newer one — it is what "allow multiple walks per asm" (`0f69615`)
-produces, and the 90 bp document is the most recently captured. So four of the five goldens
-predate a change in how this pipeline names strands.
+**The 90 bp pair matches.** Rendering the committed 90 bp `.gfa` with
+`reorderTracksForLayout` disabled — the state of the layout on the day the golden was
+captured — reproduces the golden exactly where it counts:
 
-The geometry differs too, and by more than naming. Rendering the 90 bp fixture through
-`generate-svg.mjs` gives 82 `<path>` and 517 `<rect>` against the golden's 291 and 726, and
-a viewBox 3,795 wide against 4,717 — the golden's graph carries about two more segments per
-strand than the `.gfa` committed here for the same region does.
+| | this fixture | `pgb`'s golden |
+| --- | ---: | ---: |
+| `<path>` | 291 | 291 |
+| `<rect>` | 726 | 726 |
+| viewBox | `0 -95 4717.4285714285725 7115` | `0 -95 4717.4285714285725 7115` |
 
-**This matters for increment B**, which plans to use these pairs as an end-to-end oracle:
-feed the `.gfa` in, expect the golden out. That does not hold today for the pair anyone
-would reach for first. Either the goldens need recapturing from the current server, or the
-`.gfa` inputs do. `perf/gfa-to-vg-json.mjs --names=bare` reproduces the older naming if the
-older documents turn out to be the ones worth keeping.
+The two documents share their first 210 bytes, and the strand name at the first
+divergence is identical on both sides (`NA21309#2#CM092102.1#0`). The divergence itself is
+a *colour*: the golden was captured with a PCLAI colour scheme (129 distinct fills, 92
+grey fallbacks) which is not committed here. So the input, the graph, the geometry and the
+naming all agree; only the third input to a render is missing.
+
+**The naming difference was never a convention split.** `vg` names a W-line path
+`sample#hap#contig#phaseblock`, and appends a subrange when the walk covers part of a
+contig. All three forms in the goldens are that one rule seen at different times:
+
+| golden | committed | example name |
+| --- | --- | --- |
+| 600 bp, node 5514, node 5520 | Aug 17, Aug 20 | `HG00097#1#CM094060.1` |
+| 90 bp | Aug 18 | `HG00097#1#CM094064.1#0` |
+| chr8 1.4 kb | Aug 25 | `CHM13#0#chr8#0[9659985-9661740]` |
+
+`truncateTrackName` used to strip the tail inside `vgExtractTracks` and no longer does
+(`0f69615`). The wire now carries `vg`'s spelling verbatim and the codebase truncates only
+where it looks something up — see **strand** in [`CONTEXT.md`](../../../CONTEXT.md).
+**Do not reach for `perf/gfa-to-vg-json.mjs --names=bare` to "fix" this.** On the 90 bp
+fixture the suffixed names are the ones that match; bare names would break a pair that
+works.
+
+**Two fixtures genuinely do not match their goldens**, and it is the walk count that says
+so, not the naming:
+
+| fixture | `W` lines | strands | golden's strands |
+| --- | ---: | ---: | ---: |
+| chr8 90 bp | 464 | 464 | 464 |
+| chr1 600 bp | 369 | 369 | 369 |
+| chr8 1.4 kb | 463 | 463 | 463 |
+| **chr1 8.0 kb** (node 5514) | **383** | 378 | 378 |
+| **chr1 4.2 kb** (node 5520) | **1201** | 464 | 464 |
+
+The last two carry `0f69615`'s multiple-walks-per-assembly output; their goldens come from
+the one-walk-per-assembly era that preceded it. Those are the two whose tests are skipped
+in `tests/node/generate-svg.golden.test.mjs`.
+
+**These goldens are not this repository's oracle.** They were captured from `pgb`, at
+various dates, from at least three different states of this pipeline — and
+`docs/adr/0001-additive-band-format.md` makes the band data canonical and the document
+derived. The table above is a dated cross-check that the two repositories agreed at a
+point in time, which is the useful thing a captured document can say. The pin that runs in
+CI is self-baselined band data in this repository. See #41.
 
 ## A note on `.gitignore`
 

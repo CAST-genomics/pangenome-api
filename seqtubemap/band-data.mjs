@@ -32,6 +32,19 @@
 //             colour sits on the strand.
 //   segments  one entry per drawn segment box, in document order.
 //   document  the picture's dimensions, including the viewBox string.
+//
+// Strand ids are dense and positional. A strand's `id` is the position the
+// layout gave it (reorderTracksForLayout in tubemap.js), it reaches the client
+// as the document's `trackID`, and the client indexes tables by it: `pgb`'s
+// parseBands rejects the whole document with "trackID must run from 0 upward
+// with no gaps" if the set of ids is not exactly 0..n-1.
+//
+// Nothing about the layout guarantees that on its own. `createTubeMap` splices
+// hidden strands out of the array *after* ids are assigned, so a strand dropped
+// there would leave a hole, and the failure would surface in the other
+// repository as an unparseable document rather than here. `assertDenseStrandIds`
+// is what turns the accident into a checked invariant; see the test in
+// tests/node/band-data.test.mjs.
 
 // The margins the document is given around the layout's extent: 50 px of slack
 // on the width and height, and 20 px of headroom above the topmost shape.
@@ -130,11 +143,36 @@ export class BandCollector {
 
   /** Everything this render produced. Plain data - no DOM, no live references. */
   data() {
+    assertDenseStrandIds(this.strands);
     return {
       strands: this.strands,
       bands: this.bands,
       segments: this.segments,
       document: this.document,
     };
+  }
+}
+
+/**
+ * Throw unless the strand ids are exactly 0..n-1.
+ *
+ * Checked here rather than left to the client, because here the layout that
+ * produced the hole is still in scope: a document that fails this is one `pgb`
+ * refuses outright, and a failure in this repository names the cause.
+ *
+ * A strand may hold more than one row - a recolouring gives it a second - so it
+ * is the *set* of ids that must be dense, not the row count.
+ */
+export function assertDenseStrandIds(strands) {
+  const ids = new Set(strands.map((strand) => strand.id));
+  for (let id = 0; id < ids.size; id += 1) {
+    if (!ids.has(id)) {
+      const highest = Math.max(...ids);
+      throw new Error(
+        `strand ids must run from 0 upward with no gaps: ${ids.size} strands, ` +
+          `numbered up to ${highest}, with ${id} missing. ` +
+          "A strand was dropped after reorderTracksForLayout numbered it.",
+      );
+    }
   }
 }
