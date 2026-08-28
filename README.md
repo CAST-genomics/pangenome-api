@@ -1,14 +1,16 @@
-# About Pangenome-api
+# About PangenomeAPI
 *source links: [UCSD PangenomeAPI](https://pangenome-api.ucsd.edu:8000/docs) | [UCSD Pangenome Browser](https://pangenome.ucsd.edu/)*
 
-Pangenome-api is the backend API that powers the [Pangenome Browser](https://pangenome.ucsd.edu/). Using the pangenome reference and tools from the Human Pangenome Reference Consortium (HPRC).
+PangenomeAPI is the backend API that powers the [Pangenome Browser](https://pangenome.ucsd.edu/). It uses the pangenome reference and tools from the Human Pangenome Reference Consortium (HPRC).
 
-Given a genomic region, the Pangenome-api returns the  corresponding pangenome graph coordinate of either minigraph or minigraph-cactus, using either Bandage or Sequence Tube Map(TODO:reference) algorithms. Each response includes aggregated metadata - populations, pclai, and assembly coordinates - mapped onto the graph structure. Pangenome-api uses GRCh38 coordinates only.
+Given a genomic region, the Pangenome-api returns the corresponding pangenome graph coordinate of either minigraph or minigraph-cactus, using either Bandage or Sequence Tube Map(TODO:reference) algorithms. Each response includes aggregated metadata - populations, pclai, and assembly coordinates - mapped onto the graph structure. 
+
+PangenomeAPI uses GRCh38 coordinates only.
 
 
 ## How to Use
 
-Open the pangenome-api documentation page [here](https://pangenome-api.ucsd.edu:8000/docs). Follow these steps: 
+Open the pangenome-api documentation page [here](https://pangenome-api.ucsd.edu:8000/docs), and follow these steps: 
 - expand the endpoint of interest
 - check its parameters and their definitions
 - click **Try it out**

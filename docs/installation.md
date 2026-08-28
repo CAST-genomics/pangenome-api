@@ -1,10 +1,10 @@
-# How to Install Pangenome-api Locally
+# How to Install PangenomeAPI Locally
 
-Follow these instructions to install pangenome-api on your local machine. This guide is intended for people who want to modify our code or add their own datasets or functions. If you don't plan to extend the API, we recommend using our [official pangenome-api](https://pangenome-api.ucsd.edu:8000/docs) instead, which is easier to access.
+Follow these instructions to install PangenomeAPI on your local machine. This guide is intended for people who want to modify our code or add their own datasets or functions. If you don't plan to extend the API, we recommend using our [official PangenomeAPI](https://pangenome-api.ucsd.edu:8000/docs) instead, which is easier to access.
 
 Additional links to get started with pangenome-api and the Pangenome Browser it powers, see:
-- [How to use the pangenome-api](../README.md)
-- [Official pangenome-api](https://pangenome-api.ucsd.edu:8000/docs)
+- [How to use the PangenomeAPI](../README.md)
+- [Official PangenomeAPI](https://pangenome-api.ucsd.edu:8000/docs)
 - [Official Pangenome Browser](https://pangenome.ucsd.edu/)
 
 ## Install With Docker
@@ -98,7 +98,7 @@ cd pangenome-api
 npm ci
 ```
 
-gbz-base and gfabase are subgraphing tools built in Rust. Please follow the links below to build these tools from source.
+gbz-base and gfabase Rust tools that we use for subgraphing. Please follow the links below to build these tools from source.
 - gbz-base: https://github.com/jltsiren/gbz-base
 - gfabase: https://github.com/mlin/gfabase/tree/main 
     - Follow the installation process, and adjust these lines before running `./cargo build --release`
@@ -112,30 +112,31 @@ To enable calling the gfabase and gbz-base without specializing their path, you 
 #TODO
 ```
 
-### Download Reference Data Files
-
+### Download Reference and Walk Files
 TODO: would be best if we can store all the large data files in a s3 folder
 
-#### List of Datafiles:
+The PangenomeAPI requires a set of datasets, including the pangenome reference and the `.walk` files, which contain metadata associated with each node. You can download these datasets as instructed below and store then in a user defined data folder. We recommand creating the data folder outside of the pangenomeAPI repository to avoid any conflict with git and docker. 
+
+List of datasets required:
+
 **Reference File**
-- 3.1G, minigraph version1 reference, `hprc-v1.0-minigraph-grch38.gfa`
-- 782M, minigraph version1 reference (binary), `hprc-v1.0-minigraph-grch38.gfab`
-- 3.3G, minigraph version2 reference, `hprc-v2.0-minigraph-grch38.gfa`
-- 839M, minigraph version2 reference (binary), `hprc-v2.0-minigraph-grch38.gfab`
-- 5.6G, minigraph cactus version 1 reference (gbz-base processed .db file), `hprc-v1.1-mc-grch38.gbz.db`
-- 8.7G, minigraph cactus version 2 reference (gbz-base processed .db file), `hprc-v2.0-mc-grch38.gbz.db`
+- 3.1G, [GRCh38 minigraph version1 reference](https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph/hprc-v1.0-minigraph-grch38.gfa.gz), `hprc-v1.0-minigraph-grch38.gfa.gz`
+- 3.3G, [GRCh38 minigraph version2 reference](https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.sv.gfa.gz), `hprc-v2.0-mc-grch38.sv.gfa.gz`
+(TODO: add functions to modify minigraph v2 reference file; unzip if gzipped)
+- 5.6G, [GRCh38 minigraph cactus version 1 reference](https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38/hprc-v1.1-mc-grch38.gbz), `hprc-v1.1-mc-grch38.gbz`
+- 8.7G, [GRCh38 minigraph cactus version 2 reference](https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/scratch/2025_02_28_minigraph_cactus/hprc-v2.0-mc-grch38/hprc-v2.0-mc-grch38.gbz), `hprc-v2.0-mc-grch38.gbz`
 
-**Walks File**
-- 9.9M, minigraph version1 walks file, `hprc_v1.0_minigraph_filtered_with_id.walk.gz`
-- 415, minigraph version1 walks file (tabix), `hprc_v1.0_minigraph_filtered_with_id.walk.gz.tbi`
-- 3.5G, minigraph version2 walks file, `v1_1_hprc_v2.0_minigraph.sorted.pclai.walk.gz`
-- 688, minigraph version2 walks file (tabix),  `v1_1_hprc_v2.0_minigraph.sorted.pclai.walk.gz.tbi`
-- 3.3G, minigraph cactus version1 walks file, `hprc-v1.1-mc-grch38-mapped-flattened.walk.gz`
-- 76K, minigraph cactus version1 walks file (tabix), `hprc-v1.1-mc-grch38-mapped-flattened.walk.gz.tbi`
-- (projected) 80G, minigraph cactus version2 walks file, `hprc-v2.0-mc-grch38.walk.gz`
-- (projected) 5M, minigraph cactus version2 walks file (tabix), `hprc-v2.0-mc-grch38.walk.gz.tbi`
+**Walk File**
+- 9.9M, minigraph version1 walk file, `hprc_v1.0_minigraph_filtered_with_id.walk.gz`
+- 415, minigraph version1 walk file (tabix), `hprc_v1.0_minigraph_filtered_with_id.walk.gz.tbi`
+- 3.5G, minigraph version2 walk file, `v1_1_hprc_v2.0_minigraph.sorted.pclai.walk.gz`
+- 688, minigraph version2 walk file (tabix),  `v1_1_hprc_v2.0_minigraph.sorted.pclai.walk.gz.tbi`
+- 3.3G, minigraph cactus version1 walk file, `hprc-v1.1-mc-grch38-mapped-flattened.walk.gz`
+- 76K, minigraph cactus version1 walk file (tabix), `hprc-v1.1-mc-grch38-mapped-flattened.walk.gz.tbi`
+- 250G, minigraph cactus version2 walk file, `hprc-v2.0-mc-grch38.walk.gz`
+- 157K, minigraph cactus version2 walk file (tabix), `hprc-v2.0-mc-grch38.walk.gz.tbi`
 
-Add the path to the data files to git config
+In git config, add the path to where you store these data files
 ```
 git config --local data.path [PATH_TO_DATA_DIR_WITH_MINIGRAPH_AND_MINIGRAPH-CACTUS_GFA]
 ```
@@ -146,9 +147,9 @@ For local development:
 fastapi dev main.py
 ```
 
-Once the server is running, the interactive API docs are available at <http://127.0.0.1:8000/docs>.
+Once the server is running, the interactive API docs will be available at <http://127.0.0.1:8000/docs>.
 
-From there, expand an endpoint, click **Try it out**, enter your parameters, and click **Execute** to send the request. The docs page shows the generated request URL along with the response. Alternatively, you can call the API directly by editing the query parameters in the URL.
+From there, expand an endpoint, click **Try it out**, enter the parameters, and click **Execute** to send the request. The docs page shows the generated request URL along with the response. Alternatively, you can call the API directly by editing the query parameters in the URL.
 
 If you need an HTTPS deployment, run the server with certificates:
 ```
