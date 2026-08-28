@@ -1,0 +1,894 @@
+<title>The 8100/8101 Harness</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&display=swap">
+
+<style>
+  :root {
+    --paper:      #F4F5F2;
+    --surface:    #FFFFFF;
+    --sunk:       #EBEDE8;
+    --ink:        #12171C;
+    --ink-soft:   #4A5560;
+    --ink-faint:  #6E7A85;
+    --rule:       #D6DAD3;
+    --rule-firm:  #B9BFB6;
+
+    --after:      #0B6B63;
+    --after-wash: #DDECEA;
+    --before:     #9C5236;
+    --before-wash:#F2E4DC;
+    --caution:    #8A6210;
+    --caution-wash:#F4EBD6;
+
+    --shadow: 0 1px 2px rgba(18, 23, 28, .05), 0 8px 24px -16px rgba(18, 23, 28, .25);
+
+    --measure: 68ch;
+    --step--1: clamp(.80rem, .78rem + .1vw, .86rem);
+    --step-0:  clamp(1.0rem, .97rem + .15vw, 1.09rem);
+    --step-1:  clamp(1.19rem, 1.1rem + .4vw, 1.4rem);
+    --step-2:  clamp(1.5rem, 1.3rem + .9vw, 2.05rem);
+    --step-3:  clamp(2.0rem, 1.6rem + 1.9vw, 3.1rem);
+
+    --sans:  "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+    --serif: "IBM Plex Serif", ui-serif, Georgia, Cambria, serif;
+    --mono:  "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #0E1317;
+      --surface:    #161C22;
+      --sunk:       #1B2229;
+      --ink:        #E6EAE6;
+      --ink-soft:   #A9B4BC;
+      --ink-faint:  #808D96;
+      --rule:       #2A333B;
+      --rule-firm:  #3D4851;
+
+      --after:      #48B7AA;
+      --after-wash: #14312F;
+      --before:     #D08E6C;
+      --before-wash:#33211A;
+      --caution:    #D6A93F;
+      --caution-wash:#312712;
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px -18px rgba(0, 0, 0, .8);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0E1317;
+    --surface:    #161C22;
+    --sunk:       #1B2229;
+    --ink:        #E6EAE6;
+    --ink-soft:   #A9B4BC;
+    --ink-faint:  #808D96;
+    --rule:       #2A333B;
+    --rule-firm:  #3D4851;
+
+    --after:      #48B7AA;
+    --after-wash: #14312F;
+    --before:     #D08E6C;
+    --before-wash:#33211A;
+    --caution:    #D6A93F;
+    --caution-wash:#312712;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 30px -18px rgba(0, 0, 0, .8);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: var(--step-0);
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 1.5rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 78rem; margin: 0 auto; }
+  .col  { max-width: var(--measure); }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: 4.5rem 0 2rem;
+    margin-bottom: 3rem;
+  }
+  .kicker {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.25rem;
+    margin: 0 0 1.5rem;
+  }
+  .kicker b { color: var(--after); font-weight: 500; }
+  h1 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: var(--step-3);
+    line-height: 1.02;
+    letter-spacing: -.025em;
+    text-wrap: balance;
+    margin: 0 0 1.25rem;
+    max-width: 20ch;
+  }
+  .standfirst {
+    font-size: var(--step-1);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: 58ch;
+    margin: 0;
+  }
+  .standfirst em { color: var(--ink); font-style: italic; }
+
+  /* ---------- the safety banner ---------- */
+
+  .banner {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1.25rem;
+    align-items: start;
+    background: var(--after-wash);
+    border-left: 3px solid var(--after);
+    padding: 1.25rem 1.5rem;
+    margin: 2.5rem 0 0;
+    border-radius: 2px;
+  }
+  .banner .tag {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--after);
+    white-space: nowrap;
+    padding-top: .15rem;
+  }
+  .banner p { margin: 0; font-size: var(--step--1); line-height: 1.6; color: var(--ink-soft); font-family: var(--sans); }
+  .banner p + p { margin-top: .5rem; }
+
+  /* ---------- sections ---------- */
+
+  section { margin-top: 4rem; }
+  .sec-head {
+    display: grid;
+    grid-template-columns: 3.25rem 1fr;
+    gap: 0 1rem;
+    align-items: baseline;
+    border-top: 1px solid var(--rule-firm);
+    padding-top: 1rem;
+    margin-bottom: 1.75rem;
+  }
+  .sec-num {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    font-weight: 600;
+    color: var(--after);
+    font-variant-numeric: tabular-nums;
+  }
+  h2 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: var(--step-2);
+    line-height: 1.12;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+    margin: 0;
+    max-width: 26ch;
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: var(--step-1);
+    line-height: 1.25;
+    letter-spacing: -.01em;
+    text-wrap: balance;
+    margin: 2.5rem 0 .75rem;
+  }
+  .sec-body { display: flex; flex-direction: column; gap: 1.1rem; }
+  .sec-body > * { margin: 0; }
+  p { max-width: var(--measure); }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  a { color: var(--after); text-decoration-thickness: 1px; text-underline-offset: .18em; }
+  a:hover { text-decoration-thickness: 2px; }
+  a:focus-visible { outline: 2px solid var(--after); outline-offset: 3px; border-radius: 2px; }
+
+  code {
+    font-family: var(--mono);
+    font-size: .88em;
+    background: var(--sunk);
+    padding: .12em .38em;
+    border-radius: 3px;
+    overflow-wrap: anywhere;
+  }
+
+  ul { max-width: var(--measure); margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: .5rem; }
+  li::marker { color: var(--ink-faint); }
+
+  /* ---------- the two-instance diagram ---------- */
+
+  .rig { margin: 2rem 0 0; }
+  .rig-shared {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1.1rem 1.25rem;
+    box-shadow: var(--shadow);
+  }
+  .rig-label {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 .75rem;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: .45rem; }
+  .chip {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    background: var(--sunk);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: .2rem .55rem;
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+  .rig-stem {
+    width: 1px;
+    height: 2rem;
+    background: var(--rule-firm);
+    margin: 0 auto;
+  }
+  .rig-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; }
+  .node {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--rule-firm);
+    border-radius: 3px;
+    padding: 1.1rem 1.25rem 1.25rem;
+    box-shadow: var(--shadow);
+  }
+  .node.is-before { border-top-color: var(--before); }
+  .node.is-after  { border-top-color: var(--after); }
+  .node .port {
+    font-family: var(--mono);
+    font-size: var(--step-1);
+    font-weight: 600;
+    letter-spacing: -.01em;
+    font-variant-numeric: tabular-nums;
+    display: block;
+    margin-bottom: .1rem;
+  }
+  .node.is-before .port { color: var(--before); }
+  .node.is-after  .port { color: var(--after); }
+  .node .who {
+    font-family: var(--sans);
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: .9rem;
+  }
+  .node dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: .35rem .75rem; font-size: var(--step--1); }
+  .node dt { font-family: var(--sans); color: var(--ink-faint); }
+  .node dd { margin: 0; font-family: var(--mono); color: var(--ink-soft); overflow-wrap: anywhere; }
+
+  /* ---------- tables ---------- */
+
+  .scroll { overflow-x: auto; margin: 0; -webkit-overflow-scrolling: touch; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 42rem;
+    font-family: var(--sans);
+    font-size: var(--step--1);
+  }
+  caption {
+    caption-side: top;
+    text-align: left;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    padding-bottom: .75rem;
+  }
+  th, td { padding: .6rem .85rem; text-align: left; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  thead th {
+    font-weight: 600;
+    font-size: var(--step--1);
+    letter-spacing: .04em;
+    color: var(--ink-faint);
+    border-bottom: 1px solid var(--rule-firm);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  .num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .c-before { color: var(--before); }
+  .c-after  { color: var(--after); font-weight: 600; }
+  .gain {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    color: var(--after);
+    background: var(--after-wash);
+    border-radius: 2px;
+    padding: .1rem .4rem;
+  }
+  .row-label { font-weight: 600; white-space: nowrap; }
+
+  /* ---------- code ---------- */
+
+  pre {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    line-height: 1.6;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule-firm);
+    border-radius: 3px;
+    padding: 1rem 1.15rem;
+    overflow-x: auto;
+    margin: 0;
+    tab-size: 2;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .pre-title {
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 .6rem;
+  }
+
+  /* ---------- verdict ---------- */
+
+  .verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; }
+  .verdict {
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1.15rem 1.25rem;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+  }
+  .verdict h4 {
+    font-family: var(--sans);
+    font-size: var(--step-0);
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .verdict p { font-family: var(--sans); font-size: var(--step--1); line-height: 1.55; margin: 0; color: var(--ink-soft); max-width: none; }
+  .dot { width: .55rem; height: .55rem; border-radius: 50%; flex: none; }
+  .v-yes  { border-top: 3px solid var(--after); }
+  .v-yes  .dot { background: var(--after); }
+  .v-no   { border-top: 3px solid var(--caution); background: var(--caution-wash); }
+  .v-no   .dot { background: var(--caution); }
+  .v-nc   { border-top: 3px solid var(--rule-firm); }
+  .v-nc   .dot { background: var(--ink-faint); }
+
+  /* ---------- callout ---------- */
+
+  .note {
+    border-left: 3px solid var(--caution);
+    background: var(--caution-wash);
+    padding: 1.1rem 1.35rem;
+    border-radius: 2px;
+    font-family: var(--sans);
+    font-size: var(--step--1);
+    line-height: 1.6;
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+  }
+  .note p { margin: 0; max-width: none; }
+  .note .tag {
+    font-family: var(--mono);
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--caution);
+  }
+
+  .standins { display: flex; flex-direction: column; gap: 0; }
+  .standin {
+    display: grid;
+    grid-template-columns: minmax(9rem, 12rem) 1fr;
+    gap: .35rem 1.5rem;
+    padding: 1.1rem 0;
+    border-bottom: 1px solid var(--rule);
+    align-items: baseline;
+  }
+  .standin:first-child { border-top: 1px solid var(--rule); }
+  .standin dt { font-family: var(--mono); font-size: var(--step--1); color: var(--ink); font-weight: 500; }
+  .standin dd { margin: 0; font-family: var(--sans); font-size: var(--step--1); line-height: 1.55; color: var(--ink-soft); }
+  .standin dd + dd { margin-top: .4rem; }
+  .cost { color: var(--caution); font-weight: 600; }
+
+  footer {
+    margin-top: 5rem;
+    border-top: 2px solid var(--ink);
+    padding-top: 1.5rem;
+    font-family: var(--mono);
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 2rem;
+  }
+
+  @media (max-width: 40rem) {
+    .sec-head { grid-template-columns: 1fr; gap: .35rem; }
+    .standin { grid-template-columns: 1fr; }
+    .banner { grid-template-columns: 1fr; gap: .6rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="kicker">
+      <span>Method note</span>
+      <span>2026-08-28</span>
+      <span>Issue <b>#22</b></span>
+      <span>PangenomeAPI</span>
+    </p>
+    <h1>How <code style="font-size:.82em;background:none;padding:0">/seqtubemap</code> was driven on a laptop</h1>
+    <p class="standfirst">
+      Two isolated API instances, one on each side of the change, serving the same five regions
+      over HTTP — so the before-and-after could be measured <em>on the wire</em> rather than
+      inferred from a unit test. Then pgb's own parser was run over both sides, and it recovers
+      <em>bit-identical arrays</em>. This is the method, including the one stand-in that limits
+      what it proves.
+    </p>
+
+    <div class="banner">
+      <span class="tag">Isolation</span>
+      <div>
+        <p><strong>Production was never involved.</strong> The <code>release</code> branch — the one the
+        server follows — was not read, written, or deployed to. Both instances bound to
+        <code>127.0.0.1</code> on ports <strong>8100</strong> and <strong>8101</strong>; production is
+        <code>:8000</code> on <code>pangenome-api.ucsd.edu</code>.</p>
+        <p>Everything the harness created lives outside the repository, except one gitignored
+        <code>cache/</code> directory that was deleted afterwards. <code>git status</code> is clean.</p>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>Why this needs a harness at all</h2></div>
+    <div class="sec-body">
+      <p class="col">Serving one <code>/seqtubemap</code> request touches four things a developer machine
+      does not have. Docker would supply all of them at once, and <code>docker-compose.yml</code> exists
+      for exactly that — but this machine has no Docker daemon, so each was supplied separately.</p>
+
+      <div class="scroll">
+        <table>
+          <caption>What the endpoint wants, and why it is missing</caption>
+          <thead>
+            <tr><th>Dependency</th><th>Why it is missing here</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="row-label">The HPRC v2 <code>.gbz</code> graph</td><td>Multi-gigabyte, not distributable; lives on the server</td></tr>
+            <tr><td class="row-label"><code>vg</code>, called twice</td><td>vgteam ship a <strong>Linux</strong> static build; this host is darwin/arm64</td></tr>
+            <tr><td class="row-label"><code>panCT</code> + git config paths</td><td>A developer setup step, unset in this checkout</td></tr>
+            <tr><td class="row-label"><code>adaptagrams</code>, <code>ogdf-python</code></td><td>Compiled inside the Docker image, not on the host</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="col">The Python test suite already solves three of these — <code>conftest.py</code> stubs the
+      native libraries, finds or stubs panCT, and supplies the git config through git's environment
+      variables. What it cannot solve is <code>vg</code>, which is why four tests in
+      <code>test_seqtubemap_endpoint.py</code> skip on a machine without it. Those are precisely the tests
+      that render a real tube map.</p>
+
+      <p class="col"><strong>So before this harness, no part of <code>/seqtubemap</code> had ever run end to end
+      on this machine.</strong> The coverage came from CI, where <code>vg</code> is installed, and from the
+      Node-level tests that sit below HTTP.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>What “isolated instance” means, precisely</h2></div>
+    <div class="sec-body">
+      <p class="col">Two <code>uvicorn</code> processes, each serving <code>main:app</code> out of a different
+      checkout, both running at the same time. They share every harness piece deliberately: anything
+      shared is a constant across the comparison, and therefore cannot contribute to the difference.</p>
+
+      <div class="rig">
+        <div class="rig-shared">
+          <p class="rig-label">Shared by both — the controlled constants</p>
+          <div class="chips">
+            <span class="chip">venv · fastapi 0.141.1</span>
+            <span class="chip">uvicorn 0.52.4</span>
+            <span class="chip">panCT @ 03c406b</span>
+            <span class="chip">native stubs</span>
+            <span class="chip">empty data dir</span>
+            <span class="chip">the vg stand-in</span>
+            <span class="chip">5 committed .gfa fixtures</span>
+          </div>
+        </div>
+        <div class="rig-stem" aria-hidden="true"></div>
+        <div class="rig-pair">
+          <div class="node is-before">
+            <span class="port">:8101</span>
+            <span class="who">Before</span>
+            <dl>
+              <dt>Code</dt><dd>399db1e</dd>
+              <dt>Dir</dt><dd>git worktree</dd>
+              <dt>node_modules</dt><dd>5 packages, with jsdom + canvas</dd>
+            </dl>
+          </div>
+          <div class="node is-after">
+            <span class="port">:8100</span>
+            <span class="who">After</span>
+            <dl>
+              <dt>Code</dt><dd>e8e5bfe</dd>
+              <dt>Dir</dt><dd>the repository</dd>
+              <dt>node_modules</dt><dd>2 packages</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+
+      <p class="col">A <code>git worktree</code> is what makes the “before” side honest. It is a second working
+      directory attached to the same repository, checked out at an arbitrary commit, with its own
+      untracked files — so <code>399db1e</code> gets its own <code>node_modules</code> containing the browser
+      emulation, without disturbing the main checkout or forcing a stash-and-reinstall between
+      measurements.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>The trick that removes the need for graph data</h2></div>
+    <div class="sec-body">
+      <p class="col">This is the part worth understanding, because it is not a test hook. It is a
+      <strong>production code path</strong>, used as intended.</p>
+
+      <div>
+        <p class="pre-title">main.py:735</p>
+        <pre><code>subgraph_cached = preprocess_gfa_subgraph_w_walk.exists()
+
+with stage_timing(stages, "subgraph_extract"):
+    if not subgraph_cached:
+        ...SubgraphMC(...); GenerateWalksMC(...)</code></pre>
+      </div>
+
+      <p class="col">If the extracted subgraph is already on disk, the endpoint skips extraction entirely —
+      no <code>.gbz</code>, no <code>gfabase</code>, no tabix lookups. That branch exists so a repeated region
+      is fast. It also means <strong>pre-placing a subgraph file is enough to make the rest of the pipeline
+      run.</strong></p>
+
+      <p class="col">The path it looks for is built from the query parameters, and the five fixtures in
+      <code>tests/fixtures/seqtubemap/</code> were copied out of the production server's own cache directory
+      <em>under the server's own filenames</em>. They drop straight in — and the region in each filename is
+      the region to request.</p>
+
+      <div>
+        <p class="pre-title">Five committed fixtures become five servable regions</p>
+        <pre><code>mkdir -p cache/seqtubemap/mc
+cp tests/fixtures/seqtubemap/*.gfa cache/seqtubemap/mc/</code></pre>
+      </div>
+
+      <p class="col">The second half of the same trick is issue #19: the <code>.walk.gz</code> derivatives are
+      opened the first time something reads one, rather than at import. A request with no
+      <code>minigraphnode</code> reads none — so <code>data.path</code> can point at an <strong>empty
+      directory</strong> and the app still boots and serves.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>The stand-ins, and what each one costs</h2></div>
+    <div class="sec-body">
+      <dl class="standins">
+        <div class="standin">
+          <dt>git config</dt>
+          <dd><code>tools.path</code> and <code>data.path</code> supplied through <code>GIT_CONFIG_COUNT</code> /
+          <code>KEY_n</code> / <code>VALUE_n</code> — the same mechanism <code>conftest.py</code> uses. Any
+          <code>git config --get</code> in a child process sees them.</dd>
+          <dd><strong>Cost: none.</strong> Nothing on disk changes; the developer's own config is untouched.</dd>
+        </div>
+        <div class="standin">
+          <dt>panCT</dt>
+          <dd>Cloned for real at <code>03c406b</code>, the commit CI pins. The logging in the
+          <code>[stage-timing]</code> line below is therefore panCT's own, not a placeholder's.</dd>
+          <dd><strong>Cost: none.</strong> This is the real dependency.</dd>
+        </div>
+        <div class="standin">
+          <dt>adaptagrams<br>ogdf_python</dt>
+          <dd>Two stub modules on <code>PYTHONPATH</code>. <code>main.py</code> imports them at module scope
+          through <code>bandage_graph</code>; they are the <em>3D graph layout</em> libraries, and nothing in
+          the <code>/seqtubemap</code> path calls them.</dd>
+          <dd><span class="cost">Cost:</span> <code>/json</code> was non-functional in these instances. It was
+          not exercised and no claim here covers it.</dd>
+        </div>
+        <div class="standin">
+          <dt>vg</dt>
+          <dd>A shell script first on <code>PATH</code>, implementing exactly the two invocations
+          <code>main.py</code> makes. See below — this is the one that matters.</dd>
+          <dd><span class="cost">Cost:</span> the GFA→JSON step is this repo's own derivation, not
+          <code>vg</code>'s. Detailed in section 06.</dd>
+        </div>
+      </dl>
+
+      <h3>The <code>vg</code> stand-in</h3>
+
+      <p class="col"><code>ConvertGfaToVg</code> and <code>ConvertVgToJson</code> each run
+      <code>subprocess.run</code> against <code>vg</code> unconditionally — there is no “skip if the output
+      exists” branch to exploit, the way there is for extraction. Without a <code>vg</code> on
+      <code>PATH</code>, a request cannot get past <code>gfa_to_vg</code>.</p>
+
+      <div>
+        <p class="pre-title">$S/bin/vg — deliberately outside the repository</p>
+        <pre><code>case "${1:-}" in
+  convert)   # vg convert -g &lt;in.gfa&gt;  -&gt; stdout   (main.py:464)
+    printf 'GFA_SHIM\t%s\n' "$(cd "$(dirname "$3")" &amp;&amp; pwd)/$(basename "$3")"
+    ;;
+  view)      # vg view -j &lt;in.vg&gt;      -&gt; stdout   (main.py:486)
+    gfa=$(awk -F'\t' '/^GFA_SHIM/{print $2; exit}' "$3")
+    out=$(mktemp -t vgshim); trap 'rm -f "$out"' EXIT
+    node "$REPO/perf/gfa-to-vg-json.mjs" "$gfa" "$out" &gt;/dev/null 2&gt;&amp;1
+    cat "$out"
+    ;;
+  *) echo "vg shim: unsupported invocation: $*" &gt;&amp;2; exit 64 ;;
+esac</code></pre>
+      </div>
+
+      <p class="col">The <code>.vg</code> protobuf is a private intermediate — nothing but <code>vg view</code>
+      ever reads it, and the endpoint deletes it afterwards — so <code>convert</code> need not produce one. It
+      writes a marker naming the GFA it was given; <code>view</code> reads that marker and converts the GFA
+      directly with <code>perf/gfa-to-vg-json.mjs</code>.</p>
+
+      <p class="col"><strong>It was verified before being trusted.</strong> Over the 90 bp fixture, the
+      stand-in's output is identical to the committed
+      <code>subgraph_chr8_78771162_78771252_v2_with_walk.json</code> — the very file the Node tests and the
+      band-data baselines are built from. The Node stage therefore received, over HTTP, exactly the input it
+      receives in <code>npm test</code>.</p>
+
+      <div class="note">
+        <p class="tag">Why it stays out of the repo</p>
+        <p>A file named <code>vg</code> that silently is not <code>vg</code> is a hazard. It should not be
+        findable by anyone who has not read this page, so the reproducible recipe is the only durable form
+        it takes.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>What came back</h2></div>
+    <div class="sec-body">
+      <p class="col">Each region: one warm-up request, then three timed, best taken. <code>curl</code>'s
+      <code>%{time_starttransfer}</code> is TTFB; <code>%{size_download}</code> is the payload.</p>
+
+      <div class="scroll">
+        <table>
+          <caption>Five real subgraphs, both instances</caption>
+          <thead>
+            <tr>
+              <th>Region</th>
+              <th class="num">TTFB before</th>
+              <th class="num">TTFB after</th>
+              <th class="num">Speedup</th>
+              <th class="num">Bytes before</th>
+              <th class="num">Bytes after</th>
+              <th class="num">Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="row-label">90 bp</td><td class="num c-before">0.646 s</td><td class="num c-after">0.213 s</td><td class="num"><span class="gain">3.0×</span></td><td class="num c-before">166,675</td><td class="num c-after">138,340</td><td class="num">−17.0%</td></tr>
+            <tr><td class="row-label">600 bp</td><td class="num c-before">0.982 s</td><td class="num c-after">0.278 s</td><td class="num"><span class="gain">3.5×</span></td><td class="num c-before">2,738,884</td><td class="num c-after">2,352,410</td><td class="num">−14.1%</td></tr>
+            <tr><td class="row-label">1.4 kb</td><td class="num c-before">1.226 s</td><td class="num c-after">0.331 s</td><td class="num"><span class="gain">3.7×</span></td><td class="num c-before">4,391,887</td><td class="num c-after">3,757,885</td><td class="num">−14.4%</td></tr>
+            <tr><td class="row-label">8.0 kb</td><td class="num c-before">2.376 s</td><td class="num c-after">0.735 s</td><td class="num"><span class="gain">3.2×</span></td><td class="num c-before">12,090,267</td><td class="num c-after">10,408,507</td><td class="num">−13.9%</td></tr>
+            <tr><td class="row-label">4.2 kb</td><td class="num c-before">2.561 s</td><td class="num c-after">0.589 s</td><td class="num"><span class="gain">4.3×</span></td><td class="num c-before">15,285,418</td><td class="num c-after">13,122,049</td><td class="num">−14.2%</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="col">The endpoint's own stage timer attributes the saving. On the 90 bp region:</p>
+
+      <div>
+        <p class="pre-title">[stage-timing], 90 bp</p>
+        <pre><code>before:  total=0.796s  subgraph_extract=0.0s  gfa_to_vg=0.011s  vg_to_json=0.062s  generate_svg=0.723s
+after:   total=0.323s  subgraph_extract=0.0s  gfa_to_vg=0.010s  vg_to_json=0.059s  generate_svg=0.254s</code></pre>
+      </div>
+
+      <p class="col">Every stage but <code>generate_svg</code> is unchanged, which is exactly the expected
+      shape: the change touched the Node stage and nothing else.</p>
+
+      <h3>Conformance, checked on the response bodies</h3>
+
+      <p class="col">For all five regions the “after” body is byte-identical to the “before” body once
+      <code>color=</code>, <code>class="track{id}"</code> and <code>&lt;title&gt;&lt;/title&gt;</code> are
+      textually deleted from it. Drawable counts in <code>g.track</code> are unchanged — 592, 8,089, 13,246,
+      35,020, 44,795 — and the client's parsing contract passes on every one.
+      <code>nodewidthoption=normal</code>, the one path whose geometry could have shifted, is identical too,
+      with the same nine <code>&lt;text&gt;</code> elements. Neither server log holds an error, a traceback,
+      or a non-200.</p>
+
+      <p class="col">Byte reductions read ~14% here against ~16.6% measured on the fixtures, and the reason is
+      the absence of <code>minigraphnode</code>: with no PCLAI scheme every coordinate attribute is the short
+      literal <code>None</code>, so the removed attributes are a smaller share of a smaller document.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">06</span><h2>Then the client's own parser</h2></div>
+    <div class="sec-body">
+      <p class="col"><strong><code>curl</code> stood in for pgb's fetch, not for pgb.</strong> It
+      retrieves the bytes; it does not parse them — and parsing is where compatibility actually
+      lives. That half was checked separately, and at first against this repository's <em>written
+      description</em> of what pgb requires, which is a weaker thing than it sounds.</p>
+
+      <p class="col">pgb is checked out on the same machine, so the description was replaced by the
+      code. <code>parseBands.ts</code> and <code>parseSegmentBoxes.ts</code> were run directly over
+      the five subgraphs as rendered by both sides. All ten documents were accepted — and more than
+      accepted:</p>
+
+      <div class="scroll">
+        <table>
+          <caption>pgb's recovered arrays, pre-change vs post-change</caption>
+          <thead>
+            <tr><th>Fixture</th><th class="num">Bands</th><th class="num">Strands</th><th class="num">Geometry floats</th><th>Recovered arrays</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="row-label">chr8 90 bp</td><td class="num">592</td><td class="num">464</td><td class="num">3,552</td><td class="c-after">identical</td></tr>
+            <tr><td class="row-label">chr1 600 bp</td><td class="num">8,089</td><td class="num">369</td><td class="num">48,534</td><td class="c-after">identical</td></tr>
+            <tr><td class="row-label">chr8 1.4 kb</td><td class="num">13,246</td><td class="num">463</td><td class="num">79,476</td><td class="c-after">identical</td></tr>
+            <tr><td class="row-label">chr1 8.0 kb</td><td class="num">35,020</td><td class="num">383</td><td class="num">210,120</td><td class="c-after">identical</td></tr>
+            <tr><td class="row-label">chr1 4.2 kb</td><td class="num">44,795</td><td class="num">1,201</td><td class="num">268,770</td><td class="c-after">identical</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="col">Compared element by element: <code>geometry</code>, <code>strandIds</code>,
+      <code>bandDirections</code>, <code>bandCount</code>, <code>strandColors</code>,
+      <code>strandNames</code>, <code>strandPlacements</code>, <code>strandScores</code>,
+      <code>strandCount</code>, <code>content</code>, <code>centre</code>, and the segment boxes.
+      The roadmap calls this the strongest available assertion — <em>run the client's own parser
+      over before and after, and diff the recovered arrays</em> — and it is now met with the
+      client's code rather than a description of it.</p>
+
+      <h3>Two things fell out of reading that parser</h3>
+
+      <p class="col"><strong>Our transcription was looser than the real gate.</strong> It made
+      <code>fill-opacity</code> and <code>trackName</code> optional; pgb requires both, literally —
+      <code>fill-opacity: 1;</code> is a hardcoded token inside the pattern. A lenient
+      transcription is worse than none, because it is false assurance about somebody else's gate.
+      It now mirrors pgb's own construction.</p>
+
+      <div class="note">
+        <p class="tag">Filed as #52</p>
+        <p><strong>A reversal draws shapes pgb cannot read</strong> — corners carry no
+        <code>trackName</code>, are quadratics where the grammar wants cubics, and neither they nor
+        a reversal's vertical rectangles carry the required <code>fill-opacity</code>. Because pgb
+        compares drawables <em>counted</em> against drawables <em>matched</em>, one unreadable shape
+        refuses the <em>whole document</em> — an error card, not a degraded picture.</p>
+        <p>Latent: no committed fixture draws a corner, and all five real subgraphs are entirely
+        rects and curves at <code>alpha: 1</code>. And it predates this change in both directions.
+        It now has a failing example in the test suite rather than a comment.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">07</span><h2>What this proves, and what it does not</h2></div>
+    <div class="sec-body">
+      <div class="verdicts">
+        <div class="verdict v-yes">
+          <h4><span class="dot" aria-hidden="true"></span>It proves</h4>
+          <p>That the post-change code serves <code>/seqtubemap</code> over real HTTP — real handler, real
+          caching branch, real Node subprocess; that the documents differ from the pre-change ones by
+          exactly the three removals; and that the saving sits where the change was made. A genuine A/B:
+          the instances differ only in the checkout they serve. And, separately from the harness, that
+          pgb's own parser recovers identical numbers from both sides.</p>
+        </div>
+        <div class="verdict v-no">
+          <h4><span class="dot" aria-hidden="true"></span>It does not prove</h4>
+          <p>Anything about the bytes real <code>vg</code> produces. That step ran through this repository's
+          own derivation, known to differ from <code>vg view -j</code> in at least subrange naming. It sits
+          <em>upstream</em> of the change, so it cannot mask a regression introduced here — but “production
+          will return exactly these bytes” is not supported. That evidence is CI, which installs
+          <code>vg</code> v1.75.0 and passed on PR #51.</p>
+        </div>
+        <div class="verdict v-nc">
+          <h4><span class="dot" aria-hidden="true"></span>It does not cover</h4>
+          <p><code>/json</code> and the 3D graph path, whose layout libraries were stubbed. Real subgraph
+          extraction, skipped by design. The PCLAI colouring path, which needs the minigraph walks file this
+          data directory does not contain.</p>
+        </div>
+      </div>
+
+      <p class="col" style="margin-top:1.5rem"><strong>Absolute timings are a developer laptop, not the
+      server.</strong> The ratios are the transferable part. Production's own baseline is unchanged and will
+      stay that way until something is promoted to <code>release</code>.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">08</span><h2>Reproducing it</h2></div>
+    <div class="sec-body">
+      <p class="col">Set <code>S</code> to a scratch directory outside the repo and <code>REPO</code> to the
+      checkout. The full recipe, including the stand-in's source, is in
+      <code>docs/perf/local-endpoint-harness.md</code>.</p>
+
+      <div>
+        <p class="pre-title">Build the environment, then run it</p>
+        <pre><code>S=/tmp/seqtubemap-harness; REPO=$PWD; mkdir -p "$S"/{tools,data,stubs,bin}
+
+python3 -m venv "$S/venv"
+"$S/venv/bin/pip" install -r requirements-test.txt uvicorn
+git clone --quiet https://github.com/CAST-genomics/panCT.git "$S/tools/panCT"
+git -C "$S/tools/panCT" checkout --quiet 03c406b
+
+mkdir -p "$REPO/cache/seqtubemap/mc"
+cp "$REPO"/tests/fixtures/seqtubemap/*.gfa "$REPO/cache/seqtubemap/mc/"
+
+GIT_CONFIG_COUNT=2 \
+GIT_CONFIG_KEY_0=tools.path GIT_CONFIG_VALUE_0="$S/tools" \
+GIT_CONFIG_KEY_1=data.path  GIT_CONFIG_VALUE_1="$S/data" \
+PYTHONPATH="$S/stubs" VG_SHIM_REPO="$REPO" PATH="$S/bin:$PATH" \
+  "$S/venv/bin/uvicorn" main:app --host 127.0.0.1 --port 8100</code></pre>
+      </div>
+
+      <div class="scroll">
+        <table>
+          <caption>The five servable regions</caption>
+          <thead><tr><th>Region</th><th>Query</th></tr></thead>
+          <tbody>
+            <tr><td class="row-label">90 bp</td><td><code>chrom=chr8&amp;start=78771162&amp;end=78771252</code></td></tr>
+            <tr><td class="row-label">600 bp</td><td><code>chrom=chr1&amp;start=25331046&amp;end=25331646</code></td></tr>
+            <tr><td class="row-label">1.4 kb</td><td><code>chrom=chr8&amp;start=10079054&amp;end=10080461</code></td></tr>
+            <tr><td class="row-label">8.0 kb</td><td><code>chrom=chr1&amp;start=25301271&amp;end=25309238</code></td></tr>
+            <tr><td class="row-label">4.2 kb</td><td><code>chrom=chr1&amp;start=25331646&amp;end=25335796</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="col">Requesting anything else — a region with no seeded <code>.gfa</code> — sends the endpoint
+      down the real extraction branch, which fails for want of the graph. That is correct behaviour, not a
+      harness fault.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">09</span><h2>What was left behind</h2></div>
+    <div class="sec-body">
+      <p class="col"><strong>Nothing in the repository.</strong> The seeded <code>cache/</code> directory was
+      deleted, the worktree removed, both <code>uvicorn</code> processes stopped and both ports confirmed
+      closed. <code>git status</code> is clean and <code>origin/release</code> is untouched.</p>
+      <p class="col">The harness itself — virtualenv, panCT clone, stubs, stand-in, captured documents and
+      server logs — lives in a session scratchpad, which is temporary. Section 08 is what makes it durable.</p>
+    </div>
+  </section>
+
+  <footer>
+    <span>Host: macOS 26.5.2 · arm64</span>
+    <span>Node v26.7.0 · Python 3.13.5</span>
+    <span>Method for docs/perf/increment-b.md</span>
+  </footer>
+
+</div>

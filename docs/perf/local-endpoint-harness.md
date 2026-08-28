@@ -17,6 +17,9 @@ outside the repository, except one gitignored `cache/` directory that was delete
 
 The results are in [`increment-b.md`](./increment-b.md); this is the method.
 
+- Rendered version: <https://claude.ai/code/artifact/2f0fbe8f-187d-4cf2-b553-d71cfab68f08>
+- Source of the rendered version: [`local-endpoint-harness.html`](./local-endpoint-harness.html)
+
 ---
 
 ## 1. Why this needs a harness at all
