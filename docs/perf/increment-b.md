@@ -154,6 +154,39 @@ unchanged.
 The reductions are ~14% rather than ~16.6% because these requests carry no `minigraphnode`, so
 every PCLAI attribute is the short literal `None`.
 
+## Checked against `pgb`'s own parser
+
+Everything above tests the document against *this* repository's statement of what `pgb`
+requires. On 2026-08-28 that statement was replaced by the real thing: `pgb` is checked out
+alongside, and `src/tubemap/parseBands.ts` and `parseSegmentBoxes.ts` were run directly over
+the five real subgraphs rendered by both the pre- and post-#22 code.
+
+**All five accepted, before and after.** And more than accepted — `pgb` recovers *bit-identical
+arrays* from the two sides:
+
+| fixture | bands | strands | geometry floats | recovered arrays |
+| --- | ---: | ---: | ---: | --- |
+| chr8 90 bp | 592 | 464 | 3,552 | identical |
+| chr1 600 bp | 8,089 | 369 | 48,534 | identical |
+| chr8 1.4 kb | 13,246 | 463 | 79,476 | identical |
+| chr1 8.0 kb | 35,020 | 383 | 210,120 | identical |
+| chr1 4.2 kb | 44,795 | 1,201 | 268,770 | identical |
+
+Compared element by element: `geometry`, `strandIds`, `bandDirections`, `bandCount`,
+`strandColors`, `strandNames`, `strandPlacements`, `strandScores`, `strandCount`, `content`,
+`centre`, and the segment boxes from `parseSegmentBoxes`. This is the bar the roadmap names as
+the strongest available — *"run the client's own parser over before and after, and diff the
+recovered arrays"* — met with the client's own code rather than a description of it.
+
+Two things came out of reading that parser, both recorded rather than acted on here:
+
+- `tests/node/pgb-parser.mjs` **was looser than the real gate** and has been tightened to
+  match. It had made `fill-opacity` and `trackName` optional; `pgb` requires both, literally.
+- A reversal draws shapes `pgb` cannot read at all, and its whole-document gate then refuses
+  the document rather than degrading it. Latent — no committed fixture draws a corner — and it
+  predates #22 in both directions. Filed as
+  [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52).
+
 ## What was not measured
 
 The endpoint on the server. `generate_svg` is 8.2 s of a 38.9 s 10 kb request there, against a

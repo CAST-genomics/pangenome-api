@@ -337,6 +337,12 @@ exactly the three removals and nothing else; and that the saving is where the ch
 It is a genuine A/B: the two instances differ only in the checkout they serve, because every
 stand-in is shared between them.
 
+> **`curl` stood in for `pgb`'s fetch, not for `pgb`.** It retrieves the bytes; it does not
+> parse them. The parsing side was checked separately, and afterwards properly: `pgb`'s own
+> `parseBands.ts` was run over the same documents and recovers bit-identical arrays from the
+> pre- and post-#22 sides. See [`increment-b.md`](./increment-b.md), "Checked against `pgb`'s
+> own parser".
+
 **Does not prove.** Anything about the bytes real `vg` produces. The GFA → vg-JSON step ran
 through this repository's own derivation, which is known to differ from `vg view -j` in at
 least the subrange-naming respect. That step sits entirely **upstream** of #22 — it feeds the
