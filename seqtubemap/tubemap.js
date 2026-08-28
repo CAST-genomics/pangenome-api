@@ -26,12 +26,14 @@
  * not try to merge upstream changes back in.
  *
  * Why: this project uses the module as a server-side layout engine, not as the
- * browser application upstream ships. Increment B of the /seqtubemap rework
- * will go further and remove the DOM sink outright — the layout's output is to
- * be captured as band data and the SVG emitted from that, so the jsdom/canvas
- * rendering upstream is built around stops existing in this copy. (That has not
- * landed yet: this file still calls `d3.select` and reaches for
- * `document.getElementById`.) The divergence is structural, not a patch set.
+ * browser application upstream ships. **Increment B has now landed, and the DOM
+ * sink is gone.** There is no `d3.select`, no `document`, no `window` and no
+ * `getComputedTextLength` in this file any more: every draw function collects
+ * what it was about to draw into `band-data.mjs`, and `emit-document.mjs`
+ * writes the document from that. The `d3` import remains for the parts of the
+ * layout that are arithmetic — colour interpolation and scales — and for
+ * nothing that touches a document. Upstream's rendering half no longer exists
+ * in this copy; the divergence is structural, not a patch set.
  * The decision is `docs/adr/0001-additive-band-format.md` — see its final
  * "Consequences" bullet for this file, and `docs/perf/seqtubemap-plan.md` for
  * the increment. The README's "The vendored tube map layout" section records
@@ -52,7 +54,6 @@
 /* eslint no-unused-vars: "off" */
 /* eslint no-return-assign: "off" */
 import * as d3 from "d3";
-import "d3-selection-multi";
 import "./config-client.js";
 import externalConfig from "./config-global.mjs";
 import { defaultTrackColors } from "./common.mjs";
@@ -137,9 +138,13 @@ const lightColors = [
 // "Courier", and because tools like Inkscape can't interpret the text properly
 // if they don't have the first font named here.
 const fonts = '"Courier New", "Courier", "Lucida Console", monospace';
+// The advance width of one glyph of `fonts` at 14px. Courier New's advance is
+// 1229/2048 em, so 14px gives 8.401 — the same constant the width options above
+// already scale a segment's pixel width by, arrived at the same way. It replaces
+// what a browser's getComputedTextLength used to be asked for, which is why this
+// file no longer needs one.
+const MONOSPACE_ADVANCE_14PX = 8.401;
 
-let svgID; // the (html-tag) ID of the svg
-let svg; // the svg
 export let zoom; // eslint-disable-line import/no-mutable-exports
 let inputNodes = [];
 let inputTracks = [];
@@ -228,10 +233,10 @@ let bed;
 // main function to call from outside
 // which starts the process of creating a tube map visualization
 export function create(params) {
-  // mandatory parameters: svgID (really a selector, but must be an ID selector), nodes, tracks
+  // mandatory parameters: nodes, tracks
   // optional parameters: bed, clickableNodes, reads, showLegend
-  svgID = params.svgID;
-  svg = d3.select(params.svgID);
+  // `svgID` was mandatory upstream and named the element to draw into. There is
+  // no element any more: the result is read with getBandData().
   inputNodes = deepCopy(params.nodes); // deep copy
   // Nodes are referenced in inputs by internal `name` attribute and not by index.
   // Internally in e.g. a path's indexSequence we need to reference nodes by *signed* index.
@@ -352,14 +357,13 @@ function straightenTrack(index) {
 export function setSoftClipsFlag(value) {
   if (config.showSoftClips !== value) {
     config.showSoftClips = value;
-    svg = d3.select(svgID);
     createTubeMap();
   }
 }
 
 // main
 function createTubeMap() {
-  console.log("Recreating tube map in", svgID);
+  console.log("Recreating tube map");
   const START = Date.now();
   const t = (label) => {
     const m = process.memoryUsage();
@@ -381,8 +385,6 @@ function createTubeMap() {
   minYCoordinate = 0;
   maxXCoordinate = 0;
   trackForRuler = undefined;
-  svg = d3.select(svgID);
-  svg.selectAll("*").remove(); // clear svg for (re-)drawing
 
   // early exit is necessary when visualization options such as colors are
   // changed before any graph has been rendered
@@ -493,36 +495,24 @@ function createTubeMap() {
   bandCollector.setExtent({ maxXCoordinate, maxYCoordinate, minYCoordinate });
   t("getImageDimensions");
 
-  // all drawn tracks are grouped
+  // The bands, in draw order — which is paint order, and which is the order
+  // the emitter writes them into `g.track`.
   console.error(`[shapes] rects=${trackRectangles.length} curves=${trackCurves.length} corners=${trackCorners.length} vrects=${trackVerticalRectangles.length}`);
-  let trackGroup = svg.append("g").attr("class", "track");
-  drawTrackRectangles(trackRectangles, "haplotype", trackGroup);
+  drawTrackRectangles(trackRectangles, "haplotype");
   t("drawTrackRectangles #1");
-  drawTrackCurves("haplotype", trackGroup);
+  drawTrackCurves("haplotype");
   t("drawTrackCurves #1");
-  drawReversalsByColor(
-    trackCorners,
-    trackVerticalRectangles,
-    "haplotype",
-    trackGroup
-  );
+  drawReversalsByColor(trackCorners, trackVerticalRectangles, "haplotype");
   t("drawReversalsByColor #1");
-  drawTrackRectangles(trackRectanglesStep3, "haplotype", trackGroup);
-  drawTrackRectangles(trackRectangles, "read", trackGroup);
-  drawTrackCurves("read", trackGroup);
+  drawTrackRectangles(trackRectanglesStep3, "haplotype");
+  drawTrackRectangles(trackRectangles, "read");
+  drawTrackCurves("read");
 
   // draw only those nodes which have coords assigned to them
   const dNodes = removeUnusedNodes(nodes);
-  drawReversalsByColor(
-    trackCorners,
-    trackVerticalRectangles,
-    "read",
-    trackGroup
-  );
+  drawReversalsByColor(trackCorners, trackVerticalRectangles, "read");
 
-  // all drawn nodes are grouped
-  let nodeGroup = svg.append("g").attr("class", "node");
-  drawNodes(dNodes, nodeGroup);
+  drawNodes(dNodes);
   if (config.nodeWidthOption === "normal") drawLabels(dNodes);
   if (trackForRuler !== undefined) drawRuler();
   t("drawRuler");
@@ -3153,28 +3143,20 @@ function generateReverseToForward(
 }
 
 // to avoid problems with wrong overlapping of tracks, draw them in order of their color
-function drawReversalsByColor(corners, rectangles, type, groupTrack) {
+function drawReversalsByColor(corners, rectangles, type) {
   const co = new Set();
   rectangles.forEach((rect) => {
     co.add(rect.color);
   });
   co.forEach((c) => {
-    drawTrackRectangles(
-      rectangles.filter(filterObjectByAttribute("color", c)),
-      type,
-      groupTrack
-    );
-    drawTrackCorners(
-      corners.filter(filterObjectByAttribute("color", c)),
-      type,
-      groupTrack
-    );
+    drawTrackRectangles(rectangles.filter(filterObjectByAttribute("color", c)), type);
+    drawTrackCorners(corners.filter(filterObjectByAttribute("color", c)), type);
   });
 }
 
 // draws nodes by building svg-path for border and filling it with transparent white
 
-function drawNodes(dNodes, groupNode) {
+function drawNodes(dNodes) {
   let x;
   let y;
 
@@ -3228,9 +3210,9 @@ function drawNodes(dNodes, groupNode) {
 
   console.log("config:", config);
 
-  const segments = dNodes.map((node) => {
+  dNodes.forEach((node) => {
     const colors = colorNodes(node.name);
-    return bandCollector.segment({
+    bandCollector.segment({
       id: node.name,
       outline: node.d,
       sequence: node.seq,
@@ -3240,20 +3222,6 @@ function drawNodes(dNodes, groupNode) {
       strokeWidth: "2px",
     });
   });
-
-  groupNode
-    .selectAll("node")
-    .data(segments)
-    .enter()
-    .append("path")
-    .attr("id", (d) => d.id)
-    .attr("d", (d) => d.outline)
-    .attr("sequence", (d) => d.sequence)
-    .style("fill", (d) => d.fill)
-    .style("fill-opacity", (d) => d.fillOpacity)
-    .style("stroke", (d) => d.stroke)
-    .style("stroke-width", (d) => d.strokeWidth)
-    .append("svg:title")
 }
 
 // Given a node name, return an object with "fill", "fill-opacity", and "outline"
@@ -3277,18 +3245,9 @@ function colorNodes(nodeName) {
 // draw seqence labels for nodes
 function drawLabels(dNodes) {
   if (config.nodeWidthOption === "normal") {
-    svg
-      .selectAll("text")
-      .data(dNodes)
-      .enter()
-      .append("text")
-      .attr("x", (d) => d.x - 4)
-      .attr("y", (d) => d.y + 4)
-      .text((d) => d.seq)
-      .attr("font-family", fonts)
-      .attr("font-size", "14px")
-      .attr("fill", "black")
-      .style("pointer-events", "none");
+    dNodes.forEach((node) =>
+      textOverlay(node.x - 4, node.y + 4, node.seq, { size: "14px" })
+    );
   }
 }
 
@@ -3500,36 +3459,12 @@ function drawRuler() {
   
   let axisY = minYCoordinate - 10;
   mergedIntervals.forEach((interval) => {
-    svg
-      .append("line")
-      .attr("x1", interval[0])
-      .attr("y1", axisY)
-      .attr("x2", interval[1])
-      .attr("y2", axisY)
-      .attr("stroke-width", 1)
-      .attr("stroke", "black")
-    
+    rulerLine(interval[0], axisY, interval[1], axisY);
     // starting vertical line
-    svg
-    .append("line")
-    .attr("x1", interval[0])
-    .attr("y1", axisY - 5)
-    .attr("x2", interval[0])
-    .attr("y2", axisY + 5)
-    .attr("stroke-width", 1)
-    .attr("stroke", "black")
-
+    rulerLine(interval[0], axisY - 5, interval[0], axisY + 5);
     // ending vertical line
-    svg
-    .append("line")
-    .attr("x1", interval[1])
-    .attr("y1", axisY - 5)
-    .attr("x2", interval[1])
-    .attr("y2", axisY + 5)
-    .attr("stroke-width", 1)
-    .attr("stroke", "black")
-  }
-);
+    rulerLine(interval[1], axisY - 5, interval[1], axisY + 5);
+  });
   
   // Plot all the ticks
   for (let i = 0; i < ticks.length; i++){
@@ -3553,26 +3488,58 @@ function drawRuler() {
 /// or "middle".
 function drawRulerMarking(sequencePosition, xCoordinate, align) {
   let axisY = minYCoordinate - 10;
-  svg
-    .append("text")
-    .attr("text-anchor", align)
-    .attr("x", xCoordinate)
-    .attr("y", minYCoordinate - 18)
-    .text(`${sequencePosition}`)
-    .attr("font-family", fonts)
-    .attr("font-size", "12px")
-    .attr("fill", "black")
-    .style("pointer-events", "none");
+  textOverlay(xCoordinate, minYCoordinate - 18, `${sequencePosition}`, {
+    anchor: align,
+  });
 
-    // vertical line
-    svg
-    .append("line")
-    .attr("x1", xCoordinate)
-    .attr("y1", axisY - 5)
-    .attr("x2", xCoordinate)
-    .attr("y2", axisY + 5)
-    .attr("stroke-width", 1)
-    .attr("stroke", "black")
+  // vertical line
+  rulerLine(xCoordinate, axisY - 5, xCoordinate, axisY + 5);
+}
+
+/// One black hairline of the ruler's axis.
+function rulerLine(x1, y1, x2, y2) {
+  bandCollector.overlay({
+    element: "line",
+    attributes: [
+      ["x1", x1],
+      ["y1", y1],
+      ["x2", x2],
+      ["y2", y2],
+      ["stroke-width", 1],
+      ["stroke", "black"],
+    ],
+  });
+}
+
+/// One line of black monospace text.
+///
+/// The attribute order is the order the document has always written them in, so
+/// it is fixed here rather than left to each caller: `text-anchor` first when
+/// there is one, then the position, then the face, then the pointer-events
+/// style, then whatever the caller adds after. `pointerEvents: false` is the
+/// mismatch marks, which upstream left clickable — and which this fork never
+/// draws, since it renders no reads.
+function textOverlay(
+  x,
+  y,
+  text,
+  { anchor, size = "12px", pointerEvents = false, extra = [], title } = {},
+) {
+  bandCollector.overlay({
+    element: "text",
+    attributes: [
+      ...(anchor === undefined ? [] : [["text-anchor", anchor]]),
+      ["x", x],
+      ["y", y],
+      ["font-family", fonts],
+      ["font-size", size],
+      ["fill", "black"],
+      ...(pointerEvents ? [] : [["style", "pointer-events: none;"]]),
+      ...extra,
+    ],
+    text,
+    title,
+  });
 }
 
 /// Draw ruler markings for the given requested region.
@@ -3587,14 +3554,17 @@ function drawRulerMarkingRegion(ticks_region) {
   let lineY = minYCoordinate - NODE_MARGIN - 6;
 
   if (ticks_region && ticks_region.length === 2) {
-    svg
-      .append("line")
-      .attr("x1", ticks_region[0][1])
-      .attr("y1", lineY)
-      .attr("x2", ticks_region[1][1])
-      .attr("y2", lineY)
-      .attr("stroke-width", 4)
-      .attr("stroke", "#FFFE3A");
+    bandCollector.overlay({
+      element: "line",
+      attributes: [
+        ["x1", ticks_region[0][1]],
+        ["y1", lineY],
+        ["x2", ticks_region[1][1]],
+        ["y2", lineY],
+        ["stroke-width", 4],
+        ["stroke", "#FFFE3A"],
+      ],
+    });
   }
 }
 
@@ -3605,16 +3575,21 @@ function drawRulerMarkingEndpoint(sequencePosition, xCoordinate) {
   let arrowWidth = 8;
   let arrowHeight = 10;
 
-  svg
-    .append("path")
-    .attr("d", `M${pointX - arrowWidth} ${pointY - arrowHeight}`
-      + ` L${pointX} ${pointY}`
-      + ` L${pointX + arrowWidth} ${pointY - arrowHeight}`
-    )
-    .attr("stroke-width", 0)
-    .attr("fill", "#FFFE3A")
-    .attr("stroke", "none")
-    .style("pointer-events", "none");
+  bandCollector.overlay({
+    element: "path",
+    attributes: [
+      [
+        "d",
+        `M${pointX - arrowWidth} ${pointY - arrowHeight}` +
+          ` L${pointX} ${pointY}` +
+          ` L${pointX + arrowWidth} ${pointY - arrowHeight}`,
+      ],
+      ["stroke-width", 0],
+      ["fill", "#FFFE3A"],
+      ["stroke", "none"],
+      ["style", "pointer-events: none;"],
+    ],
+  });
 }
 
 function filterObjectByAttribute(attribute, value) {
@@ -3636,40 +3611,10 @@ function collectStrand(shape) {
   });
 }
 
-function strandOf(band) {
-  return bandCollector.strandOf(band);
-}
-
-// The band data keeps a missing PCLAI placement as null; the document has
-// always written the string "None" for it.
-function orNone(value) {
-  return value === null ? "None" : value;
-}
-
-// Bind the per-strand attributes every band carries. Shared by the three shapes
-// so that a change to what a band says about its strand cannot reach one shape
-// and miss another.
-function bindStrandAttributes(selection) {
-  return selection
-    .attr("trackID", (d) => strandOf(d).id)
-    // A corner carries no strand name, because the layout builds one without a
-    // name to give it (see the trackCorners.push calls above). Its strand row
-    // knows the name; the element has never said it, and must not start to.
-    .attr("trackName", (d) => (d.kind === "corner" ? null : strandOf(d).name))
-    .attr("class", (d) => `track${strandOf(d).id}`)
-    .attr("color", (d) => strandOf(d).color)
-    .attr("pclaiX", (d) => orNone(strandOf(d).pclaiX))
-    .attr("pclaiY", (d) => orNone(strandOf(d).pclaiY))
-    .attr("pclaiScore", (d) => orNone(strandOf(d).pclaiScore));
-}
-
-function drawTrackRectangles(rectangles, type, groupTrack) {
+function drawTrackRectangles(rectangles, type) {
   rectangles = rectangles.filter(filterObjectByAttribute("type", type));
 
-  // Collect first, then draw what was collected: the elements below are bound
-  // to the bands themselves, so the band data and the document are one list
-  // read twice rather than two descriptions that have to be kept in step.
-  const bands = rectangles.map((rectangle) =>
+  rectangles.forEach((rectangle) =>
     bandCollector.band({
       kind: "rect",
       strand: collectStrand(rectangle),
@@ -3680,20 +3625,6 @@ function drawTrackRectangles(rectangles, type, groupTrack) {
       alpha: rectangle.alpha,
     })
   );
-
-  bindStrandAttributes(
-    groupTrack
-      .selectAll("trackRectangles")
-      .data(bands)
-      .enter()
-      .append("rect")
-      .attr("x", (d) => d.x)
-      .attr("y", (d) => d.y)
-      .attr("width", (d) => d.width)
-      .attr("height", (d) => d.height)
-      .style("fill", (d) => strandOf(d).color)
-      .style("fill-opacity", (d) => d.alpha)
-  ).append("svg:title")
 }
 
 function compareCurvesByXYStartValue(a, b) {
@@ -3704,7 +3635,7 @@ function compareCurvesByXYStartValue(a, b) {
   return 0;
 }
 
-function drawTrackCurves(type, groupTrack) {
+function drawTrackCurves(type) {
 
   const filteredTrackCurves = trackCurves.filter(
     filterObjectByAttribute("type", type)
@@ -3793,7 +3724,7 @@ function drawTrackCurves(type, groupTrack) {
   // Collected in the order they are about to be drawn — which is the order the
   // grouping and the within-group sort above arrived at, not the order the
   // curves were generated in.
-  const bands = flattenedGroups.map((curve) =>
+  flattenedGroups.forEach((curve) =>
     bandCollector.band({
       kind: "curve",
       strand: collectStrand(curve),
@@ -3801,39 +3732,18 @@ function drawTrackCurves(type, groupTrack) {
       alpha: curve.alpha,
     })
   );
-
-  bindStrandAttributes(
-    groupTrack
-      .selectAll("trackCurves")
-      .data(bands)
-      .enter()
-      .append("path")
-      .attr("d", (d) => d.path)
-      .style("fill", (d) => strandOf(d).color)
-      .style("fill-opacity", (d) => d.alpha)
-  ).append("svg:title")
 }
 
-function drawTrackCorners(corners, type, groupTrack) {
+function drawTrackCorners(corners, type) {
   corners = corners.filter(filterObjectByAttribute("type", type));
 
-  const bands = corners.map((corner) =>
+  corners.forEach((corner) =>
     bandCollector.band({
       kind: "corner",
       strand: collectStrand(corner),
       path: corner.path,
     })
   );
-
-  bindStrandAttributes(
-    groupTrack
-      .selectAll("trackCorners")
-      .data(bands)
-      .enter()
-      .append("path")
-      .attr("d", (d) => d.path)
-      .style("fill", (d) => strandOf(d).color)
-  ).append("svg:title")
 }
 
 // extract info about nodes from vg-json
@@ -3881,25 +3791,15 @@ function generateNodeWidth() {
     case "normal":
       nodes.forEach((node) => {
         node.width = node.sequenceLength;
-
-        // get width of node's text label by writing label, measuring it and removing label
-        svg
-          .append("text")
-          .attr("x", 0)
-          .attr("y", 100)
-          .attr("id", "dummytext")
-          .text(node.seq ? node.seq.substr(1) : "A")
-          .attr("font-family", fonts)
-          .attr("font-size", "14px")
-          .attr("fill", "black")
-          .style("pointer-events", "none");
-        // TODO: This assumes that svg is in the document.
-        let element = document.getElementById("dummytext");
-        if (element.getComputedTextLength) {
-          // We are on a platform where text length computation is possible (i.e. a real browser)
-          node.pixelWidth = Math.round(element.getComputedTextLength());
-        }
-        document.getElementById("dummytext").remove();
+        // The width of the node's text label. Upstream measures it by writing
+        // the label into the document and asking the browser; this fork has no
+        // document to write it into, so it computes the advance instead. The
+        // label is set in `fonts` — Courier New and monospace fallbacks — where
+        // every glyph is one advance wide, so the measurement is arithmetic
+        // rather than typography.
+        node.pixelWidth = Math.round(
+          (node.seq ? node.seq.length - 1 : 1) * MONOSPACE_ADVANCE_14PX
+        );
       });
       break;
     default:
@@ -4322,43 +4222,30 @@ function drawMismatches() {
 }
 
 function drawInsertion(x, y, seq, nodeY) {
-  svg
-    .append("text")
-    .attr("x", x)
-    .attr("y", y)
-    .text("*")
-    .attr("font-family", fonts)
-    .attr("font-size", "12px")
-    .attr("fill", "black")
-    .attr("nodeY", nodeY)
-    .append("svg:title")
-    .text(seq);
+  textOverlay(x, y, "*", { pointerEvents: true, extra: [["nodeY", nodeY]], title: seq });
 }
 
 function drawSubstitution(x1, x2, y, nodeY, seq) {
-  svg
-    .append("text")
-    .attr("x", x1)
-    .attr("y", y)
-    .text(seq)
-    .attr("font-family", fonts)
-    .attr("font-size", "12px")
-    .attr("fill", "black")
-    .attr("nodeY", nodeY)
-    .attr("rightX", x2)
+  textOverlay(x1, y, seq, {
+    pointerEvents: true,
+    extra: [["nodeY", nodeY], ["rightX", x2]],
+  });
 }
 
 function drawDeletion(x1, x2, y, nodeY) {
   // draw horizontal block
-  svg
-    .append("line")
-    .attr("x1", x1)
-    .attr("y1", y - 1)
-    .attr("x2", x2)
-    .attr("y2", y - 1)
-    .attr("stroke-width", READ_WIDTH)
-    .attr("stroke", "grey")
-    .attr("nodeY", nodeY)
+  bandCollector.overlay({
+    element: "line",
+    attributes: [
+      ["x1", x1],
+      ["y1", y - 1],
+      ["x2", x2],
+      ["y2", y - 1],
+      ["stroke-width", READ_WIDTH],
+      ["stroke", "grey"],
+      ["nodeY", nodeY],
+    ],
+  });
 }
 
 function filterReads(reads) {

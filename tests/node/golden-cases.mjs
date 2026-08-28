@@ -21,11 +21,14 @@ const generator = join(repoRoot, "seqtubemap", "generate-svg.mjs");
 //
 // Two sizes on purpose: the small one is legible in a diff, the large one carries
 // enough strands that a change to how strands are laid out or ordered shows up.
-// `nodeWidthOption` is "compressed" throughout — the endpoint's own default
-// (main.py:720), and the only width mode whose geometry is portable. "normal"
-// measures the segment's label with the platform's fonts, so its bytes differ between
-// a developer's machine and CI and cannot be goldened; the smoke test covers that
-// mode without asserting on bytes.
+// `nodeWidthOption` is "compressed" on all but the last case — the endpoint's own
+// default (main.py:720). "normal" is a live value of the same query parameter, and
+// it used to be ungoldenable: it measured each segment's label by writing it into
+// the emulated document and asking the browser, so the bytes depended on which
+// fonts the host had. #22 removed the browser and with it the measurement — the
+// label is monospace, so its width is its glyph count times one advance — which
+// makes the mode deterministic and therefore pinnable. `small-normal` is what
+// pins it, and it is the one case whose bytes that change moved.
 //
 // The third case renders the *same* input as `small` through the generator's
 // optional sixth argument, the PCLAI colour scheme. Production passes it whenever
@@ -49,6 +52,17 @@ export const cases = [
     // at a size that is still reasonable to commit.
     params: { spineNodes: 40, haplotypes: 120, seqLen: 12, seed: 7 },
     nodeWidthOption: "compressed",
+  },
+  {
+    ...small,
+    name: "small-normal",
+    inputName: small.name,
+    // The same input as `small`, at the other width. Sharing the input is the
+    // point again: the two documents differ only by the width option, so this
+    // case is exactly the geometry that `nodeWidthOption=normal` produces —
+    // including the segment labels and the finer ruler, which no other golden
+    // has, because "normal" is the only mode that draws either.
+    nodeWidthOption: "normal",
   },
   {
     ...small,

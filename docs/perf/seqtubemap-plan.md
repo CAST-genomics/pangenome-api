@@ -204,7 +204,7 @@ these, never a target in themselves.
 | --- | --- | --- | --- |
 | **#12** | stage timing ✅ *shipped, deployed, read* | measurement | none — no behaviour change |
 | **A** | `async def` → `def` ×2; lazy `TabixFile` | goal 1 | very low |
-| **B** | capture the d3 joins; derive SVG from band data; **delete jsdom + canvas** | goal 2 | low — see below |
+| **B** | capture the d3 joins; derive SVG from band data; **delete jsdom + canvas** ✅ *shipped to `main`* | goal 2 | low — see below |
 | **C** | floats not strings; binary body; `?format=bands` | goals 2, 3 | medium |
 | **E** | batch `GenerateWalksMC`'s per-node tabix fetch | goal 3 | unscoped — needs its own investigation |
 | **D** | delete the `vg` round trip | provisioning, not perf | low |
@@ -217,9 +217,13 @@ prevent the app from booting unless all three `.walk.gz` derivatives are present
 request that touches none of them. Both are server-wide, so this improves `/json` too —
 which also makes it the easiest PR in the programme for Cici to say yes to.
 
-**B — delete the browser.** Capture the d3 data joins rather than appending to a document,
-emit the SVG from the captured band data, and drop `jsdom` and `canvas` from
-`package.json` — two of five dependencies, present solely to feed `tubemap.js`.
+**B — delete the browser. ✅ Landed; the constraint held.** Capture the d3 data joins rather
+than appending to a document, emit the SVG from the captured band data, and drop `jsdom` and
+`canvas` from `package.json` — two of five dependencies, present solely to feed
+`tubemap.js`. Retained memory in `create()` went from 1,851.4 MB (95.0% of it DOM) to
+94.9 MB with no DOM at all, peak RSS from 2,446.5 MB to 472.5 MB, and the fixed per-request
+cost from ~0.56 s to ~0.13 s — and an input that died with `heap out of memory` at
+production's own 8 GB heap now renders. The record is [`increment-b.md`](./increment-b.md).
 
 The reason B is *low* risk and not medium: it is held **byte-compatible with `pgb`'s
 existing parser by design**. `parseBands.ts` requires `style="fill: rgb(R, G, B);

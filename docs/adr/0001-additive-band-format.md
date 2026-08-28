@@ -91,6 +91,20 @@ Dropping `color=`, `class=`, and the empty `<title>` children changes none of th
 a server-only change against an unchanged client, and `pgb` becomes its conformance test: a
 bad B shows up as an error card rather than as a diff nobody ran.
 
+> *Amended 2026-08-28: **B has landed**, and the constraint held.* The layout collects its
+> numbers into `seqtubemap/band-data.mjs` and `seqtubemap/emit-document.mjs` writes the
+> document from them; `jsdom` and `canvas` are gone from `package.json`, and no file the
+> endpoint runs imports either. The three removals are exactly the three named above and
+> nothing else: every committed golden and all five real subgraphs were checked to be
+> byte-identical to their old documents with `color=`, `class="track{id}"` and
+> `<title></title>` deleted, which is **16.2-19.8%** of the payload. The numbers this
+> predicted, measured: retained memory in `create()` **1,851.4 MB → 94.9 MB** and peak RSS
+> **2,446.5 MB → 472.5 MB** on `perf/fixtures/split-400.json`, where 95.0% of the before-side
+> figure was the emulated document and the after-side figure is all layout; the smallest
+> possible request **0.56 s → 0.13 s** warm; and `perf/fixtures/cross.json`, which died with
+> `heap out of memory` at production's own 8 GB heap, now renders a 240 MB document in 6.4 s.
+> The record is [`docs/perf/increment-b.md`](../perf/increment-b.md).
+
 **C** — the path builder emits floats rather than strings, the binary body appears, and
 `pgb`'s parser changes for the first time.
 
@@ -144,4 +158,16 @@ new format is how dead code becomes permanent.
 - **`seqtubemap/tubemap.js` is declared a fork.** It is an unmarked 4,000-line vendored copy
   of `vgteam/sequenceTubeMap`, carrying upstream's eslint header and no provenance. B
   removes its DOM sink, so the re-sync option is gone in fact; the header comment makes it
-  gone on paper too.
+  gone on paper too. *As of B this is past tense: the DOM sink is removed.*
+- **The document carries a handful of elements that are not bands.** The ruler — an axis,
+  its ticks and their labels — and, in `nodeWidthOption=normal`, one text label per segment.
+  They are not band data, so the collector keeps them as `overlays`: an element name and its
+  attributes, in document order. Production documents contain none of them, because a real
+  subgraph carries no reference offset; they exist so that the synthetic fixtures, which do,
+  still render. `?format=bands` has no reason to carry them.
+- **`nodeWidthOption=normal` measures its labels arithmetically.** It used to write the label
+  into the emulated document and ask for `getComputedTextLength`, which is the only thing
+  `canvas` was ever installed for. The label is set in a monospace face, so the width is the
+  glyph count times one advance — 8.401 px at 14 px, the same constant the other width modes
+  already use. It also makes that mode deterministic across machines, which it was not
+  before: it depended on which fonts the host had.

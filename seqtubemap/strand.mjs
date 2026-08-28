@@ -9,8 +9,9 @@
 //
 // This is the same rule as `truncateTrackName` in tubemap.js, which is where the
 // layout applies it (`getPclaiEntry`, tubemap.js:2563). It lives here as well
-// because tubemap.js cannot be imported without first standing up a config and a
-// jsdom window, and a name is not a thing that should cost a browser.
+// because tubemap.js cannot be imported without first standing up its config —
+// it used to cost a jsdom window too — and a name is not a thing that should
+// cost a layout engine.
 
 /**
  * The `sample#haplotype#contig` triple a strand is identified by.

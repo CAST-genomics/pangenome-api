@@ -1,17 +1,17 @@
-// The layout's band data, captured alongside the document it currently produces.
+// The layout's band data — which is now the only description of the picture
+// there is.
 //
-// The document that /seqtubemap returns is 93.7% emulated browser, and that
-// document exists only so the numbers the layout already held can be serialized
-// to text and parsed straight back into numbers by the client. Before it can be
-// removed, the numbers going into it have to be reachable — which is what
-// `getBandData()` makes them.
+// The document /seqtubemap returns used to be 93.7% emulated browser, built so
+// that the numbers the layout already held could be serialized to text and
+// parsed straight back into numbers by the client. #21 made those numbers
+// reachable; #22 deleted the browser, and `emit-document.mjs` writes the bytes
+// from them.
 //
-// Nothing observable changes yet, so the claim this file has to carry is not
-// "the data looks right" but "the data is enough": enough to rebuild the
-// document that is shipping today. It demonstrates that rather than asserting
-// it, by reconstructing the document from the captured data alone
-// (reconstruct-document.mjs, which is given the data and nothing else) and
-// comparing the result against the render byte for byte.
+// So the claim this file carries is no longer "the data is enough" — the
+// document could not be written at all if it were not. What is worth checking
+// is what the data *is*: plain, transportable, in paint order, with the
+// per-band constants said once, and describing a document whose element counts
+// match it.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -27,7 +27,7 @@ import {
   regionFor,
   repoRoot,
 } from "./golden-cases.mjs";
-import { reconstructDocument } from "./reconstruct-document.mjs";
+import { emitDocument } from "../../seqtubemap/emit-document.mjs";
 
 // The smallest of the committed real subgraphs, named for the region it was
 // fetched for — which is where the render gets its coordinates, as the endpoint
@@ -58,41 +58,21 @@ for (const testCase of cases) {
   const { document, bandData } = rendered.get(testCase.name);
 
   test(`the ${testCase.name} render still produces its golden document`, () => {
-    // The capture is meant to change nothing about the output, and this render
-    // goes through the same code the golden test drives through the CLI. If the
-    // two ever disagree, the reconstruction below is being checked against the
-    // wrong oracle, and it should say so here rather than there.
+    // This render goes through the same code the golden test drives through the
+    // CLI. If the two ever disagree, everything below is being checked against
+    // the wrong oracle, and it should say so here rather than there.
     assert.equal(document, readFileSync(goldenPath(testCase), "utf8"));
   });
 
-  test(`the ${testCase.name} document can be rebuilt from its band data alone`, () => {
-    // This is the acceptance criterion the ticket asks to be demonstrated
-    // rather than asserted: everything below comes out of the band data, and if
-    // anything needed to draw the picture were missing from it, these bytes
-    // could not be produced.
-    const rebuilt = reconstructDocument(bandData);
-    assert.ok(
-      document.startsWith(rebuilt),
-      describeDifference(document, rebuilt),
-    );
-
-    // What the reconstruction stops short of is the ruler, which is not band
-    // data: the axis line, its ticks and their labels. Everything the band data
-    // covers has to be inside the prefix, so the tail must carry no band, no
-    // segment box and no group of either.
-    const tail = document.slice(rebuilt.length);
-    assert.equal(tail.slice(-6), "</svg>");
-    for (const marker of ["<g ", "trackID=", "sequence="]) {
-      assert.ok(!tail.includes(marker), `${marker} appears after the reconstructed prefix`);
-    }
-  });
-
-  test(`the ${testCase.name} band data survives a round trip through JSON`, () => {
-    // The point of capturing the data is to be able to hand it to somebody
-    // else. Plain numbers and strings — no DOM nodes, no live references into
-    // the layout, nothing that only means something inside this process.
-    const rebuilt = reconstructDocument(JSON.parse(JSON.stringify(bandData)));
-    assert.equal(rebuilt, reconstructDocument(bandData));
+  test(`the ${testCase.name} document survives a round trip through JSON`, () => {
+    // The document is written from the band data, so this is not a check that
+    // the data is *sufficient* — it could not be written otherwise. It is a
+    // check that the data is transportable: plain numbers and strings, no live
+    // references into the layout, nothing that only means something inside this
+    // process. #24 puts this very data on the wire, and a value that does not
+    // survive JSON is a value that cannot go.
+    const shipped = emitDocument(JSON.parse(JSON.stringify(bandData)));
+    assert.ok(shipped === document, describeDifference(document, shipped));
   });
 
   test(`the ${testCase.name} band data has one strand row per strand`, () => {
@@ -115,10 +95,9 @@ for (const testCase of cases) {
   });
 
   test(`the ${testCase.name} band data is in paint order`, () => {
-    // Ordering is not incidental: bands are drawn in the order they appear, so
-    // a later band draws over an earlier one. The reconstruction above is the
-    // real check — it would not be byte-identical if the order were wrong — and
-    // this states the count the document and the data have to agree on.
+    // Ordering is not incidental: bands are written in the order they appear, so
+    // a later band draws over an earlier one. This states the count the document
+    // and the data have to agree on.
     const trackGroup = document.slice(
       document.indexOf('<g class="track">'),
       document.indexOf('<g class="node">'),
@@ -169,12 +148,13 @@ test("a strand's colour and placement are on the strand, not on every band", () 
   }
 });
 
-test("a real subgraph's document is rebuilt from its band data, in full", async () => {
+test("a real subgraph carries no overlays at all", async () => {
   // The synthetic fixtures above are shaped like a subgraph; this one is a
   // subgraph — 464 strands, fetched from the live server (see
-  // tests/fixtures/seqtubemap/README.md). It carries no ruler, which is what
-  // production documents look like, so here the reconstruction accounts for
-  // every byte of the document rather than for its leading ones.
+  // tests/fixtures/seqtubemap/README.md). It carries no reference offset, so it
+  // gets no ruler, and its document is bands and segment boxes and nothing
+  // else. That is what a production document looks like, and it is why the
+  // overlays are a footnote rather than a second format.
   const { document, bandData } = await renderTubeMap({
     inputFile: join(repoRoot, "tests", "fixtures", "seqtubemap", `${REAL_SUBGRAPH}.json`),
     start: 78771162,
@@ -182,9 +162,10 @@ test("a real subgraph's document is rebuilt from its band data, in full", async 
     nodeWidthOption: "compressed",
   });
 
-  const rebuilt = reconstructDocument(bandData);
-  assert.ok(document.startsWith(rebuilt), describeDifference(document, rebuilt));
-  assert.equal(document.slice(rebuilt.length), "</svg>");
+  assert.deepEqual(bandData.overlays, []);
+  // Nothing between the segment boxes' group and the end of the document: no
+  // ruler, no labels, nothing that is not a band or a box.
+  assert.ok(document.endsWith("</g></svg>"), "something is drawn after the segment boxes");
   assert.ok(bandData.strands.length > 400, `only ${bandData.strands.length} strands`);
 });
 
@@ -233,10 +214,7 @@ test("an inversion's corners and vertical rectangles are captured too", async ()
     assert.ok(document.includes(`trackName="${strand.name}"`));
   }
 
-  assert.ok(
-    document.startsWith(reconstructDocument(bandData)),
-    describeDifference(document, reconstructDocument(bandData)),
-  );
+  assert.equal(document, emitDocument(bandData));
 });
 
 test("a strand's PCLAI placement reaches the strand table", async () => {
@@ -276,8 +254,6 @@ test("a strand's PCLAI placement reaches the strand table", async () => {
 
   // And the document is still exactly what the table says it is — including the
   // "None" it writes where a placement is absent.
-  const rebuilt = reconstructDocument(bandData);
-  assert.ok(document.startsWith(rebuilt), describeDifference(document, rebuilt));
   assert.ok(document.includes(`pclaiX="1.5" pclaiY="-2.5" pclaiScore="0.875"`));
 });
 
@@ -290,10 +266,10 @@ function describeDifference(document, rebuilt) {
   while (at < document.length && at < rebuilt.length && document[at] === rebuilt[at]) at += 1;
   const context = 120;
   return (
-    `the reconstruction diverges from the document at byte ${at} ` +
+    `the two documents diverge at byte ${at} ` +
     `(${rebuilt.length} bytes rebuilt, ${document.length} in the document)\n` +
-    `  document:      ...${document.slice(at, at + context)}\n` +
-    `  reconstructed: ...${rebuilt.slice(at, at + context)}\n` +
-    "The band data is missing something the document says, or says it differently."
+    `  document: ...${document.slice(at, at + context)}\n` +
+    `  rebuilt:  ...${rebuilt.slice(at, at + context)}\n` +
+    "Something in the band data does not survive being written down and read back."
   );
 }

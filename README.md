@@ -53,7 +53,7 @@ read a committed vg JSON fixture. panCT is used for real if you
 have it — from the `tools.path` Step 5 sets, or from `PANCT_PATH` — and stubbed
 if you do not. Tests that shell out to `vg` skip when it is not installed, and
 so does the `/seqtubemap` endpoint test when `node_modules` is not installed —
-it renders a real tube map, which reaches Node through `jsdom` and `canvas`.
+it renders a real tube map, which reaches Node through `d3`.
 
 Both suites run in CI on every pull request (`.github/workflows/ci.yml`), where
 `vg` and panCT are installed and a skip is turned into a failure.

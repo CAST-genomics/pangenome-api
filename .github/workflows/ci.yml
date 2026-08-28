@@ -55,8 +55,8 @@ jobs:
           git -C "$PANCT_PATH/panCT" checkout --quiet "$PANCT_COMMIT"
 
       # The endpoint seam renders its tube map by shelling out to
-      # `node seqtubemap/generate-svg.mjs`, which imports jsdom and canvas, so
-      # the Python job needs the Node dependencies too.
+      # `node seqtubemap/generate-svg.mjs`, so the Python job needs the Node
+      # dependencies too.
       - uses: actions/setup-node@v4
         with:
           node-version: "24"

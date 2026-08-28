@@ -17,29 +17,16 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 import { assertDenseStrandIds } from "../../seqtubemap/band-data.mjs";
+import { installLayoutConfig } from "../../seqtubemap/layout-config.mjs";
 import { inputPath, realCases } from "./real-cases.mjs";
 
 /**
- * The layout, loaded the way `render.mjs` loads it: config first, then a window,
- * and only then the module. Nothing here renders — the reorder is pure — but
- * `tubemap.js` reaches for both at import time.
+ * The layout, loaded the way `render.mjs` loads it: config first, then the
+ * module. There is no window any more — #22 took the browser emulation out — but
+ * `tubemap.js` still reads its config at import time, so the order stands.
  */
 async function layout() {
-  const { JSDOM } = await import("jsdom");
-  globalThis["__sequence_tube_map_config"] ??= {
-    defaultHaplotypeColorPalette: { mainPalette: "reds", auxPalette: "blues" },
-    defaultReadColorPalette: { mainPalette: "reds", auxPalette: "blues" },
-    defaultGraphColorPalette: { mainPalette: "reds", auxPalette: "blues" },
-    nodeIntervalThreshold: 150,
-    coloredNodes: [],
-    DATA_SOURCES: [],
-    BACKEND_URL: "",
-  };
-  if (!globalThis.window) {
-    const dom = new JSDOM(`<!DOCTYPE html><body><svg id="mysvg"></svg></body>`);
-    globalThis.window = dom.window;
-    globalThis.document = dom.window.document;
-  }
+  installLayoutConfig();
   return import("../../seqtubemap/tubemap.js");
 }
 

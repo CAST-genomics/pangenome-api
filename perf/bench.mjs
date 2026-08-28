@@ -74,7 +74,11 @@ function table(title, rows, axisKey) {
       continue;
     }
     const s = r.rec.stages;
-    const fixed = s["import:jsdom+canvas"] + s["jsdom:construct-dom"] + s["import:tubemap.js"];
+    // The fixed floor, which since #22 is the `tubemap.js` import and nothing
+    // else: `import:jsdom+canvas` and `jsdom:construct-dom` — 437.6 ms and
+    // 109.0 ms of the 722 ms measured in docs/perf/seqtubemap-latency.md §2 —
+    // are gone with the browser emulation that produced them.
+    const fixed = s["import:tubemap.js"];
     const bloat = (r.rec.output.svgBytes / r.rec.input.bytes).toFixed(1);
     console.log([
       String(r.axisValue).padEnd(11),
