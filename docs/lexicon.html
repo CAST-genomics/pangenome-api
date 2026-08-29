@@ -91,6 +91,14 @@
   /* ---------- the plate ---------- */
 
   figure { margin: 2.5rem 0 0; }
+  .hero {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(92rem, calc(100vw - 5rem));
+    margin: 3rem 0 0;
+  }
+  .hero .plate { padding: .8rem .8rem .5rem; }
   .plate {
     background: var(--plate);
     color: var(--plate-ink);
@@ -111,12 +119,17 @@
 
   /* ---------- annotation type, inside the plate ---------- */
 
-  .a-word { font-family: var(--grotesk); font-size: 11px; font-weight: 600; letter-spacing: .01em; }
-  .a-gloss { font-family: var(--serif); font-size: 9.5px; font-style: italic; }
-  .a-lead { stroke: #1A1D1A; stroke-width: .7; fill: none; }
-  .a-frame { stroke: #1A1D1A; stroke-width: .7; fill: none; stroke-dasharray: 4 3; opacity: .45; }
-  .a-brace { stroke: #1A1D1A; stroke-width: .7; fill: none; }
+  .a-word { font-family: var(--grotesk); font-size: 14px; font-weight: 600; letter-spacing: .01em; }
+  .a-gloss { font-family: var(--serif); font-size: 12px; font-style: italic; }
+  .a-lead { stroke: #1A1D1A; stroke-width: 1.4; fill: none; }
+  .a-frame { stroke: #1A1D1A; stroke-width: 1.4; fill: none; stroke-dasharray: 9 7; opacity: .45; }
+  .a-brace { stroke: #1A1D1A; stroke-width: 1.4; fill: none; }
   .a-dim { fill: #585E59; }
+
+  /* The generator's markup is used verbatim, but it is drawn at 2.2x so the tube
+     map fills the plate. Its one piece of type — the "0" on the region ruler —
+     is counter-scaled here so it stays the size the generator drew it. */
+  .plate .fig-scale text { font-size: 5.45px; }
 
   /* Every band gets a white seam, so two bands of the same colour that touch
      still read as two shapes. This is what makes the count of fourteen visible. */
@@ -203,56 +216,61 @@
     bands.</p>
   </header>
 
-  <figure>
+  <figure class="hero">
     <div class="plate">
-      <svg viewBox="-240 -95 800 315" role="img"
+      <svg viewBox="-182 -163 1072 596" role="img"
            aria-label="A sequence tube map with six segment boxes and four coloured haplotype ribbons, annotated with the terms region, pivot strand, strand, band, segment, sequence tube map, and node.">
 
         <!-- the node: everything the tube map draws is inside one -->
-        <rect class="a-frame" x="-14" y="-46" width="350" height="236" />
+        <rect class="a-frame" x="-30.8" y="-101.2" width="770" height="475.2" />
 
         <!-- ============ real generator output, unaltered ============ -->
+        <g class="fig-scale" transform="scale(2.2)">
         <g class="track"><rect x="0" y="65" width="48" height="15" style="fill: rgb(107, 174, 214); fill-opacity: 1;"></rect><rect x="101.28571428571429" y="90" width="26" height="15" style="fill: rgb(107, 174, 214); fill-opacity: 1;"></rect><rect x="189.14285714285714" y="65" width="136.28571428571425" height="15" style="fill: rgb(107, 174, 214); fill-opacity: 1;"></rect><rect x="0" y="50" width="325.4285714285714" height="15" style="fill: rgb(158, 202, 225); fill-opacity: 1;"></rect><rect x="0" y="35" width="127.28571428571429" height="15" style="fill: rgb(198, 219, 239); fill-opacity: 1;"></rect><rect x="189.14285714285714" y="-5" width="28" height="15" style="fill: rgb(198, 219, 239); fill-opacity: 1;"></rect><rect x="270.4285714285714" y="20" width="55" height="15" style="fill: rgb(198, 219, 239); fill-opacity: 1;"></rect><rect x="0" y="20" width="127.28571428571429" height="15" style="fill: rgb(252, 187, 161); fill-opacity: 1;"></rect><rect x="189.14285714285714" y="35" width="136.28571428571425" height="15" style="fill: rgb(252, 187, 161); fill-opacity: 1;"></rect><path d="M 47 65 C 74.64285714285714 65 74.64285714285714 90 102.28571428571429 90 V 105 C 74.64285714285714 105 74.64285714285714 80 47 80 Z" style="fill: rgb(107, 174, 214); fill-opacity: 1;"></path><path d="M 126.28571428571429 35 C 158.21428571428572 35 158.21428571428572 -5 190.14285714285714 -5 V 10 C 158.21428571428572 10 158.21428571428572 50 126.28571428571429 50 Z" style="fill: rgb(198, 219, 239); fill-opacity: 1;"></path><path d="M 126.28571428571429 20 C 158.21428571428572 20 158.21428571428572 35 190.14285714285714 35 V 50 C 158.21428571428572 50 158.21428571428572 35 126.28571428571429 35 Z" style="fill: rgb(252, 187, 161); fill-opacity: 1;"></path><path d="M 126.28571428571429 90 C 158.21428571428572 90 158.21428571428572 65 190.14285714285714 65 V 80 C 158.21428571428572 80 158.21428571428572 105 126.28571428571429 105 Z" style="fill: rgb(107, 174, 214); fill-opacity: 1;"></path><path d="M 216.14285714285714 -5 C 243.78571428571428 -5 243.78571428571428 20 271.4285714285714 20 V 35 C 243.78571428571428 35 243.78571428571428 10 216.14285714285714 10 Z" style="fill: rgb(198, 219, 239); fill-opacity: 1;"></path></g><g class="node"><path id="1" d="M 11 20 Q 11 11 20 11 L 47 11 Q 56 11 56 20 L 56 80 Q 56 89 47 89 L 20 89 Q 11 89 11 80 L 11 20" style="fill: rgb(255, 255, 255); fill-opacity: 0.4; stroke: rgb(0, 0, 0); stroke-width: 2px;"></path><path id="2" d="M 92.28571428571429 20 Q 92.28571428571429 11 101.28571428571429 11 L 126.28571428571429 11 Q 135.28571428571428 11 135.28571428571428 20 L 135.28571428571428 65 Q 135.28571428571428 74 126.28571428571428 74 L 101.28571428571428 74 Q 92.28571428571428 74 92.28571428571428 65 L 92.28571428571428 20" style="fill: rgb(255, 255, 255); fill-opacity: 0.4; stroke: rgb(0, 0, 0); stroke-width: 2px;"></path><path id="3" d="M 92.28571428571429 90 Q 92.28571428571429 81 101.28571428571429 81 L 123.28571428571429 81 Q 132.28571428571428 81 132.28571428571428 90 L 132.28571428571428 105 Q 132.28571428571428 114 123.28571428571428 114 L 101.28571428571428 114 Q 92.28571428571428 114 92.28571428571428 105 L 92.28571428571428 90" style="fill: rgb(255, 255, 255); fill-opacity: 0.4; stroke: rgb(0, 0, 0); stroke-width: 2px;"></path><path id="4" d="M 180.14285714285714 35 Q 180.14285714285714 26 189.14285714285714 26 L 216.14285714285714 26 Q 225.14285714285714 26 225.14285714285714 35 L 225.14285714285714 80 Q 225.14285714285714 89 216.14285714285714 89 L 189.14285714285714 89 Q 180.14285714285714 89 180.14285714285714 80 L 180.14285714285714 35" style="fill: rgb(255, 255, 255); fill-opacity: 0.4; stroke: rgb(0, 0, 0); stroke-width: 2px;"></path><path id="5" d="M 180.14285714285714 -5 Q 180.14285714285714 -14 189.14285714285714 -14 L 213.14285714285714 -14 Q 222.14285714285714 -14 222.14285714285714 -5 L 222.14285714285714 10 Q 222.14285714285714 19 213.14285714285714 19 L 189.14285714285714 19 Q 180.14285714285714 19 180.14285714285714 10 L 180.14285714285714 -5" style="fill: rgb(255, 255, 255); fill-opacity: 0.4; stroke: rgb(0, 0, 0); stroke-width: 2px;"></path><path id="6" d="M 261.4285714285714 20 Q 261.4285714285714 11 270.4285714285714 11 L 304.4285714285714 11 Q 313.4285714285714 11 313.4285714285714 20 L 313.4285714285714 80 Q 313.4285714285714 89 304.4285714285714 89 L 270.4285714285714 89 Q 261.4285714285714 89 261.4285714285714 80 L 261.4285714285714 20" style="fill: rgb(255, 255, 255); fill-opacity: 0.4; stroke: rgb(0, 0, 0); stroke-width: 2px;"></path></g><path d="M8 -36 L16 -26 L24 -36" stroke-width="0" fill="#FFFE3A" stroke="none"></path><path d="M297.8035714285714 -36 L305.8035714285714 -26 L313.8035714285714 -36" stroke-width="0" fill="#FFFE3A" stroke="none"></path><line x1="16" y1="-31" x2="305.8035714285714" y2="-31" stroke-width="4" stroke="#FFFE3A"></line><line x1="16" y1="-25" x2="308.4285714285714" y2="-25" stroke-width="1" stroke="black"></line><line x1="16" y1="-30" x2="16" y2="-20" stroke-width="1" stroke="black"></line><line x1="308.4285714285714" y1="-30" x2="308.4285714285714" y2="-20" stroke-width="1" stroke="black"></line><text text-anchor="start" x="16" y="-33" font-family="&quot;Courier New&quot;, &quot;Courier&quot;, &quot;Lucida Console&quot;, monospace" font-size="12px" fill="black">0</text>
+        </g>
         <!-- ============ end generator output ============ -->
 
         <!-- region -->
-        <path class="a-lead" d="M 40 -56 L 90 -34" />
-        <text class="a-word" x="16" y="-66">region</text>
-        <text class="a-gloss a-dim" x="16" y="-78">the chrom : start – end that was asked for</text>
+        <path class="a-lead" d="M 118 -122 L 198 -74.8" />
+        <text class="a-word" x="60" y="-132">region</text>
+        <text class="a-gloss a-dim" x="60" y="-152">the chrom : start – end that was asked for</text>
 
         <!-- pivot strand -->
-        <line class="a-lead" x1="-22" y1="27.5" x2="-2" y2="27.5" />
-        <text class="a-word" x="-26" y="25" text-anchor="end">pivot strand</text>
-        <text class="a-gloss a-dim" x="-26" y="37" text-anchor="end">GRCh38 — everything else is arranged around it</text>
+        <line class="a-lead" x1="-46" y1="60.5" x2="-4.4" y2="60.5" />
+        <text class="a-word" x="-52" y="57" text-anchor="end">pivot strand</text>
+        <text class="a-gloss a-dim" x="-52" y="73" text-anchor="end">GRCh38 — everything else</text>
+        <text class="a-gloss a-dim" x="-52" y="87" text-anchor="end">is arranged around it</text>
 
         <!-- segment -->
-        <line class="a-lead" x1="-22" y1="100" x2="90" y2="100" />
-        <text class="a-word" x="-26" y="97.5" text-anchor="end">segment</text>
-        <text class="a-gloss a-dim" x="-26" y="109.5" text-anchor="end">one stretch of sequence — here, ACGTCA</text>
+        <line class="a-lead" x1="-46" y1="220" x2="198" y2="220" />
+        <text class="a-word" x="-52" y="216" text-anchor="end">segment</text>
+        <text class="a-gloss a-dim" x="-52" y="232" text-anchor="end">one stretch of sequence</text>
+        <text class="a-gloss a-dim" x="-52" y="246" text-anchor="end">— here, ACGTCA</text>
 
         <!-- strand -->
-        <line class="a-lead" x1="366" y1="42.5" x2="327" y2="42.5" />
-        <text class="a-word" x="370" y="40">strand</text>
-        <text class="a-gloss a-dim" x="370" y="52">one haplotype's whole route, end to end</text>
+        <line class="a-lead" x1="760" y1="93.5" x2="719.4" y2="93.5" />
+        <text class="a-word" x="766" y="89.5">strand</text>
+        <text class="a-gloss a-dim" x="766" y="105.5">one haplotype&#8217;s whole</text>
+        <text class="a-gloss a-dim" x="766" y="119.5">route, end to end</text>
 
         <!-- band, straight -->
-        <line class="a-lead" x1="366" y1="72.5" x2="327" y2="72.5" />
-        <text class="a-word" x="370" y="70">band</text>
-        <text class="a-gloss a-dim" x="370" y="82">one piece of one strand</text>
+        <line class="a-lead" x1="760" y1="159.5" x2="719.4" y2="159.5" />
+        <text class="a-word" x="766" y="155.5">band</text>
+        <text class="a-gloss a-dim" x="766" y="171.5">one piece of one strand</text>
 
         <!-- band, curved -->
-        <path class="a-lead" d="M 120 134 L 156 96" />
-        <text class="a-word" x="108" y="146" text-anchor="middle">band</text>
-        <text class="a-gloss a-dim" x="108" y="158" text-anchor="middle">a curve is one too</text>
+        <path class="a-lead" d="M 300 272 L 343.2 211.2" />
+        <text class="a-word" x="300" y="288" text-anchor="middle">band</text>
+        <text class="a-gloss a-dim" x="300" y="304" text-anchor="middle">a curve is one too</text>
 
         <!-- sequence tube map -->
-        <path class="a-brace" d="M 0 166 L 0 172 L 325.43 172 L 325.43 166" />
-        <text class="a-word" x="162.7" y="186" text-anchor="middle">sequence tube map</text>
+        <path class="a-brace" d="M 0 318 L 0 328 L 715.9 328 L 715.9 318" />
+        <text class="a-word" x="358" y="352" text-anchor="middle">sequence tube map</text>
 
         <!-- node -->
-        <line class="a-lead" x1="330" y1="190" x2="330" y2="197" />
-        <text class="a-word" x="336" y="206" text-anchor="end">node</text>
-        <text class="a-gloss a-dim" x="336" y="218" text-anchor="end">the whole picture is the inside of one</text>
+        <line class="a-lead" x1="730" y1="374" x2="730" y2="390" />
+        <text class="a-word" x="739" y="408" text-anchor="end">node</text>
+        <text class="a-gloss a-dim" x="739" y="424" text-anchor="end">the whole picture is the inside of one</text>
 
       </svg>
     </div>
