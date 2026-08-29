@@ -3,7 +3,8 @@
   "scripts": {
     "test": "node --max-old-space-size=8192 --test \"tests/node/**/*.test.mjs\"",
     "baseline:golden": "node tests/node/baseline-golden.mjs",
-    "baseline:bands": "node --max-old-space-size=8192 tests/node/baseline-bands.mjs"
+    "baseline:bands": "node --max-old-space-size=8192 tests/node/baseline-bands.mjs",
+    "render:fixtures": "node --max-old-space-size=8192 tests/node/render-fixtures.mjs"
   },
   "dependencies": {
     "d3": "^7.9.0",

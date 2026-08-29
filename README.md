@@ -72,6 +72,33 @@ When a change is *meant* to alter the output, re-baseline deliberately with
 Details, including why the fixtures are synthetic, are in
 [`tests/fixtures/tubemap-golden/README.md`](tests/fixtures/tubemap-golden/README.md).
 
+### Rendering the real subgraphs to look at
+
+```
+npm run render:fixtures                 # into ./rendered/
+npm run render:fixtures -- ~/somewhere  # into a directory of your choosing
+```
+
+Renders the five real subgraphs in [`tests/fixtures/seqtubemap/`](tests/fixtures/seqtubemap/)
+to SVG documents, twice each — once plain, once with the region's PCLAI colour
+scheme, which is what production passes whenever `minigraphnode` is set. Ten
+documents, 0.13 MB to 12.58 MB, in about two seconds.
+
+**It needs no server, no graph data, no `vg` and no Docker.** The fixtures include
+the vg JSON each region produces, which is the output of the entire Python half
+of the pipeline, so this runs exactly the Node stage `/seqtubemap` spawns. It
+goes through the same `real-cases.mjs` the band test uses, so a document rendered
+here cannot come from a different code path than the one under test.
+
+Use it when you want to *look* at a tube map: `pgb` can load a static document, so
+these are what to point a dev harness at when the live server is unavailable or
+its deploy is behind `main` — see [`docs/releasing.md`](docs/releasing.md).
+Confirming a document renders is the one thing the byte comparisons in the test
+suite cannot do for you.
+
+The outputs are large — 57 MB for the ten — and `*.svg*` is gitignored repo-wide,
+so they stay out of commits wherever they are written.
+
 ## The vendored tube map layout
 
 `seqtubemap/` holds a **vendored fork** of the sequence tube map layout, not a
