@@ -187,6 +187,37 @@ Two things came out of reading that parser, both recorded rather than acted on h
   predates #22 in both directions. Filed as
   [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52).
 
+## Rendered, and looked at
+
+Everything above establishes that the documents are *correct* — the right bytes, and arrays
+`pgb` recovers identically from both sides. None of it establishes that they *render*, which
+is the one thing a byte comparison cannot reach.
+
+On 2026-08-29 all five real subgraphs were rendered on a developer machine with
+`npm run render:fixtures` — no server, no graph data, no `vg`, no Docker — and the resulting
+documents loaded into `pgb`'s static-document dev harness.
+
+| document | bytes | strands | bands | render |
+| --- | ---: | ---: | ---: | ---: |
+| chr8 90 bp | 138,340 | 464 | 592 | 0.12 s |
+| chr1 600 bp | 2,352,410 | 369 | 8,089 | 0.07 s |
+| chr8 1.4 kb | 3,757,885 | 463 | 13,246 | 0.11 s |
+| **chr1 8.0 kb** | **10,408,507** | 383 | 35,020 | **0.38 s** |
+| **chr1 4.2 kb, 1,201 strands** | **13,122,049** | 1,201 | 44,795 | **0.27 s** |
+
+Each was also rendered with its PCLAI colour scheme, the argument production passes whenever
+`minigraphnode` is set; those are 0.1-0.6% larger and are the variants a real node click
+produces.
+
+**The two at the fetch ceiling render correctly.** Those are the bold rows — the regime #13
+exists for, and the sizes that fail in production. Confirmed visually, not by diff.
+
+This closes the correctness argument for #22 at both ends of the size range. It says nothing
+about production latency: these render in tenths of a second here because nothing local pays
+for extraction, and because the heap failure mode is gone. What a researcher actually
+experiences still depends on the deploy — `release..main` is where that queue lives
+([`releasing.md`](../releasing.md)).
+
 ## What was not measured
 
 The endpoint on the server. `generate_svg` is 8.2 s of a 38.9 s 10 kb request there, against a

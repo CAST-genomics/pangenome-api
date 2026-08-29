@@ -1,0 +1,959 @@
+<title>Two Ways to Draw a Tube Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --paper:     #F7F7F4;
+    --ink:       #1A1D1A;
+    --ink-soft:  #585E59;
+    --rule:      #D3D6D0;
+    --plate:     #FCFCFA;
+    --plate-ink: #1A1D1A;
+    --old:       #8F3222;
+    --new:       #1D6B5B;
+    --old-wash:  #F0E0DB;
+    --new-wash:  #DDEAE5;
+
+    --measure: 62ch;
+    --s--1: clamp(.80rem, .78rem + .10vw, .86rem);
+    --s-0:  clamp(1.06rem, 1.02rem + .18vw, 1.18rem);
+    --s-1:  clamp(1.26rem, 1.16rem + .45vw, 1.5rem);
+    --s-2:  clamp(1.5rem, 1.28rem + .95vw, 2.05rem);
+    --s-3:  clamp(2.0rem, 1.55rem + 2.0vw, 3.15rem);
+
+    --grotesk: "Archivo", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --serif:   "EB Garamond", ui-serif, Georgia, Cambria, serif;
+    --mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #121513; --ink: #E9EBE6; --ink-soft: #9BA29C; --rule: #2A2E2A;
+      --old: #CC7259; --new: #63AE99;
+      --old-wash: #3A2620; --new-wash: #1E322C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #121513; --ink: #E9EBE6; --ink-soft: #9BA29C; --rule: #2A2E2A;
+    --old: #CC7259; --new: #63AE99;
+    --old-wash: #3A2620; --new-wash: #1E322C;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: var(--s-0);
+    line-height: 1.58;
+    margin: 0;
+    padding: 0 1.5rem 7rem;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 62rem; margin: 0 auto; }
+
+  header { padding: 5rem 0 0; }
+  .eyebrow {
+    font-family: var(--grotesk); font-size: var(--s--1); font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft);
+    margin: 0 0 1.5rem;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 500; font-size: var(--s-3);
+    line-height: 1.04; letter-spacing: -.015em; text-wrap: balance;
+    margin: 0 0 1.5rem; max-width: 16ch;
+  }
+  .lede { font-size: var(--s-1); line-height: 1.45; color: var(--ink-soft); margin: 0 0 1rem; max-width: 54ch; }
+  .dateline { font-family: var(--grotesk); font-size: var(--s--1); color: var(--ink-soft); margin: 2rem 0 0; }
+
+  h2 {
+    font-family: var(--grotesk); font-weight: 500; font-size: var(--s-2);
+    line-height: 1.14; letter-spacing: -.015em; text-wrap: balance;
+    margin: 4.5rem 0 1.1rem; padding-top: 1.1rem; border-top: 1px solid var(--rule);
+  }
+  h3 {
+    font-family: var(--grotesk); font-weight: 600; font-size: var(--s-0);
+    letter-spacing: -.005em; margin: 2.2rem 0 .5rem;
+  }
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+  strong { font-weight: 500; }
+  code { font-family: var(--mono); font-size: .82em; overflow-wrap: anywhere; }
+  a { color: inherit; text-decoration-color: var(--rule); text-underline-offset: .18em; }
+  a:hover { text-decoration-color: currentColor; }
+  a:focus-visible { outline: 2px solid var(--old); outline-offset: 3px; }
+
+  .pull {
+    font-size: var(--s-1); line-height: 1.34; max-width: 30ch;
+    border-left: 2px solid var(--old); padding-left: 1rem;
+    margin: 2rem 0 2rem; color: var(--ink);
+  }
+
+  /* ---------- plates ---------- */
+  figure { margin: 2.6rem 0 0; }
+  .plate {
+    background: var(--plate); color: var(--plate-ink);
+    border: 1px solid var(--rule); padding: 1.4rem 1.1rem 1rem;
+    overflow-x: auto;
+  }
+  .plate svg { display: block; width: 100%; height: auto; min-width: 42rem; }
+  figcaption {
+    font-family: var(--grotesk); font-size: var(--s--1); line-height: 1.55;
+    color: var(--ink-soft); margin-top: .9rem; max-width: 74ch;
+  }
+  figcaption b { color: var(--ink); font-weight: 500; }
+
+  /* ---------- tables ---------- */
+  .tbl-scroll { overflow-x: auto; margin: 2rem 0 0; }
+  table { border-collapse: collapse; width: 100%; min-width: 30rem; font-family: var(--grotesk); font-size: var(--s--1); }
+  th {
+    text-align: left; font-weight: 500; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-soft); font-size: .82em; padding: 0 .9rem .55rem 0;
+    border-bottom: 1px solid var(--ink);
+  }
+  td { padding: .58rem .9rem .58rem 0; border-bottom: 1px solid var(--rule); vertical-align: baseline; }
+  th.n, td.n { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); padding-right: 0; }
+  td.n { font-size: .95em; }
+  td.was { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--old); }
+  td.now { color: var(--new); font-weight: 500; }
+  caption { caption-side: bottom; text-align: left; font-family: var(--grotesk); font-size: var(--s--1); color: var(--ink-soft); padding-top: .8rem; max-width: 74ch; }
+
+  /* ---------- the step ledger ---------- */
+  .steps { margin: 2.4rem 0 0; display: grid; gap: 0; }
+  .step {
+    display: grid; grid-template-columns: 2.4rem 1fr; gap: 1.1rem;
+    padding: 1.3rem 0; border-top: 1px solid var(--rule);
+  }
+  .step:last-child { border-bottom: 1px solid var(--rule); }
+  .step .letter {
+    font-family: var(--grotesk); font-weight: 600; font-size: var(--s-1);
+    line-height: 1.1; color: var(--old);
+  }
+  .step.done .letter { color: var(--new); }
+  .step h3 { margin: 0 0 .35rem; }
+  .step p { margin: 0; font-size: .96em; max-width: 60ch; }
+  .chip {
+    display: inline-block; font-family: var(--grotesk); font-size: .68rem;
+    font-weight: 500; letter-spacing: .1em; text-transform: uppercase;
+    padding: .18rem .5rem; margin-left: .55rem; vertical-align: .12em;
+    border: 1px solid currentColor;
+  }
+  .chip.built { color: var(--new); background: var(--new-wash); }
+  .chip.next  { color: var(--old); background: var(--old-wash); }
+  .chip.later { color: var(--ink-soft); }
+
+  /* ---------- closing note ---------- */
+  .note {
+    margin: 3rem 0 0; padding: 1.3rem 1.4rem;
+    background: var(--old-wash); border-left: 2px solid var(--old);
+  }
+  .note p { margin: 0; max-width: 58ch; font-size: .98em; }
+  .note p + p { margin-top: .8rem; }
+
+  footer {
+    margin-top: 5rem; padding-top: 1.2rem; border-top: 1px solid var(--rule);
+    font-family: var(--grotesk); font-size: var(--s--1); color: var(--ink-soft);
+  }
+  footer ul { list-style: none; padding: 0; margin: .6rem 0 0; display: grid; gap: .35rem; }
+
+  @media (max-width: 40rem) {
+    h1 { max-width: none; }
+    .step { grid-template-columns: 1.8rem 1fr; gap: .8rem; }
+  }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">PangenomeAPI &middot; sequence tube maps</p>
+  <h1>Two Ways to Draw a Tube Map</h1>
+  <p class="lede">A researcher clicks one spot on the pangenome and asks to see inside it.
+  Here is what the server used to do to answer that, what it cost, and what it does
+  instead.</p>
+  <p class="dateline">Written 2026-08-28 &middot; every number on this page is measured, and each one says where it was measured</p>
+</header>
+
+<h2>The picture being asked for</h2>
+
+<p>The Pangenome Browser draws a whole genome graph in three dimensions. Each vertex of
+that graph is a <strong>node</strong> &mdash; one stretch of DNA. Click a node and you ask
+to look <em>inside</em> it: the <strong>sequence tube map</strong>, a base-by-base picture
+of how several hundred people's genomes differ across that stretch.</p>
+
+<p>Three words carry the rest of this page. A <strong>segment</strong> is one small piece
+of sequence inside the node. A <strong>strand</strong> is one person's haplotype threaded
+through those segments &mdash; there are typically 464 of them. A <strong>band</strong> is
+the atomic thing that gets drawn: one strand crossing one slice of the picture. A single
+tube map is tens of thousands of bands. (Each of these is pointed at, on a real map, in
+<a href="https://claude.ai/code/artifact/eb3ad4a1-d1cb-44b9-a3b8-7c6e7cc12726">the illustrated lexicon</a>.)</p>
+
+<p>The server's job is to work out where every band goes, and to get those numbers to the
+browser. That is the whole assignment. What follows is a story about how far the numbers
+travelled to get there.</p>
+
+<h2>The old way, in one picture</h2>
+
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 880 322" role="img" aria-label="The old pipeline computes band positions as numbers, converts them to text inside an invisible browser, sends ten megabytes of text, and the app converts the text back into the same numbers. The new pipeline sends the numbers directly.">
+      <defs>
+        <marker id="ar-old" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#8F3222"/>
+        </marker>
+        <marker id="ar-new" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#1D6B5B"/>
+        </marker>
+      </defs>
+
+      <!-- OLD LANE -->
+      <text x="0" y="16" font-family="Archivo, sans-serif" font-size="11" font-weight="600" letter-spacing="1.4" fill="#8F3222">BEFORE</text>
+      <text x="62" y="16" font-family="EB Garamond, serif" font-size="12" font-style="italic" fill="#585E59">120 seconds and 10 MB, for a 10,000-base region</text>
+
+      <rect x="0" y="34" width="176" height="66" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+      <text x="88" y="61" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">The layout works out</text>
+      <text x="88" y="77" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">where each band goes</text>
+      <text x="88" y="93" text-anchor="middle" font-family="EB Garamond, serif" font-size="11" font-style="italic" fill="#585E59">as numbers</text>
+
+      <line x1="176" y1="67" x2="228" y2="67" stroke="#8F3222" stroke-width="1.3" marker-end="url(#ar-old)"/>
+      <text x="202" y="58" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" fill="#8F3222">writes</text>
+
+      <rect x="232" y="34" width="176" height="66" fill="#F0E0DB" stroke="#8F3222" stroke-width="1"/>
+      <text x="320" y="61" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="600" fill="#8F3222">An invisible browser</text>
+      <text x="320" y="77" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#8F3222">holds them as text</text>
+      <text x="320" y="93" text-anchor="middle" font-family="EB Garamond, serif" font-size="11" font-style="italic" fill="#8F3222">93.7% of the memory</text>
+
+      <line x1="408" y1="67" x2="460" y2="67" stroke="#8F3222" stroke-width="1.3" marker-end="url(#ar-old)"/>
+      <text x="434" y="58" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" fill="#8F3222">sends</text>
+
+      <rect x="464" y="34" width="176" height="66" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+      <text x="552" y="61" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">10 MB of text</text>
+      <text x="552" y="77" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">crosses the network</text>
+      <text x="552" y="93" text-anchor="middle" font-family="EB Garamond, serif" font-size="11" font-style="italic" fill="#585E59">41&ndash;47% of it repetition</text>
+
+      <line x1="640" y1="67" x2="692" y2="67" stroke="#8F3222" stroke-width="1.3" marker-end="url(#ar-old)"/>
+      <text x="666" y="58" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" fill="#8F3222">re-reads</text>
+
+      <rect x="696" y="34" width="176" height="66" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+      <text x="784" y="61" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">The app pulls the</text>
+      <text x="784" y="77" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">numbers back out</text>
+      <text x="784" y="93" text-anchor="middle" font-family="EB Garamond, serif" font-size="11" font-style="italic" fill="#585E59">the same numbers</text>
+
+      <!-- the round trip brace -->
+      <path d="M 88 112 L 88 128 L 784 128 L 784 112" fill="none" stroke="#8F3222" stroke-width="1" stroke-dasharray="4 3"/>
+      <text x="436" y="146" text-anchor="middle" font-family="EB Garamond, serif" font-size="13" font-style="italic" fill="#8F3222">the same numbers, at both ends &mdash; everything between them is packing and unpacking</text>
+
+      <line x1="0" y1="178" x2="880" y2="178" stroke="#D3D6D0" stroke-width="1"/>
+
+      <!-- NEW LANE -->
+      <text x="0" y="212" font-family="Archivo, sans-serif" font-size="11" font-weight="600" letter-spacing="1.4" fill="#1D6B5B">AFTER</text>
+      <text x="52" y="212" font-family="EB Garamond, serif" font-size="12" font-style="italic" fill="#585E59">the same picture, from the numbers the layout already had</text>
+
+      <rect x="0" y="230" width="250" height="66" fill="#DDEAE5" stroke="#1D6B5B" stroke-width="1"/>
+      <text x="125" y="257" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="600" fill="#1D6B5B">The layout works out</text>
+      <text x="125" y="273" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1D6B5B">where each band goes</text>
+      <text x="125" y="289" text-anchor="middle" font-family="EB Garamond, serif" font-size="11" font-style="italic" fill="#1D6B5B">as numbers</text>
+
+      <line x1="250" y1="263" x2="306" y2="263" stroke="#1D6B5B" stroke-width="1.3" marker-end="url(#ar-new)"/>
+      <text x="278" y="254" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" fill="#1D6B5B">sends</text>
+
+      <rect x="310" y="230" width="250" height="66" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+      <text x="435" y="257" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">1.5 MB of numbers</text>
+      <text x="435" y="273" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">crosses the network</text>
+      <text x="435" y="289" text-anchor="middle" font-family="EB Garamond, serif" font-size="11" font-style="italic" fill="#585E59">each strand's colour sent once</text>
+
+      <line x1="560" y1="263" x2="616" y2="263" stroke="#1D6B5B" stroke-width="1.3" marker-end="url(#ar-new)"/>
+      <text x="588" y="254" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" fill="#1D6B5B">draws</text>
+
+      <rect x="620" y="230" width="252" height="66" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+      <text x="746" y="257" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">The app hands them</text>
+      <text x="746" y="273" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">straight to the screen</text>
+      <text x="746" y="289" text-anchor="middle" font-family="EB Garamond, serif" font-size="11" font-style="italic" fill="#585E59">no re-reading step at all</text>
+    </svg>
+  </div>
+  <figcaption>The whole rework in one comparison. <b>The layout has always produced numbers.</b>
+  The old pipeline spent most of its time and nearly all of its memory converting those
+  numbers into text, shipping the text, and converting it back. The new pipeline sends the
+  numbers. Nothing about the picture the researcher sees changes.</figcaption>
+</figure>
+
+<p>The invisible browser deserves a sentence, because it is the strange part. The
+drawing code was written to run in a web page, so to run it on the server the server
+pretends to be a web page: it builds a whole document in memory, lets the drawing code
+fill it in, and then takes a snapshot of that document as text. Nothing is ever displayed.
+The document exists only to hold values that were already sitting in memory one step
+earlier.</p>
+
+<p class="pull">The layout computes numbers. A fake browser holds them as text. The wire
+carries the text. The app parses the text back into numbers.</p>
+
+<h2>What it cost</h2>
+
+<div class="tbl-scroll">
+<table>
+  <caption>Live service, 2026-08-27, one chromosome-8 region grown three times. Single
+  samples on a shared server.</caption>
+  <thead>
+    <tr><th>Region asked for</th><th class="n">Time to first byte</th><th class="n">Delivered</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>90 bases</td><td class="n">1.5 s</td><td class="n">178 KB</td></tr>
+    <tr><td>3,000 bases</td><td class="n">35.3 s</td><td class="n">3.2 MB</td></tr>
+    <tr><td>10,000 bases</td><td class="n">120.4 s</td><td class="n">10.1 MB</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The browser gives up after 90 seconds, so the bottom row of that table is not a slow
+feature &mdash; it is an absent one. Roughly <strong>43% of catalogued nodes could not be
+opened at all</strong>, and there was no way to tell in advance which ones. The most
+information-dense regions were exactly the ones nobody could look at.</p>
+
+<p>The failure did not stay put, either. The server was written so that one request had to
+finish before any other could be served, even though nothing about the work required that.
+While a 120-second request was in flight, four unrelated requests failed outright &mdash;
+including requests for the 3D graph, a different feature entirely. One person exploring a
+big region froze everybody else's browser.</p>
+
+<h2>Where the 38.9 seconds went</h2>
+
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 880 226" role="img" aria-label="A 38.9 second request broken into stages: finding the region takes 30.1 seconds, format conversion 0.6 seconds, and drawing 8.2 seconds. Inside the 30.1 seconds, the actual graph query is only 0.042 seconds.">
+      <text x="0" y="14" font-family="Archivo, sans-serif" font-size="11" font-weight="600" letter-spacing="1.4" fill="#585E59">ONE REQUEST FOR A 10,000-BASE REGION &mdash; 38.9 SECONDS, MEASURED ON THE SERVER</text>
+
+      <!-- the bar: 800px = 38.887s -->
+      <rect x="0" y="34" width="618.6" height="46" fill="#DAD9D2" stroke="#1A1D1A" stroke-width="1"/>
+      <rect x="618.6" y="34" width="13.0" height="46" fill="#B4B1A6" stroke="#1A1D1A" stroke-width="1"/>
+      <rect x="631.6" y="34" width="168.4" height="46" fill="#8F3222" stroke="#1A1D1A" stroke-width="1"/>
+
+      <!-- the hairline: the actual graph query, 0.042s -->
+      <rect x="0" y="34" width="0.9" height="46" fill="#1D6B5B"/>
+      <line x1="0.9" y1="34" x2="0.9" y2="20" stroke="#1D6B5B" stroke-width="1"/>
+      <text x="6" y="18" font-family="Archivo, sans-serif" font-size="10" font-weight="500" fill="#1D6B5B">0.042 s &mdash; the graph query itself</text>
+
+      <!-- leaders -->
+      <line x1="309" y1="80" x2="309" y2="106" stroke="#1A1D1A" stroke-width="1"/>
+      <text x="309" y="124" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="600" fill="#1A1D1A">Finding the region &mdash; 30.1 s</text>
+      <text x="309" y="141" text-anchor="middle" font-family="EB Garamond, serif" font-size="12" font-style="italic" fill="#585E59">a loop that looks up each of 381 pieces separately, one at a time</text>
+      <text x="309" y="158" text-anchor="middle" font-family="EB Garamond, serif" font-size="12" font-style="italic" fill="#585E59">77% of the request &mdash; and a flat 79 ms per piece, however many there are</text>
+
+      <line x1="625" y1="80" x2="625" y2="96" stroke="#1A1D1A" stroke-width="1"/>
+      <line x1="625" y1="96" x2="700" y2="96" stroke="#1A1D1A" stroke-width="1"/>
+      <text x="706" y="100" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#585E59">Changing file formats &mdash; 0.6 s</text>
+
+      <line x1="716" y1="80" x2="716" y2="106" stroke="#8F3222" stroke-width="1"/>
+      <text x="880" y="124" text-anchor="end" font-family="Archivo, sans-serif" font-size="13" font-weight="600" fill="#8F3222">Drawing &mdash; 8.2 s</text>
+      <text x="880" y="141" text-anchor="end" font-family="EB Garamond, serif" font-size="12" font-style="italic" fill="#8F3222">the invisible browser</text>
+
+      <!-- second bar: the same stage at a larger region -->
+      <line x1="0" y1="180" x2="880" y2="180" stroke="#D3D6D0" stroke-width="1"/>
+      <text x="0" y="202" font-family="EB Garamond, serif" font-size="13" fill="#1A1D1A">Drawing gets worse faster than anything else: at 3.5&times; the data it took <tspan font-weight="500" fill="#8F3222">11&times; the time</tspan>. On a 36,000-base</text>
+      <text x="0" y="219" font-family="EB Garamond, serif" font-size="13" fill="#1A1D1A">region where finding was skipped entirely, drawing alone was <tspan font-weight="500" fill="#8F3222">91 of the 93.6 seconds</tspan>.</text>
+    </svg>
+  </div>
+  <figcaption>Server-side stage timings, 2026-08-27. The stages sum to the total exactly &mdash;
+  nothing is hiding between them. <b>Two findings re-ordered the whole plan.</b> The
+  30.1 seconds of "finding the region" is not the database: the database answers in
+  0.042 seconds, drawn here as the hairline at the far left. The rest is our own code
+  looking up one piece at a time. And drawing, which an earlier estimate had at one or two
+  seconds, is 8.2 &mdash; and grows faster than the data does.</figcaption>
+</figure>
+
+<h2>What was in the ten megabytes</h2>
+
+<p>Every band in the old format carried its strand's colour, its strand's full name, a
+second copy of that colour, a second copy of its strand's number, and an empty label. Tens
+of thousands of times. One real 13.6 MB document contained <strong>40,716 empty
+labels</strong>.</p>
+
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 880 214" role="img" aria-label="Composition of a 13.56 megabyte response: geometry 29.9 percent, repeated strand colours 14.2 percent, repeated strand names 10.1 percent, duplicate colour 7.5 percent, duplicate strand number 4.8 percent, empty labels 4.3 percent, and structural text 29.2 percent. 40.8 percent carries no information.">
+      <text x="0" y="14" font-family="Archivo, sans-serif" font-size="11" font-weight="600" letter-spacing="1.4" fill="#585E59">ONE REAL 13.56 MB RESPONSE, BY WHAT THE BYTES SAY</text>
+
+      <!-- 800px wide bar -->
+      <rect x="0"     y="30" width="239.2" height="44" fill="#1D6B5B"/>
+      <rect x="239.2" y="30" width="113.6" height="44" fill="#C8A79B"/>
+      <rect x="352.8" y="30" width="80.8"  height="44" fill="#C8A79B"/>
+      <rect x="433.6" y="30" width="60.0"  height="44" fill="#8F3222"/>
+      <rect x="493.6" y="30" width="38.4"  height="44" fill="#8F3222"/>
+      <rect x="532.0" y="30" width="34.4"  height="44" fill="#8F3222"/>
+      <rect x="566.4" y="30" width="233.6" height="44" fill="#DAD9D2"/>
+      <rect x="0" y="30" width="800" height="44" fill="none" stroke="#1A1D1A" stroke-width="1"/>
+      <line x1="239.2" y1="30" x2="239.2" y2="74" stroke="#FCFCFA" stroke-width="1"/>
+      <line x1="352.8" y1="30" x2="352.8" y2="74" stroke="#FCFCFA" stroke-width="1"/>
+      <line x1="433.6" y1="30" x2="433.6" y2="74" stroke="#FCFCFA" stroke-width="1"/>
+      <line x1="493.6" y1="30" x2="493.6" y2="74" stroke="#FCFCFA" stroke-width="1"/>
+      <line x1="532.0" y1="30" x2="532.0" y2="74" stroke="#FCFCFA" stroke-width="1"/>
+      <line x1="566.4" y1="30" x2="566.4" y2="74" stroke="#FCFCFA" stroke-width="1"/>
+
+      <!-- brace under the redundant span -->
+      <path d="M 239.2 84 L 239.2 96 L 566.4 96 L 566.4 84" fill="none" stroke="#8F3222" stroke-width="1.2"/>
+      <text x="402" y="114" text-anchor="middle" font-family="Archivo, sans-serif" font-size="13" font-weight="600" fill="#8F3222">40.8% carries nothing the app did not already know</text>
+
+      <!-- keyed rows -->
+      <rect x="0" y="134" width="10" height="10" fill="#1D6B5B"/>
+      <text x="18" y="143" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">29.9%</text>
+      <text x="66" y="143" font-family="EB Garamond, serif" font-size="13" fill="#1A1D1A">Where the bands go &mdash; the only genuinely new information per band</text>
+
+      <rect x="0" y="154" width="10" height="10" fill="#C8A79B"/>
+      <text x="18" y="163" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">24.3%</text>
+      <text x="66" y="163" font-family="EB Garamond, serif" font-size="13" fill="#1A1D1A">Each strand's colour and name, rewritten on every one of its bands</text>
+
+      <rect x="0" y="174" width="10" height="10" fill="#8F3222"/>
+      <text x="18" y="183" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">16.5%</text>
+      <text x="66" y="183" font-family="EB Garamond, serif" font-size="13" fill="#1A1D1A">A second copy of the colour, a second copy of the number, and 40,716 empty labels</text>
+
+      <rect x="0" y="194" width="10" height="10" fill="#DAD9D2"/>
+      <text x="18" y="203" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">29.2%</text>
+      <text x="66" y="203" font-family="EB Garamond, serif" font-size="13" fill="#1A1D1A">The scaffolding of the text format itself</text>
+    </svg>
+  </div>
+  <figcaption>Measured across five real documents spanning 0.29 MB to 13.56 MB; the shape
+  holds across all of them, at between <b>41% and 47% redundant</b>. Sending each strand's
+  colour and name once, rather than once per band, is most of the difference between 10 MB
+  and 1.5 MB &mdash; and it costs nothing, because there are only ~464 strands.</figcaption>
+</figure>
+
+<h2>Why the big nodes failed at all</h2>
+
+<p>Slowness and size are annoyances. The nodes that never loaded were a different problem,
+and it had a single cause: the invisible document. Measured either side of a render &mdash;
+build the document, then throw it away and see what is released &mdash; the answer was
+unambiguous.</p>
+
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 880 200" role="img" aria-label="Memory held during one render: before, 1851 megabytes of which 1759 was the invisible document and 92 was the actual layout. After, 95 megabytes, all layout, no document.">
+      <text x="0" y="14" font-family="Archivo, sans-serif" font-size="11" font-weight="600" letter-spacing="1.4" fill="#585E59">MEMORY HELD WHILE DRAWING ONE MAP &mdash; 465 STRANDS, 117,207 BANDS</text>
+
+      <!-- before: 1851.4 MB over 760px -->
+      <text x="0" y="48" font-family="Archivo, sans-serif" font-size="12" font-weight="600" fill="#8F3222">BEFORE</text>
+      <rect x="72" y="34" width="37.9" height="26" fill="#1D6B5B"/>
+      <rect x="109.9" y="34" width="722.1" height="26" fill="#8F3222"/>
+      <rect x="72" y="34" width="760" height="26" fill="none" stroke="#1A1D1A" stroke-width="1"/>
+      <text x="842" y="52" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="500" fill="#1A1D1A">1,851 MB</text>
+      <text x="470" y="52" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="600" fill="#FCFCFA">the invisible document &mdash; 95.0%</text>
+      <line x1="91" y1="60" x2="91" y2="76" stroke="#1D6B5B" stroke-width="1"/>
+      <text x="91" y="90" text-anchor="middle" font-family="Archivo, sans-serif" font-size="11" fill="#1D6B5B">92 MB of actual layout</text>
+
+      <!-- after: 94.9 MB -->
+      <text x="0" y="132" font-family="Archivo, sans-serif" font-size="12" font-weight="600" fill="#1D6B5B">AFTER</text>
+      <rect x="72" y="118" width="39.0" height="26" fill="#1D6B5B" stroke="#1A1D1A" stroke-width="1"/>
+      <text x="121" y="136" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="500" fill="#1A1D1A">95 MB</text>
+      <text x="186" y="136" font-family="EB Garamond, serif" font-size="13" font-style="italic" fill="#585E59">&mdash; all of it layout. There is no document left to weigh.</text>
+
+      <line x1="0" y1="164" x2="880" y2="164" stroke="#D3D6D0" stroke-width="1"/>
+      <text x="0" y="186" font-family="EB Garamond, serif" font-size="13" fill="#1A1D1A">A map that ran out of memory after 35 seconds and produced nothing now finishes in <tspan font-weight="500" fill="#1D6B5B">6.4 seconds</tspan>, at the same memory limit the server uses.</text>
+    </svg>
+  </div>
+  <figcaption>Retained memory either side of a render, forced garbage collection at every
+  mark. <b>The real work was never the expensive part.</b> The layout &mdash; the arithmetic
+  that decides where 117,207 bands go &mdash; is about a twentieth of what the document
+  built to hold it cost. That ratio is why large nodes failed: they hit a memory ceiling
+  that had almost nothing to do with the size of the answer.</figcaption>
+</figure>
+
+<h2>The new way</h2>
+
+<p>The change is smaller than the numbers suggest. The layout keeps its numbers instead of
+handing them to a document; the picture is written out from those numbers; and the same
+numbers can be requested directly, as numbers.</p>
+
+<p>Three decisions shape the rest:</p>
+
+<h3>The numbers are the truth; the picture is made from them</h3>
+<p>Not two parallel ways of producing an answer &mdash; one, with the picture derived from
+the numbers. Two parallel paths drift apart the moment someone stops watching. One path
+cannot.</p>
+
+<h3>The new format is added, never substituted</h3>
+<p>The existing address keeps returning exactly what it returned before. Asking for numbers
+is a request you opt into. The server and the app are separate projects; this way neither
+has to wait for the other, and the old format stays available as the reference the new one
+is checked against.</p>
+
+<h3>Each strand's details are sent once</h3>
+<p>A small table at the top of the response lists the ~464 strands with their colours and
+names. After that, each band carries only where it is and which strand it belongs to. The
+app copies that block straight onto the screen &mdash; there is no reading step to delete,
+because there is nothing left to read.</p>
+
+<h2>How it gets there</h2>
+
+<p>Five steps, each shippable on its own, so that a problem with one does not hold up the
+others. They are lettered in the order they were planned; measurement has since re-ordered
+what matters.</p>
+
+<div class="steps">
+
+  <div class="step done">
+    <div class="letter">A</div>
+    <div>
+      <h3>Stop one request from blocking everyone<span class="chip built">Built</span></h3>
+      <p>The most severe symptom had a one-line cause: the server was told to handle these
+      requests on the thread that answers everybody. Moving them off it means a slow request
+      is now just a slow request. This fixes the 3D graph too, and it arrived alongside the
+      project's first tests and first automated checks &mdash; neither of which existed.</p>
+    </div>
+  </div>
+
+  <div class="step done">
+    <div class="letter">B</div>
+    <div>
+      <h3>Delete the invisible browser<span class="chip built">Built</span></h3>
+      <p>Collect the layout's numbers directly, and write the picture out from them. Two of
+      the project's five external dependencies existed only to pretend to be a browser and
+      are now gone. Deliberately, the picture came out <em>byte-for-byte compatible</em>
+      with what the app already reads &mdash; so this was a server-only change against an
+      unchanged app, and the app itself became the test of whether it worked.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="letter">C</div>
+    <div>
+      <h3>Publish the numbers<span class="chip next">Next</span></h3>
+      <p>Positions become numbers rather than drawing instructions, the strand table moves
+      to the top of the response, and the new format appears as an option on the existing
+      address. Roughly 1.5 MB where today's is 10 MB. This is the step where the app
+      changes, and the only one that needs both projects.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="letter">E</div>
+    <div>
+      <h3>Stop looking up 381 pieces one at a time<span class="chip next">Largest win left</span></h3>
+      <p>30 of the 38.9 seconds, in code that costs a flat 79 milliseconds per piece however
+      many pieces there are &mdash; the signature of a fixed overhead paid over and over,
+      not of hard work. It touches nothing the app can see, so it can proceed in parallel
+      with C. What it needs first is an investigation into whether those lookups can be
+      asked for in one go.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="letter">D</div>
+    <div>
+      <h3>Remove the detour through two extra file formats<span class="chip later">Cleanup</span></h3>
+      <p>Two separate programs are launched and two temporary files written, purely to
+      convert between formats we control on both sides &mdash; inflating the data thirteenfold
+      on the way. This was originally ranked first, on the reasonable assumption that it was
+      the silliest thing in the pipeline. Measurement put it at <strong>1.6%</strong> of a
+      slow request. It is worth doing as a simplification &mdash; one fewer tool to install
+      &mdash; and it is worth doing last.</p>
+    </div>
+  </div>
+
+</div>
+
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 880 176" role="img" aria-label="Dependency order of the five steps: A leads to B leads to C, which is the only step requiring the app to change. E and D are independent of the chain and of each other.">
+      <defs>
+        <marker id="ar-dep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#585E59"/>
+        </marker>
+      </defs>
+      <text x="0" y="14" font-family="Archivo, sans-serif" font-size="11" font-weight="600" letter-spacing="1.4" fill="#585E59">WHAT WAITS ON WHAT</text>
+
+      <circle cx="60" cy="60" r="24" fill="#DDEAE5" stroke="#1D6B5B" stroke-width="1.4"/>
+      <text x="60" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="16" font-weight="600" fill="#1D6B5B">A</text>
+      <line x1="86" y1="60" x2="164" y2="60" stroke="#585E59" stroke-width="1.2" marker-end="url(#ar-dep)"/>
+      <text x="125" y="52" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" fill="#585E59">needs its tests</text>
+
+      <circle cx="192" cy="60" r="24" fill="#DDEAE5" stroke="#1D6B5B" stroke-width="1.4"/>
+      <text x="192" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="16" font-weight="600" fill="#1D6B5B">B</text>
+      <line x1="218" y1="60" x2="296" y2="60" stroke="#585E59" stroke-width="1.2" marker-end="url(#ar-dep)"/>
+      <text x="257" y="52" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" fill="#585E59">is C's yardstick</text>
+
+      <circle cx="324" cy="60" r="24" fill="#FCFCFA" stroke="#8F3222" stroke-width="1.4"/>
+      <text x="324" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="16" font-weight="600" fill="#8F3222">C</text>
+      <text x="324" y="104" text-anchor="middle" font-family="EB Garamond, serif" font-size="12" font-style="italic" fill="#8F3222">the app changes here</text>
+
+      <line x1="420" y1="24" x2="420" y2="140" stroke="#D3D6D0" stroke-width="1"/>
+
+      <circle cx="500" cy="60" r="24" fill="#FCFCFA" stroke="#8F3222" stroke-width="1.4"/>
+      <text x="500" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="16" font-weight="600" fill="#8F3222">E</text>
+      <text x="538" y="56" font-family="EB Garamond, serif" font-size="13" fill="#1A1D1A">Independent of all of the above &mdash; it sits upstream</text>
+      <text x="538" y="73" font-family="EB Garamond, serif" font-size="13" fill="#1A1D1A">of the picture and the app cannot observe it.</text>
+
+      <circle cx="500" cy="128" r="24" fill="#FCFCFA" stroke="#585E59" stroke-width="1.4"/>
+      <text x="500" y="134" text-anchor="middle" font-family="Archivo, sans-serif" font-size="16" font-weight="600" fill="#585E59">D</text>
+      <text x="538" y="124" font-family="EB Garamond, serif" font-size="13" fill="#585E59">Also independent, and no longer urgent: 1.6% of</text>
+      <text x="538" y="141" font-family="EB Garamond, serif" font-size="13" fill="#585E59">a slow request.</text>
+    </svg>
+  </div>
+  <figcaption>Only three of the five steps are in a line, and only one of them &mdash; C
+  &mdash; requires the two projects to move together. <b>That is the point of splitting it
+  this way:</b> the two largest wins, B and E, land without the app shipping anything at
+  all.</figcaption>
+</figure>
+
+<h2>The pipeline, format by format</h2>
+
+<p>Everything above is the argument. This is the machinery: every representation the data
+takes between the graph on disk and the pixels on screen, in all three versions of the
+pipeline &mdash; what is deployed, what is on <code>main</code>, and what C, D and E are
+aiming at.</p>
+
+<p>Read it down a column and you follow one request. Read it across and you watch
+representations disappear.</p>
+
+<figure>
+  <div class="plate">
+<svg viewBox="0 0 880 1112" role="img" aria-label="The chain of data formats a tube map request passes through, in three versions: as deployed today, as it stands on the main branch after increments A and B, and as intended after increments C, D and E. Each version removes representations from the chain.">
+<defs><marker id="fl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#585E59"/></marker><marker id="fl-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#1D6B5B"/></marker></defs>
+<rect x="0" y="18" width="268" height="3" fill="#8F3222"/>
+<text x="0" y="42" font-family="Archivo, sans-serif" font-size="12" font-weight="600" font-style="normal" fill="#8F3222" text-anchor="start" letter-spacing="1.4">BEFORE</text>
+<text x="0" y="58" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">what is deployed today</text>
+<rect x="306" y="18" width="268" height="3" fill="#1D6B5B"/>
+<text x="306" y="42" font-family="Archivo, sans-serif" font-size="12" font-weight="600" font-style="normal" fill="#1D6B5B" text-anchor="start" letter-spacing="1.4">NOW ON main</text>
+<text x="306" y="58" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">increments A and B — not deployed</text>
+<rect x="612" y="18" width="268" height="3" fill="#1D6B5B"/>
+<text x="612" y="42" font-family="Archivo, sans-serif" font-size="12" font-weight="600" font-style="normal" fill="#1D6B5B" text-anchor="start" letter-spacing="1.4">INTENDED</text>
+<text x="612" y="58" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">increments C, D and E</text>
+<rect x="0" y="96" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="10" y="116" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.gbz</text>
+<text x="260" y="114" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PYTHON</text>
+<text x="10" y="131" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">the whole pangenome graph, indexed</text>
+<text x="10" y="145" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">~30 GB on disk, read-only</text>
+<line x1="134.0" y1="154" x2="134.0" y2="178" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="134.0" y="171" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">gbz-base query — 0.042 s</text>
+<rect x="0" y="180" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="10" y="200" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.gfa</text>
+<text x="260" y="198" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PYTHON</text>
+<text x="10" y="215" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">text — segments and links only</text>
+<text x="10" y="229" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">temp file</text>
+<line x1="134.0" y1="238" x2="134.0" y2="262" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="134.0" y="255" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">GenerateWalksMC — one lookup per segment — 30.0 s</text>
+<rect x="0" y="264" width="268" height="58" fill="#F0E0DB" stroke="#8F3222" stroke-width="1"/>
+<text x="10" y="284" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#8F3222" text-anchor="start">.gfa + W</text>
+<text x="260" y="282" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PYTHON</text>
+<text x="10" y="299" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#8F3222" text-anchor="start">text — plus one walk line per haplotype</text>
+<text x="10" y="313" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">temp file · the one cached artifact</text>
+<line x1="134.0" y1="322" x2="134.0" y2="346" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="134.0" y="339" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">vg convert -g — subprocess</text>
+<rect x="0" y="348" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="10" y="368" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.vg</text>
+<text x="260" y="366" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">VG</text>
+<text x="10" y="383" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">protobuf binary</text>
+<text x="10" y="397" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">temp file</text>
+<line x1="134.0" y1="406" x2="134.0" y2="430" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="134.0" y="423" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">vg view -j — subprocess · 13× inflation</text>
+<rect x="0" y="432" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="10" y="452" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.json</text>
+<text x="260" y="450" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">VG</text>
+<text x="10" y="467" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">vg JSON — nodes, edges, paths</text>
+<text x="10" y="481" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">11.59 MB temp file</text>
+<line x1="134.0" y1="490" x2="134.0" y2="514" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="134.0" y="507" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">node generate-svg.mjs · JSON.parse</text>
+<rect x="0" y="516" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="10" y="536" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">JS objects</text>
+<text x="260" y="534" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="10" y="551" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">parsed nodes and tracks</text>
+<text x="10" y="565" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">in memory</text>
+<line x1="134.0" y1="574" x2="134.0" y2="598" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="134.0" y="591" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">tubemap.js create() — the arithmetic</text>
+<rect x="0" y="600" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="10" y="620" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">layout numbers</text>
+<text x="260" y="618" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="10" y="635" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">where every band goes</text>
+<text x="10" y="649" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">in memory</text>
+<line x1="134.0" y1="658" x2="134.0" y2="682" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="134.0" y="675" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">bound to an emulated browser document</text>
+<rect x="0" y="684" width="268" height="58" fill="#F0E0DB" stroke="#8F3222" stroke-width="1"/>
+<text x="10" y="704" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#8F3222" text-anchor="start">emulated DOM</text>
+<text x="260" y="702" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="10" y="719" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#8F3222" text-anchor="start">235,624 elements holding those numbers</text>
+<text x="10" y="733" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">1,759 MB — 95% of the render</text>
+<line x1="134.0" y1="742" x2="134.0" y2="766" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="134.0" y="759" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">document.outerHTML → writeFileSync</text>
+<rect x="0" y="768" width="268" height="58" fill="#F0E0DB" stroke="#8F3222" stroke-width="1"/>
+<text x="10" y="788" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#8F3222" text-anchor="start">.svg</text>
+<text x="260" y="786" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="10" y="803" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#8F3222" text-anchor="start">the document as text</text>
+<text x="10" y="817" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">16.64 MB temp file</text>
+<line x1="134.0" y1="826" x2="134.0" y2="850" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="134.0" y="843" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">FileResponse</text>
+<rect x="0" y="852" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="10" y="872" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">HTTP</text>
+<text x="260" y="870" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">WIRE</text>
+<text x="10" y="887" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">image/svg+xml</text>
+<text x="10" y="901" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">10.07 MB on the wire</text>
+<line x1="134.0" y1="910" x2="134.0" y2="934" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="134.0" y="927" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">parseBands.ts — regex over raw text</text>
+<rect x="0" y="936" width="268" height="58" fill="#F0E0DB" stroke="#8F3222" stroke-width="1"/>
+<text x="10" y="956" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#8F3222" text-anchor="start">Float32Array</text>
+<text x="260" y="954" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PGB</text>
+<text x="10" y="971" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#8F3222" text-anchor="start">pgb rebuilds the numbers with a regex</text>
+<text x="10" y="985" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">megabytes of text scanned</text>
+<line x1="134.0" y1="994" x2="134.0" y2="1018" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<rect x="0" y="1020" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="10" y="1040" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">GPU buffer</text>
+<text x="260" y="1038" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PGB</text>
+<text x="10" y="1055" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">InstancedBufferGeometry</text>
+<text x="10" y="1069" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">drawn</text>
+<rect x="306" y="96" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="316" y="116" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.gbz</text>
+<text x="566" y="114" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PYTHON</text>
+<text x="316" y="131" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">the whole pangenome graph, indexed</text>
+<text x="316" y="145" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">~30 GB on disk, read-only</text>
+<line x1="440.0" y1="154" x2="440.0" y2="178" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="440.0" y="171" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">gbz-base query — 0.042 s</text>
+<rect x="306" y="180" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="316" y="200" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.gfa</text>
+<text x="566" y="198" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PYTHON</text>
+<text x="316" y="215" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">text — segments and links only</text>
+<text x="316" y="229" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">temp file</text>
+<line x1="440.0" y1="238" x2="440.0" y2="262" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="440.0" y="255" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">GenerateWalksMC — unchanged</text>
+<rect x="306" y="264" width="268" height="58" fill="#F0E0DB" stroke="#8F3222" stroke-width="1"/>
+<text x="316" y="284" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#8F3222" text-anchor="start">.gfa + W</text>
+<text x="566" y="282" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PYTHON</text>
+<text x="316" y="299" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#8F3222" text-anchor="start">text — plus one walk line per haplotype</text>
+<text x="316" y="313" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">temp file · the one cached artifact</text>
+<line x1="440.0" y1="322" x2="440.0" y2="346" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="440.0" y="339" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">vg convert -g — subprocess</text>
+<rect x="306" y="348" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="316" y="368" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.vg</text>
+<text x="566" y="366" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">VG</text>
+<text x="316" y="383" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">protobuf binary</text>
+<text x="316" y="397" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">temp file</text>
+<line x1="440.0" y1="406" x2="440.0" y2="430" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="440.0" y="423" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">vg view -j — subprocess · 13× inflation</text>
+<rect x="306" y="432" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="316" y="452" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.json</text>
+<text x="566" y="450" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">VG</text>
+<text x="316" y="467" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">vg JSON — nodes, edges, paths</text>
+<text x="316" y="481" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">11.59 MB temp file</text>
+<line x1="440.0" y1="490" x2="440.0" y2="514" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="440.0" y="507" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">node generate-svg.mjs · JSON.parse</text>
+<rect x="306" y="516" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="316" y="536" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">JS objects</text>
+<text x="566" y="534" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="316" y="551" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">parsed nodes and tracks</text>
+<text x="316" y="565" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">in memory</text>
+<line x1="440.0" y1="574" x2="440.0" y2="598" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="440.0" y="591" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">tubemap.js create() — the arithmetic</text>
+<rect x="306" y="600" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="316" y="620" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">layout numbers</text>
+<text x="566" y="618" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="316" y="635" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">where every band goes</text>
+<text x="316" y="649" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">in memory</text>
+<line x1="440.0" y1="658" x2="440.0" y2="682" stroke="#1D6B5B" stroke-width="1.2" marker-end="url(#fl-n)"/>
+<text x="440.0" y="675" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="middle">collected as numbers — no document</text>
+<rect x="306" y="684" width="268" height="58" fill="#DDEAE5" stroke="#1D6B5B" stroke-width="1"/>
+<text x="316" y="704" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1D6B5B" text-anchor="start">band data</text>
+<text x="566" y="702" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="316" y="719" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="start">strands · bands · segments · dimensions</text>
+<text x="316" y="733" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">95 MB in memory</text>
+<line x1="440.0" y1="742" x2="440.0" y2="766" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="440.0" y="759" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">emit-document.mjs writes the text from them</text>
+<rect x="306" y="768" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="316" y="788" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.svg</text>
+<text x="566" y="786" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="316" y="803" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">the document as text</text>
+<text x="316" y="817" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">16.64 MB temp file</text>
+<line x1="440.0" y1="826" x2="440.0" y2="850" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="440.0" y="843" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">FileResponse</text>
+<rect x="306" y="852" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="316" y="872" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">HTTP</text>
+<text x="566" y="870" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">WIRE</text>
+<text x="316" y="887" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">image/svg+xml</text>
+<text x="316" y="901" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">10.07 MB on the wire</text>
+<line x1="440.0" y1="910" x2="440.0" y2="934" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="440.0" y="927" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">parseBands.ts — regex over raw text</text>
+<rect x="306" y="936" width="268" height="58" fill="#F0E0DB" stroke="#8F3222" stroke-width="1"/>
+<text x="316" y="956" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#8F3222" text-anchor="start">Float32Array</text>
+<text x="566" y="954" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PGB</text>
+<text x="316" y="971" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#8F3222" text-anchor="start">pgb rebuilds the numbers with a regex</text>
+<text x="316" y="985" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">megabytes of text scanned</text>
+<line x1="440.0" y1="994" x2="440.0" y2="1018" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<rect x="306" y="1020" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="316" y="1040" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">GPU buffer</text>
+<text x="566" y="1038" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PGB</text>
+<text x="316" y="1055" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">InstancedBufferGeometry</text>
+<text x="316" y="1069" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">drawn</text>
+<rect x="612" y="96" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="622" y="116" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.gbz</text>
+<text x="872" y="114" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PYTHON</text>
+<text x="622" y="131" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">the whole pangenome graph, indexed</text>
+<text x="622" y="145" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">~30 GB on disk, read-only</text>
+<line x1="746.0" y1="154" x2="746.0" y2="178" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="746.0" y="171" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">gbz-base query</text>
+<rect x="612" y="180" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="622" y="200" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.gfa</text>
+<text x="872" y="198" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PYTHON</text>
+<text x="622" y="215" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">text — segments and links only</text>
+<text x="622" y="229" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">temp file</text>
+<line x1="746.0" y1="238" x2="746.0" y2="262" stroke="#1D6B5B" stroke-width="1.2" marker-end="url(#fl-n)"/>
+<text x="746.0" y="255" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="middle">one batched lookup — increment E</text>
+<rect x="612" y="264" width="268" height="58" fill="#DDEAE5" stroke="#1D6B5B" stroke-width="1"/>
+<text x="622" y="284" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1D6B5B" text-anchor="start">.gfa + W</text>
+<text x="872" y="282" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PYTHON</text>
+<text x="622" y="299" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="start">text — plus one walk line per haplotype</text>
+<text x="622" y="313" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">temp file · the one cached artifact</text>
+<line x1="746.0" y1="322" x2="746.0" y2="406" stroke="#9DA098" stroke-width="1" stroke-dasharray="3 4"/>
+<text x="746.0" y="381.0" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#9DA098" text-anchor="middle">the vg round trip is gone</text>
+<line x1="746.0" y1="322" x2="746.0" y2="514" stroke="#1D6B5B" stroke-width="1.2" marker-end="url(#fl-n)"/>
+<text x="746.0" y="339" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="middle">built in process — increment D</text>
+<rect x="612" y="516" width="268" height="58" fill="#DDEAE5" stroke="#1D6B5B" stroke-width="1"/>
+<text x="622" y="536" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1D6B5B" text-anchor="start">JS objects</text>
+<text x="872" y="534" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="622" y="551" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="start">parsed nodes and tracks</text>
+<text x="622" y="565" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">in memory</text>
+<line x1="746.0" y1="574" x2="746.0" y2="598" stroke="#585E59" stroke-width="1.2" marker-end="url(#fl)"/>
+<text x="746.0" y="591" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#585E59" text-anchor="middle">tubemap.js create()</text>
+<rect x="612" y="600" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
+<text x="622" y="620" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">layout numbers</text>
+<text x="872" y="618" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="622" y="635" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1A1D1A" text-anchor="start">where every band goes</text>
+<text x="622" y="649" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">in memory</text>
+<line x1="746.0" y1="658" x2="746.0" y2="682" stroke="#1D6B5B" stroke-width="1.2" marker-end="url(#fl-n)"/>
+<text x="746.0" y="675" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="middle">geometry as floats — increment C</text>
+<rect x="612" y="684" width="268" height="58" fill="#DDEAE5" stroke="#1D6B5B" stroke-width="1"/>
+<text x="622" y="704" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1D6B5B" text-anchor="start">band data</text>
+<text x="872" y="702" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">NODE</text>
+<text x="622" y="719" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="start">same, geometry as 6 floats per band</text>
+<text x="622" y="733" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">in memory</text>
+<line x1="746.0" y1="742" x2="746.0" y2="826" stroke="#9DA098" stroke-width="1" stroke-dasharray="3 4"/>
+<text x="746.0" y="801.0" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#9DA098" text-anchor="middle">no disk round trip</text>
+<line x1="746.0" y1="742" x2="746.0" y2="850" stroke="#1D6B5B" stroke-width="1.2" marker-end="url(#fl-n)"/>
+<text x="746.0" y="759" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="middle">?format=bands — increment C</text>
+<rect x="612" y="852" width="268" height="58" fill="#DDEAE5" stroke="#1D6B5B" stroke-width="1"/>
+<text x="622" y="872" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1D6B5B" text-anchor="start">HTTP</text>
+<text x="872" y="870" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">WIRE</text>
+<text x="622" y="887" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="start">JSON header + binary body</text>
+<text x="622" y="901" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">~1.5 MB projected</text>
+<line x1="746.0" y1="910" x2="746.0" y2="994" stroke="#9DA098" stroke-width="1" stroke-dasharray="3 4"/>
+<text x="746.0" y="969.0" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#9DA098" text-anchor="middle">nothing to parse</text>
+<line x1="746.0" y1="910" x2="746.0" y2="1018" stroke="#1D6B5B" stroke-width="1.2" marker-end="url(#fl-n)"/>
+<text x="746.0" y="927" font-family="Archivo, sans-serif" font-size="10" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="middle">copied straight in — no parse step</text>
+<rect x="612" y="1020" width="268" height="58" fill="#DDEAE5" stroke="#1D6B5B" stroke-width="1"/>
+<text x="622" y="1040" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1D6B5B" text-anchor="start">GPU buffer</text>
+<text x="872" y="1038" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PGB</text>
+<text x="622" y="1055" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="start">InstancedBufferGeometry</text>
+<text x="622" y="1069" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">drawn</text>
+<path d="M 866 742 L 866 768 L 888 768" fill="none" stroke="#9DA098" stroke-width="1" stroke-dasharray="3 4"/>
+<text x="870" y="784" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#9DA098" text-anchor="end">the SVG route stays,</text>
+<text x="870" y="796" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#9DA098" text-anchor="end">derived from the same data</text>
+<text x="0" y="1106" font-family="Archivo, sans-serif" font-size="10" font-weight="500" font-style="normal" fill="#9DA098" text-anchor="start">PYTHON  the FastAPI server   ·   VG  an external binary, spawned twice   ·   NODE  a spawned subprocess   ·   WIRE  the HTTP response   ·   PGB  the browser app</text>
+</svg>
+  </div>
+  <figcaption>Every hop is a change of representation, and most of them cross a process
+  boundary or touch the disk. <b>Twelve representations become eight.</b> The three that
+  go are the two the <code>vg</code> binary exists to produce, the emulated document, the
+  file the response is written to so it can be read straight back &mdash; and, on the
+  client, the regex pass that turns the text into the numbers the server had in the first
+  place. Column three is planned, not built: its sizes are projections, and are labelled as
+  such.</figcaption>
+</figure>
+
+<h3>What each hop is actually for</h3>
+
+<p><strong>The two GFA files</strong> are one extraction split in two. The graph query pulls
+the segments and links of the requested region out of the indexed <code>.gbz</code>; a
+second pass adds one <code>W</code> line per haplotype, by looking up each segment
+separately in a set of position-indexed files. That second pass is 30 of the 38.9 seconds,
+and it is the only stage whose output is cached &mdash; which is why a repeated region can
+come back fast, and why a 1,000-base request once beat a 300-base one.</p>
+
+<p><strong>The <code>.vg</code> and <code>.json</code> pair</strong> exists purely to change
+representation. The subgraph is written out, handed to <code>vg convert</code> to become
+protobuf, handed back to <code>vg view -j</code> to become JSON, and only then read. The
+same information costs about 3.9 bytes per segment visit in GFA and about 51 in the JSON
+&mdash; a thirteenfold inflation for a conversion between two formats this project controls
+both ends of. Increment D does it in process; the golden tests passing with <code>vg</code>
+uninstalled is how that gets demonstrated rather than claimed.</p>
+
+<p><strong>The emulated document</strong> is where the numbers used to go to be turned into
+text. Increment B replaced it with the collector in <code>seqtubemap/band-data.mjs</code>,
+which is now the only description of the picture that exists &mdash; the document is written
+out from it by <code>emit-document.mjs</code>, not alongside it. Bands still carry curves as
+path strings there; increment C is what makes them six floats.</p>
+
+<p><strong>The <code>.svg</code> file</strong> is written to disk so that it can be opened
+and streamed back, then deleted by a background task. It is the clearest single example of
+a stage boundary that used to be a process boundary and no longer is.</p>
+
+<h3>The files a single request leaves behind</h3>
+
+<div class="tbl-scroll">
+<table>
+  <caption>All under <code>./cache/seqtubemap/mc/</code>, named from the region and the query
+  parameters. Everything but the cached subgraph is deleted by a background task after the
+  response is sent &mdash; which is the cleanup half of a problem increment&nbsp;D and
+  increment&nbsp;E's companion work remove rather than tidy.</caption>
+  <thead>
+    <tr><th>File</th><th>Written by</th><th>Fate</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>subgraph_&hellip;_no_walk.gfa</code></td><td>the graph query</td><td>deleted after the response</td></tr>
+    <tr><td><code>subgraph_&hellip;_with_walk.gfa</code></td><td>the walk pass</td><td class="now">kept &mdash; the one deliberate cache</td></tr>
+    <tr><td><code>subgraph_&hellip;.vg</code></td><td><code>vg convert</code></td><td>deleted after the response</td></tr>
+    <tr><td><code>subgraph_&hellip;.json</code></td><td><code>vg view -j</code></td><td>deleted after the response</td></tr>
+    <tr><td><code>subgraph_&hellip;.svg</code></td><td>the Node subprocess</td><td>deleted after the response</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>One consequence worth knowing: because only the walk-added subgraph is checked for
+existence, two requests for the same uncached region will both extract it, over the top of
+each other. That is filed separately and is not part of this rework.</p>
+
+<h2>What has actually been measured</h2>
+
+<p>A and B are built. Run through the real endpoint against five real regions, with the
+picture checked against the app's own reading code &mdash; not a description of it &mdash;
+the results:</p>
+
+<div class="tbl-scroll">
+<table>
+  <caption>Two isolated instances of the real service, one on each side of the change,
+  serving the same five regions, 2026-08-28. The regions are smaller than the ones that
+  fail in production, which cannot be reproduced off the server.</caption>
+  <thead>
+    <tr><th>Region</th><th class="n">Was</th><th class="n">Now</th><th class="n">Faster by</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>90 bases</td><td class="n was">0.65 s</td><td class="n now">0.21 s</td><td class="n">3.0&times;</td></tr>
+    <tr><td>600 bases</td><td class="n was">0.98 s</td><td class="n now">0.28 s</td><td class="n">3.5&times;</td></tr>
+    <tr><td>1,400 bases</td><td class="n was">1.23 s</td><td class="n now">0.33 s</td><td class="n">3.7&times;</td></tr>
+    <tr><td>8,000 bases</td><td class="n was">2.38 s</td><td class="n now">0.74 s</td><td class="n">3.2&times;</td></tr>
+    <tr><td>4,200 bases, 1,201 strands</td><td class="n was">2.56 s</td><td class="n now">0.59 s</td><td class="n">4.3&times;</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Alongside those: memory during a render fell from 1,851 MB to 95 MB; peak memory from
+2,446 MB to 473 MB; the fixed cost paid on <em>every</em> request, however small, fell by
+about 440 milliseconds; and a map that previously exhausted the server's memory limit and
+produced nothing now renders in 6.4 seconds. The responses are byte-for-byte what they were,
+minus the three redundant things that were removed, and all five satisfy the app's parser
+exactly &mdash; the app recovers <em>identical</em> arrays of numbers from before and after.</p>
+
+<p>All of that is with the format unchanged. C is where the 10 MB becomes 1.5 MB.</p>
+
+<div class="note">
+  <p><strong>None of this is live yet.</strong> The service is deployed from a separate
+  release branch, and 43 commits &mdash; A, B, the first tests and the first automated
+  checks &mdash; are waiting behind it. The 120-second, 43%-failure numbers at the top of
+  this page are still what a researcher gets today.</p>
+  <p>The next thing that changes a researcher's experience is not writing more code. It is a
+  deploy.</p>
+</div>
+
+<footer>
+  <p>Every figure on this page is drawn from measurements recorded in this repository:</p>
+  <ul>
+    <li><a href="./perf/seqtubemap-latency.md">docs/perf/seqtubemap-latency.md</a> &mdash; the diagnosis: timings, byte census, memory split</li>
+    <li><a href="./perf/increment-b.md">docs/perf/increment-b.md</a> &mdash; what deleting the invisible browser bought</li>
+    <li><a href="./adr/0001-additive-band-format.md">docs/adr/0001-additive-band-format.md</a> &mdash; the decision, and the alternatives rejected</li>
+    <li><a href="./perf/seqtubemap-plan.md">docs/perf/seqtubemap-plan.md</a> &mdash; the order of events, and what has been closed</li>
+    <li><a href="../CONTEXT.md">CONTEXT.md</a> and <a href="https://claude.ai/code/artifact/eb3ad4a1-d1cb-44b9-a3b8-7c6e7cc12726">docs/lexicon.html</a> &mdash; the vocabulary used here</li>
+  </ul>
+</footer>
+
+</div>
