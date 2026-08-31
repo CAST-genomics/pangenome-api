@@ -57,7 +57,13 @@ import * as d3 from "d3";
 import "./config-client.js";
 import externalConfig from "./config-global.mjs";
 import { defaultTrackColors } from "./common.mjs";
-import { BandCollector } from "./band-data.mjs";
+import {
+  BandCollector,
+  cornerShape,
+  curveBand,
+  rectBand,
+  verticalConnector,
+} from "./band-data.mjs";
 import deepEqual from "deep-equal";
 // const deepEqual = require("deep-equal");
 
@@ -2966,6 +2972,37 @@ function createFeatureRectangle(
 
 const MIN_BEND_WIDTH = 7;
 
+// A reversal's two quarter turns, as the numbers that describe them: where each
+// turn starts, the ordinate it turns at, and how far past the bend's radius it
+// reaches. Both ends of every reversal are this shape — the top and bottom turns
+// differ only in which ordinate they take, and the two directions only in which
+// way they reach — so it is said once here. The drawing command they used to be
+// written as is built in emit-document.mjs (#23).
+function pushReversalTurns({
+  x,
+  yTop,
+  yBottom,
+  radius,
+  trackWidth,
+  direction,
+  trackColor,
+  trackID,
+  type,
+}) {
+  const turn = {
+    x,
+    radius,
+    bend: Math.min(MIN_BEND_WIDTH, trackWidth),
+    thickness: trackWidth,
+    direction,
+    color: trackColor,
+    id: trackID,
+    type,
+  };
+  trackCorners.push({ ...turn, y: yBottom, turn: "bottom" });
+  trackCorners.push({ ...turn, y: yTop, turn: "top" });
+}
+
 function generateForwardToReverse(
   x,
   yStart,
@@ -3017,25 +3054,17 @@ function generateForwardToReverse(
   }); // elongate outgoing rectangle a bit to the right
 
 
-  let d = `M ${x + 5} ${yBottom}`;
-  d += ` Q ${x + 5 + radius} ${yBottom} ${x + 5 + radius} ${yBottom - radius}`;
-  d += ` H ${x + 5 + radius + Math.min(MIN_BEND_WIDTH, trackWidth)}`;
-  d += ` Q ${x + 5 + radius + Math.min(MIN_BEND_WIDTH, trackWidth)} ${
-    yBottom + trackWidth
-  } ${x + 5} ${yBottom + trackWidth}`;
-  d += " Z ";
-  trackCorners.push({ path: d, color: trackColor, id: trackID, type });
-
-  d = `M ${x + 5} ${yTop}`;
-  d += ` Q ${x + 5 + radius + Math.min(MIN_BEND_WIDTH, trackWidth)} ${yTop} ${
-    x + 5 + radius + Math.min(MIN_BEND_WIDTH, trackWidth)
-  } ${yTop + trackWidth + radius}`;
-  d += ` H ${x + 5 + radius}`;
-  d += ` Q ${x + 5 + radius} ${yTop + trackWidth} ${x + 5} ${
-    yTop + trackWidth
-  }`;
-  d += " Z ";
-  trackCorners.push({ path: d, color: trackColor, id: trackID, type });
+  pushReversalTurns({
+    x: x + 5,
+    yTop,
+    yBottom,
+    radius,
+    trackWidth,
+    direction: "rightward",
+    trackColor,
+    trackID,
+    type,
+  });
   extraRight[order] += 1;
 }
 
@@ -3086,27 +3115,20 @@ function generateReverseToForward(
     type,
   }); // elongate outgoing rectangle a bit to the left
 
-  // Path for bottom 90 degree bend
-  let d = `M ${x - 5} ${yBottom}`;
-  d += ` Q ${x - 5 - radius} ${yBottom} ${x - 5 - radius} ${yBottom - radius}`;
-  d += ` H ${x - 5 - radius - Math.min(MIN_BEND_WIDTH, trackWidth)}`;
-  d += ` Q ${x - 5 - radius - Math.min(MIN_BEND_WIDTH, trackWidth)} ${
-    yBottom + trackWidth
-  } ${x - 5} ${yBottom + trackWidth}`;
-  d += " Z ";
-  trackCorners.push({ path: d, color: trackColor, id: trackID, type });
-
-  // Path for top 90 degree bend
-  d = `M ${x - 5} ${yTop}`;
-  d += ` Q ${x - 5 - radius - Math.min(MIN_BEND_WIDTH, trackWidth)} ${yTop} ${
-    x - 5 - radius - Math.min(MIN_BEND_WIDTH, trackWidth)
-  } ${yTop + trackWidth + radius}`;
-  d += ` H ${x - 5 - radius}`;
-  d += ` Q ${x - 5 - radius} ${yTop + trackWidth} ${x - 5} ${
-    yTop + trackWidth
-  }`;
-  d += " Z ";
-  trackCorners.push({ path: d, color: trackColor, id: trackID, type });
+  // The same two turns as generateForwardToReverse's, reaching to the left of
+  // where the reversal starts rather than to the right. That is the whole of the
+  // difference, and it is what `direction` carries.
+  pushReversalTurns({
+    x: x - 5,
+    yTop,
+    yBottom,
+    radius,
+    trackWidth,
+    direction: "leftward",
+    trackColor,
+    trackID,
+    type,
+  });
   extraLeft[order] += 1;
 }
 
@@ -3117,7 +3139,7 @@ function drawReversalsByColor(corners, rectangles, type) {
     co.add(rect.color);
   });
   co.forEach((c) => {
-    drawTrackRectangles(rectangles.filter(filterObjectByAttribute("color", c)), type);
+    drawVerticalRectangles(rectangles.filter(filterObjectByAttribute("color", c)), type);
     drawTrackCorners(corners.filter(filterObjectByAttribute("color", c)), type);
   });
 }
@@ -3579,20 +3601,35 @@ function collectStrand(shape) {
   });
 }
 
-function drawTrackRectangles(rectangles, type) {
-  rectangles = rectangles.filter(filterObjectByAttribute("type", type));
+// A rectangle of this type, collected as `collect` makes it: the layout's two
+// corners read as a corner and an extent, which is what both kinds take.
+function drawRectangles(rectangles, type, collect) {
+  rectangles
+    .filter(filterObjectByAttribute("type", type))
+    .forEach((rectangle) =>
+      bandCollector.band(
+        collect({
+          strand: collectStrand(rectangle),
+          x: rectangle.xStart,
+          y: rectangle.yStart,
+          width: rectangle.xEnd - rectangle.xStart + 1,
+          height: rectangle.yEnd - rectangle.yStart + 1,
+          alpha: rectangle.alpha,
+        })
+      )
+    );
+}
 
-  rectangles.forEach((rectangle) =>
-    bandCollector.band({
-      kind: "rect",
-      strand: collectStrand(rectangle),
-      x: rectangle.xStart,
-      y: rectangle.yStart,
-      width: rectangle.xEnd - rectangle.xStart + 1,
-      height: rectangle.yEnd - rectangle.yStart + 1,
-      alpha: rectangle.alpha,
-    })
-  );
+// A strand's passage through a segment box: the degenerate band, drawn flat.
+function drawTrackRectangles(rectangles, type) {
+  drawRectangles(rectangles, type, rectBand);
+}
+
+// The vertical connectors of a reversal. The same rectangle to draw, and not a
+// band: one is as tall as the reversal is deep, where a band is always
+// BAND_THICKNESS.
+function drawVerticalRectangles(rectangles, type) {
+  drawRectangles(rectangles, type, verticalConnector);
 }
 
 function compareCurvesByXYStartValue(a, b) {
@@ -3650,15 +3687,12 @@ function drawTrackCurves(type) {
         adjustValue += adjustIncrement;
         xNextAdjusted = curve.xStart + (curve.xEnd - curve.xStart) * adjustValue;
       }
-      let d = `M ${curve.xStart} ${curve.yStart}`;
-      d += ` C ${xAdjusted} ${curve.yStart} ${xAdjusted} ${curve.yEnd} ${curve.xEnd} ${curve.yEnd}`;
-      d += ` V ${curve.yEnd + curve.width}`;
-      d += ` C ${xNextAdjusted} ${curve.yEnd + curve.width} ${xNextAdjusted} ${
-        curve.yStart + curve.width
-      } ${curve.xStart} ${curve.yStart + curve.width}`;
-      d += " Z";
-      curve.path = d;
-
+      // The two control abscissae, which is all the grouping above exists to
+      // work out: everything else about the curve's shape is already on it. The
+      // drawing command they used to be built into is written in
+      // emit-document.mjs now, out of these numbers (#23).
+      curve.controlTop = xAdjusted;
+      curve.controlBottom = xNextAdjusted;
     })
   });
 
@@ -3693,12 +3727,19 @@ function drawTrackCurves(type) {
   // grouping and the within-group sort above arrived at, not the order the
   // curves were generated in.
   flattenedGroups.forEach((curve) =>
-    bandCollector.band({
-      kind: "curve",
-      strand: collectStrand(curve),
-      path: curve.path,
-      alpha: curve.alpha,
-    })
+    bandCollector.band(
+      curveBand({
+        strand: collectStrand(curve),
+        x0: curve.xStart,
+        y0: curve.yStart,
+        x1: curve.xEnd,
+        y1: curve.yEnd,
+        controlTop: curve.controlTop,
+        controlBottom: curve.controlBottom,
+        thickness: curve.width,
+        alpha: curve.alpha,
+      })
+    )
   );
 }
 
@@ -3706,11 +3747,18 @@ function drawTrackCorners(corners, type) {
   corners = corners.filter(filterObjectByAttribute("type", type));
 
   corners.forEach((corner) =>
-    bandCollector.band({
-      kind: "corner",
-      strand: collectStrand(corner),
-      path: corner.path,
-    })
+    bandCollector.band(
+      cornerShape({
+        strand: collectStrand(corner),
+        x: corner.x,
+        y: corner.y,
+        radius: corner.radius,
+        bend: corner.bend,
+        thickness: corner.thickness,
+        turn: corner.turn,
+        direction: corner.direction,
+      })
+    )
   );
 }
 

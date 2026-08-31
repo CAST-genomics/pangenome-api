@@ -197,9 +197,19 @@ test("an inversion's corners and vertical rectangles are captured too", async ()
 
   const corners = bandData.bands.filter((band) => band.kind === "corner");
   assert.ok(corners.length > 0, "the inverted input produced no corner bands");
+
+  // The vertical connectors between the two turns. They are their own kind
+  // rather than bands, because one is as tall as the reversal is deep where a
+  // band is always `BAND_THICKNESS` — see band-geometry.test.mjs — and they are
+  // the other shape the document paints no opacity on.
+  const connectors = bandData.bands.filter((band) => band.kind === "connector");
+  assert.ok(connectors.length > 0, "the inverted input produced no vertical connectors");
+  for (const connector of connectors) {
+    assert.equal(connector.alpha, undefined, "a vertical connector carries an opacity");
+  }
   assert.ok(
-    bandData.bands.some((band) => band.kind === "rect" && band.alpha === undefined),
-    "the inverted input produced no rectangle without an opacity",
+    connectors.some((connector) => connector.height !== 15),
+    "no vertical connector is taller than a band, so nothing here needed its own height",
   );
 
   // The layout builds a corner without a strand name — which is why the
