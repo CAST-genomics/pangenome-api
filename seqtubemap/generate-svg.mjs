@@ -24,12 +24,6 @@ if (pclaiColorSchemeArg !== undefined) {
   pclaiColorScheme = JSON.parse(pclaiColorSchemeArg);
 }
 
-// DEBUGGING
-setInterval(() => {
-  const m = process.memoryUsage();
-  console.error(`[mem] rss=${(m.rss/1e6).toFixed(0)}MB heapUsed=${(m.heapUsed/1e6).toFixed(0)}MB heapTotal=${(m.heapTotal/1e6).toFixed(0)}MB`);
-}, 500).unref();
-
 const { document } = await renderTubeMap({
   inputFile,
   start,

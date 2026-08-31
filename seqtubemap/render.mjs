@@ -66,9 +66,6 @@ export async function renderTubeMap({
 
   const segments = vgExtractNodes(vgJson);
   const strands = reorderTracksForLayout(vgExtractTracks(vgJson, 0, 1));
-  // DEBUGGING — the fork logs its own progress to stderr; this is the line the
-  // CLI has always printed alongside it.
-  console.error("tracks[0].name:", strands[0].name, "length:", strands[0].sequence.length);
 
   create({
     // The layout's own vocabulary: its `nodes` are this codebase's segments,

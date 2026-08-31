@@ -364,14 +364,6 @@ export function setSoftClipsFlag(value) {
 // main
 function createTubeMap() {
   console.log("Recreating tube map");
-  const START = Date.now();
-  const t = (label) => {
-    const m = process.memoryUsage();
-    console.error(
-      `[time] ${label}: ${Date.now() - START}ms, tracks=${tracks ? tracks.length : "?"}, nodes=${nodes ? nodes.length : "?"}, ` +
-      `rss=${(m.rss/1e6).toFixed(0)}MB heapUsed=${(m.heapUsed/1e6).toFixed(0)}MB heapTotal=${(m.heapTotal/1e6).toFixed(0)}MB`
-    );
-  };
   trackRectangles = [];
   trackCurves = [];
   trackCorners = [];
@@ -390,13 +382,10 @@ function createTubeMap() {
   // changed before any graph has been rendered
   if (inputNodes.length === 0 || inputTracks.length === 0) return;
 
-  t("init");
   straightenTrack(0);
-  t("straightenTrack");
   nodes = deepCopy(inputNodes); // deep copy (can add stuff to copy and leave original unchanged)
   tracks = deepCopy(inputTracks);
   reads = deepCopy(inputReads);
-  t("deepCopy");
 
   reads = filterReads(reads);
 
@@ -415,51 +404,38 @@ function createTubeMap() {
   }
   if (tracks.length === 0) return;
 
-  t("type/hidden loop");
   nodeMap = generateNodeMap(nodes);
   generateTrackIndexSequences(tracks);
-  t("generateTrackIndexSequences #1");
   if (reads && config.showReads) generateTrackIndexSequences(reads);
   generateNodeWidth();
-  t("generateNodeWidth #1");
 
   if (config.mergeNodesFlag) {
     generateNodeSuccessors(); // requires indexSequence
-    t("generateNodeSuccessors #1");
     generateNodeOrder(); // requires successors
-    t("generateNodeOrder #1");
     if (reads && config.showReads) reverseReversedReads();
     mergeNodes();
-    t("mergeNodes");
     nodeMap = generateNodeMap(nodes);
     generateNodeWidth();
     generateTrackIndexSequences(tracks);
     if (reads && config.showReads) generateTrackIndexSequences(reads);
-    t("post-merge regen");
   }
 
   numberOfNodes = nodes.length;
   numberOfTracks = tracks.length;
   generateNodeSuccessors();
-  t("generateNodeSuccessors #2");
   generateNodeDegree();
-  t("generateNodeDegree");
   if (DEBUG) console.log(`${numberOfNodes} nodes.`);
   generateNodeOrder();
-  t("generateNodeOrder #2");
   maxOrder = getMaxOrder();
 
   // can cause problems when there is a reversed single track node
   // OTOH, can solve problems with complex inversion patterns
   switchNodeOrientation();
-  t("switchNodeOrientation");
   generateNodeOrder(nodes, tracks);
-  t("generateNodeOrder #3");
   maxOrder = getMaxOrder();
 
   calculateTrackWidth(tracks);
   generateLaneAssignment();
-  t("generateLaneAssignment");
 
   if (config.showExonsFlag === true && bed !== null) addTrackFeatures();
 
@@ -479,10 +455,8 @@ function createTubeMap() {
   }
 
   generateNodeXCoords();
-  t("generateNodeXCoords");
 
   generateSVGShapesFromPath(nodes, tracks);
-  t("generateSVGShapesFromPath");
   if (DEBUG) {
     console.log("Tracks:");
     console.log(tracks);
@@ -493,17 +467,12 @@ function createTubeMap() {
   }
   getImageDimensions();
   bandCollector.setExtent({ maxXCoordinate, maxYCoordinate, minYCoordinate });
-  t("getImageDimensions");
 
   // The bands, in draw order — which is paint order, and which is the order
   // the emitter writes them into `g.track`.
-  console.error(`[shapes] rects=${trackRectangles.length} curves=${trackCurves.length} corners=${trackCorners.length} vrects=${trackVerticalRectangles.length}`);
   drawTrackRectangles(trackRectangles, "haplotype");
-  t("drawTrackRectangles #1");
   drawTrackCurves("haplotype");
-  t("drawTrackCurves #1");
   drawReversalsByColor(trackCorners, trackVerticalRectangles, "haplotype");
-  t("drawReversalsByColor #1");
   drawTrackRectangles(trackRectanglesStep3, "haplotype");
   drawTrackRectangles(trackRectangles, "read");
   drawTrackCurves("read");
@@ -515,7 +484,6 @@ function createTubeMap() {
   drawNodes(dNodes);
   if (config.nodeWidthOption === "normal") drawLabels(dNodes);
   if (trackForRuler !== undefined) drawRuler();
-  t("drawRuler");
   if (config.nodeWidthOption === "normal") drawMismatches(); // TODO: call this before drawLabels and fix d3 data/append/enter stuff
   if (DEBUG) {
     console.log(`number of tracks: ${numberOfTracks}`);
