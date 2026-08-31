@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { cases, goldenPath, repoRoot } from "./golden-cases.mjs";
-import { assertParseableByPgb, drawables, readBands } from "./pgb-parser.mjs";
+import { assertParseableByPgb, drawables, readBands, strandGroup } from "./pgb-parser.mjs";
 
 // Measured on the jsdom-era goldens, at commit 399db1e. `small-normal` had no
 // golden then — the mode was not deterministic enough to have one — so its count
@@ -171,4 +171,48 @@ test("a reversal draws shapes pgb cannot read, and this is where that is written
     `expected pgb's grammar to miss some of the ${counted} drawables, but it matched all of them`,
   );
   assert.throws(() => assertParseableByPgb(document), /are not bands pgb recognises/);
+});
+
+test("a PCLAI scheme with fractional channels still emits colours pgb can read", async () => {
+  // The live failure this test was written from: `pgb` refused a chr7 document
+  // whole, over 6 of its 1,626 drawables, because their strand's colour was
+  // `rgb(0, 228.5, 178.5)`. `pgb`'s grammar matches whole-number channels only,
+  // and a PCLAI scheme supplies floats — the walks file carries them that way and
+  // `bandage_graph.py` parses them with `float()`.
+  //
+  // The emulated document rounded them in jsdom's CSS serializer on the way out,
+  // so this never surfaced before #22; the emitter has to round them itself, and
+  // `cssColor` is where it does. No committed scheme holds a fractional channel,
+  // which is exactly why nothing caught it — so one is made here, from a real
+  // subgraph's own scheme, by putting every channel half a step off.
+  const { pclaiPath, realCases, regionOf, inputPath } = await import("./real-cases.mjs");
+  const { renderTubeMap } = await import("../../seqtubemap/render.mjs");
+
+  const name = realCases[0];
+  const scheme = JSON.parse(readFileSync(pclaiPath(name), "utf8"));
+  for (const entry of Object.values(scheme)) {
+    entry[0] = entry[0].map((channel) => channel + 0.5);
+  }
+
+  const { start, end } = regionOf(name);
+  const { document, bandData } = await renderTubeMap({
+    inputFile: inputPath(name),
+    start,
+    end,
+    nodeWidthOption: "compressed",
+    pclaiColorScheme: scheme,
+  });
+
+  // The scheme really did colour the picture, so the assertion below is about it.
+  assert.ok(
+    bandData.strands.some((strand) => /\.\d/.test(strand.color)),
+    "no strand carries a fractional colour, so this test is no longer about anything",
+  );
+
+  assert.doesNotMatch(
+    strandGroup(document),
+    /fill: rgb\([^)]*\.\d/,
+    "a band's colour reached the document with a fractional channel, which pgb cannot read",
+  );
+  assertParseableByPgb(document, bandData);
 });
