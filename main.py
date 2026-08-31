@@ -83,7 +83,7 @@ class MissingWalkDerivative(RuntimeError):
 
 
 class WalkDerivative:
-    """One tabix-indexed walk derivative, opened the first time it is read.
+    """One tabix-indexed walk derivative, opened the first time a thread reads it.
 
     Stands in for the `pysam.TabixFile` the call sites used to be handed: they
     call `fetch` and nothing else. The open is deferred because these files are
@@ -93,35 +93,49 @@ class WalkDerivative:
     now a `MissingWalkDerivative` on the request that needed it, naming the file
     and what wanted it, instead of a crash before the first request.
 
-    The handle is kept, so a file is opened once per process rather than once
-    per request. Endpoints run in FastAPI's threadpool, hence the lock.
+    **One handle per thread, and that is load-bearing.** A `pysam.TabixFile` is
+    one htslib file handle with one seek position, and pysam does not support
+    reading it from two threads at once. `fetch` compounds that: it returns a
+    lazy iterator, so the handle stays in use for as long as the *caller* takes
+    to consume it — `GenerateWalksMC` holds one open per `S` line, for minutes on
+    a large region — and no lock this class could take around `fetch` would cover
+    that. Endpoints run in FastAPI's threadpool, so two requests really do
+    overlap. Sharing one handle across them interleaved the seeks and left the
+    handle broken for the life of the process: after it, every request that read
+    a walk derivative failed, while cached requests, which read none, went on
+    working. `threading.local` gives each threadpool thread its own handle, which
+    is the granularity pysam actually supports. The pool is small and long-lived,
+    so this is a handful of handles, still opened once each rather than per
+    request.
     """
 
     def __init__(self, path, purpose):
         self.path = Path(path)
         self.purpose = purpose
-        self._tabix_file = None
-        self._lock = threading.Lock()
+        self._per_thread = threading.local()
 
     def fetch(self, *args, **kwargs):
         return self._open().fetch(*args, **kwargs)
 
     def _open(self):
-        with self._lock:
-            if self._tabix_file is None:
-                try:
-                    self._tabix_file = pysam.TabixFile(str(self.path))
-                except (OSError, ValueError) as error:
-                    # pysam raises for both the file and its tabix index, and
-                    # says only "could not open" — the path and the caller are
-                    # what makes it actionable.
-                    raise MissingWalkDerivative(
-                        f"{self.path} could not be opened, and it is needed to "
-                        f"{self.purpose}. It is a team-generated walk derivative: "
-                        f"put it, and its tabix index, in the directory named by "
-                        f"`git config data.path`. ({error})"
-                    ) from error
-        return self._tabix_file
+        # No lock: the attribute lives on this thread's `threading.local`, so
+        # there is nothing here for another thread to race with.
+        tabix_file = getattr(self._per_thread, "tabix_file", None)
+        if tabix_file is None:
+            try:
+                tabix_file = pysam.TabixFile(str(self.path))
+            except (OSError, ValueError) as error:
+                # pysam raises for both the file and its tabix index, and
+                # says only "could not open" — the path and the caller are
+                # what makes it actionable.
+                raise MissingWalkDerivative(
+                    f"{self.path} could not be opened, and it is needed to "
+                    f"{self.purpose}. It is a team-generated walk derivative: "
+                    f"put it, and its tabix index, in the directory named by "
+                    f"`git config data.path`. ({error})"
+                ) from error
+            self._per_thread.tabix_file = tabix_file
+        return tabix_file
 
 
 @app.exception_handler(MissingWalkDerivative)
@@ -243,9 +257,16 @@ def PreprocessMCSubgraphV1(gfa_preprocessed, gfa_postprocessed, mc_mapped_walks,
         subgfa_postprocess.write(f"L\t{link[1]}\t{link[2]}\t{link[3]}\t{link[4]}\t{link[5]}\n")
 
 def GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_walk, mc_mapped_walks_v2, log):
-    
     """
     Add W lines to minigraph cactus subgraph .gfa
+
+    Written under a temporary name and renamed into place only once the W lines
+    are down. The `W` lines are written last, after every `S` and `L` line, so a
+    run that fails partway leaves a *structurally valid GFA describing a graph
+    with no paths in it* — which the cache took for a finished extraction, and
+    which the renderer can only fail on. `os.replace` is atomic within a
+    directory, and the temporary is made in the destination's own directory so
+    that it is: either the finished file is there or nothing is.
 
     Parameters
     ----------
@@ -256,7 +277,23 @@ def GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_w
         mc_mapped_walks_v2: WalkDerivative
             minigraph cactus walk file
     """
-    
+    destination = Path(preprocess_gfa_subgraph_w_walk)
+    # Distinct per thread as well as per process: two requests for the same
+    # uncached region run concurrently on the threadpool (#54), and each must
+    # write its own file rather than interleave into one.
+    partial = destination.with_name(
+        f"{destination.name}.partial-{os.getpid()}-{threading.get_ident()}"
+    )
+    try:
+        _write_walks_mc(preprocess_gfa_subgraph_no_walk, partial, mc_mapped_walks_v2, log)
+    except BaseException:
+        partial.unlink(missing_ok=True)
+        raise
+    os.replace(partial, destination)
+
+
+def _write_walks_mc(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_walk, mc_mapped_walks_v2, log):
+    """The body of `GenerateWalksMC`, writing wherever it is pointed."""
     gfa_no_walk = open(preprocess_gfa_subgraph_no_walk, "r")
     gfa_w_walk = open(preprocess_gfa_subgraph_w_walk, "w")
     strand_translation = {"+":">", "-":"<"}
@@ -385,7 +422,56 @@ def GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_w
                 walk_start = sorted_coords_final[q][0][0]
                 walk_end = sorted_coords_final[q][-1][1]
                 gfa_w_walk.write(f"W\t{sample}\t{haplo}\t{contig}\t{walk_start}\t{walk_end}\t{write_walk}\n")
-            
+
+    gfa_w_walk.close()
+    gfa_no_walk.close()
+
+
+def subgraph_has_walks(gfa_subgraph):
+    """True when this extracted subgraph carries at least one `W` line.
+
+    What "already extracted" has to mean, in place of "the file is there".
+    A GFA with no walks names no strands, so the renderer has nothing to draw
+    and every stage after it fails — and because the file exists, a cache keyed
+    on existence pins that failure for good rather than retrying it. This is the
+    check that tells a finished extraction from an abandoned one, and it clears
+    entries left behind before `GenerateWalksMC` wrote atomically.
+
+    Read from the end of the file: `W` lines are written after every `S` and `L`
+    line, so a subgraph that has any ends with one, and this stays constant-time
+    on a subgraph of any size.
+    """
+    gfa_subgraph = Path(gfa_subgraph)
+    if not gfa_subgraph.exists():
+        return False
+    # Comfortably more than the longest `W` line these subgraphs produce, so the
+    # window always spans a whole line when there is one to find.
+    window = 1 << 16
+    with open(gfa_subgraph, "rb") as handle:
+        handle.seek(max(0, gfa_subgraph.stat().st_size - window))
+        tail = handle.read()
+    return b"\nW\t" in tail or tail.startswith(b"W\t")
+
+
+def stage_failed(stage, region, detail):
+    """The error a failed pipeline stage raises, naming itself.
+
+    A stage that failed used to reach the client as a bare 500 from
+    `FileResponse`, over a file no stage ever wrote — which says nothing about
+    which stage failed, and reaches the browser as "Failed to fetch", because an
+    unhandled exception is rendered outside the CORS middleware and so arrives
+    with no CORS headers on it. Raised as an `HTTPException` it passes through
+    that middleware like any other response, so the browser can show what
+    happened. 502 rather than 500: every one of these stages is an external tool
+    — gbz-base, `vg`, Node — and the failure is theirs.
+    """
+    message = (
+        f"the {stage} stage failed for {region.chrom}:{region.start}-{region.end}: {detail}"
+    )
+    api_log.error(message)
+    return HTTPException(status_code=502, detail=message)
+
+
 def SeqTubeGfaProcessor(preprocess_gfa_subgraph, postprocess_gfa_subgraph, pathnumoption):
     """
     rewrite gfa to fit the input requirements of sequence tube map. Output of this function is 
@@ -444,6 +530,27 @@ def SeqTubeGfaProcessor(preprocess_gfa_subgraph, postprocess_gfa_subgraph, pathn
 
     return
 
+def _stage_succeeded(proc, described_as):
+    """Whether an external tool succeeded, and what it said when it did not.
+
+    Every one of these helpers captures the tool's stderr and has always thrown
+    it away, so a stage that failed left the server with a False and the
+    operator with nothing. The message is what turns "it returns 500" into a
+    cause; `stage_failed` points the client at it.
+    """
+    if proc.returncode == 0:
+        return True
+    stderr = (proc.stderr or b"").decode("utf-8", "replace").strip()
+    # The last few lines: these tools print progress before they print the
+    # problem, and the tail is the part that says what went wrong.
+    tail = "\n".join(stderr.splitlines()[-20:])
+    api_log.error(
+        f"`{described_as}` exited {proc.returncode}"
+        + (f", stderr:\n{tail}" if tail else " and said nothing on stderr")
+    )
+    return False
+
+
 def ConvertGfaToVg(gfa_file, vg_file):
     """
     convert .gfa to .vg with vg convert
@@ -463,8 +570,8 @@ def ConvertGfaToVg(gfa_file, vg_file):
     
     cmd = ["vg", "convert", "-g", gfa_file]
     with open(vg_file, "wb") as out:
-        proc = subprocess.run(cmd, stdout=out)
-    return proc.returncode == 0
+        proc = subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE)
+    return _stage_succeeded(proc, "vg convert -g")
     
 def ConvertVgToJson(vg_file, json_file):
     """
@@ -486,7 +593,7 @@ def ConvertVgToJson(vg_file, json_file):
     cmd = ["vg", "view", "-j", vg_file]
     with open(json_file, "wb") as out:
         proc = subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE)
-    return proc.returncode == 0
+    return _stage_succeeded(proc, "vg view -j")
 
 def GenerateSeqTubeMapSvg(json_file, svg_file, start, end, nodewidthoption, pclai_color_scheme = None):
     """
@@ -520,7 +627,7 @@ def GenerateSeqTubeMapSvg(json_file, svg_file, start, end, nodewidthoption, pcla
         cmd.append(json.dumps(pclai_color_scheme))
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-    return proc.returncode == 0
+    return _stage_succeeded(proc, "node generate-svg.mjs")
 
 def SubgraphMini(query_region, gfa_preprocessed, reference_gfa, log):
     # check gbz.db file and create subgraph
@@ -732,7 +839,11 @@ def seqtubemap(
     seqtubemap_svg = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_path{pathnumoption}_{version}.svg")
       
     stages = {}
-    subgraph_cached = preprocess_gfa_subgraph_w_walk.exists()
+    # A cache hit is a subgraph with walks in it, not merely a file at the path:
+    # see subgraph_has_walks. An entry that fails this is re-extracted rather
+    # than served, so an extraction that died halfway costs one retry instead of
+    # breaking its region until somebody deletes the file by hand.
+    subgraph_cached = subgraph_has_walks(preprocess_gfa_subgraph_w_walk)
 
     with stage_timing(stages, "subgraph_extract"):
         if not subgraph_cached:
@@ -745,14 +856,32 @@ def seqtubemap(
                 background_tasks.add_task(delete_files, [preprocess_gfa_subgraph_no_walk])
             else:
                 log.error(f"Invalid graph version {version}(valid versions: \"v1\" or \"v2\")")
-    
+
+    # Checked rather than assumed, and checked the same way for a fresh
+    # extraction and a cached one: everything downstream reads this file, and a
+    # subgraph with no walks in it fails every one of those stages in turn, each
+    # for a reason further from the cause.
+    if not subgraph_has_walks(preprocess_gfa_subgraph_w_walk):
+        raise stage_failed(
+            "subgraph_extract",
+            query_region,
+            f"{preprocess_gfa_subgraph_w_walk.name} carries no W lines, so the "
+            "subgraph names no strands. Either the region yielded no walks, or "
+            "the extraction did not finish.",
+        )
+
     # TODO update SeqTubeGfaProcessor; pathnumoption = compressed is currently not supported
     # with stage_timing(stages, "gfa_process"):
         # SeqTubeGfaProcessor(preprocess_gfa_subgraph, postprocess_gfa_subgraph, pathnumoption)
     with stage_timing(stages, "gfa_to_vg"):
-        ConvertGfaToVg(preprocess_gfa_subgraph_w_walk, vg_subgraph)
+        converted_to_vg = ConvertGfaToVg(preprocess_gfa_subgraph_w_walk, vg_subgraph)
+    if not converted_to_vg:
+        raise stage_failed("gfa_to_vg", query_region, "`vg convert -g` exited non-zero")
+
     with stage_timing(stages, "vg_to_json"):
-        ConvertVgToJson(vg_subgraph, json_subgraph)
+        converted_to_json = ConvertVgToJson(vg_subgraph, json_subgraph)
+    if not converted_to_json:
+        raise stage_failed("vg_to_json", query_region, "`vg view -j` exited non-zero")
     
     with stage_timing(stages, "get_pclai_color_scheme"):
         pclai_color_scheme = None
@@ -764,7 +893,14 @@ def seqtubemap(
                 pclai_color_scheme = GetPclaiColorScheme(minigraphnode, minigraph_walks_v2_updated, log)
             
     with stage_timing(stages, "generate_svg"):
-        GenerateSeqTubeMapSvg(json_subgraph, seqtubemap_svg, start, end, nodewidthoption, pclai_color_scheme)
+        rendered = GenerateSeqTubeMapSvg(json_subgraph, seqtubemap_svg, start, end, nodewidthoption, pclai_color_scheme)
+    if not rendered or not seqtubemap_svg.exists():
+        raise stage_failed(
+            "generate_svg",
+            query_region,
+            "the Node render exited non-zero or wrote no document; its stderr is "
+            "in the log above",
+        )
 
     def size_mb(path):
         return round(path.stat().st_size / 1048576, 2) if path.exists() else None

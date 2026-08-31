@@ -56,6 +56,16 @@ FAST_REQUEST = (
 )
 
 
+# What a stage has to leave behind for the pipeline to carry on: a `W` line, so
+# the extracted subgraph counts as one with walks in it
+# (`main.py:subgraph_has_walks`), and a truthy return, so the stage counts as
+# having succeeded. Both are checked now — a stage that produces nothing is a
+# 502 naming itself rather than a 500 three stages later
+# (tests/python/test_pipeline_failures.py) — and a stand-in has to satisfy the
+# same contract as the real thing or it is standing in for something else.
+STAND_IN_OUTPUT = b"H\tVN:Z:1.1\nS\t1\tACGT\nW\tHG1\t1\tchr1\t0\t4\t>1\n"
+
+
 def _stage_writing_its_output(stalls_for=None):
     """Stand in for one pipeline stage: write the output path it was handed.
 
@@ -67,7 +77,8 @@ def _stage_writing_its_output(stalls_for=None):
     def stage(*args, **kwargs):
         if stalls_for is not None:
             time.sleep(stalls_for)
-        Path(args[1]).write_bytes(b"stand-in for a pipeline stage's output\n")
+        Path(args[1]).write_bytes(STAND_IN_OUTPUT)
+        return True
 
     return stage
 
