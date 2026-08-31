@@ -30,6 +30,12 @@
 // If a change here has to break that contract, stop and escalate: shipping
 // against an unchanged `pgb` is the whole reason this increment is safe to ship
 // alone.
+//
+// Since #23 that includes the geometry itself. The layout used to hand over each
+// band's `d` attribute already built; now it hands over the six numbers the
+// attribute encoded, and the drawing command is written here — so this module is
+// the one place a band becomes a drawing at all.
+import { BAND_THICKNESS } from "./band-data.mjs";
 
 /** The document this band data describes, in full. */
 export function emitDocument(bandData) {
@@ -45,12 +51,94 @@ export function emitDocument(bandData) {
   );
 }
 
+// Which element a band is drawn as, and the geometry attributes that go on it.
+// The band data holds numbers (`band-data.mjs`); the drawing command is built
+// here, and nowhere else, which is what "the document is derived from the band
+// data" now means down to the `d` attribute.
+function bandGeometry(band) {
+  switch (band.kind) {
+    case "rect":
+      return {
+        element: "rect",
+        // A band's far end is carried as an abscissa and written back as a
+        // width. `rectBand` is what holds the two spellings to the same number.
+        attributes:
+          ` x="${attribute(band.x0)}" y="${attribute(band.y0)}"` +
+          ` width="${attribute(band.x1 - band.x0)}" height="${attribute(BAND_THICKNESS)}"`,
+      };
+    case "connector":
+      return {
+        element: "rect",
+        attributes:
+          ` x="${attribute(band.x)}" y="${attribute(band.y)}"` +
+          ` width="${attribute(band.width)}" height="${attribute(band.height)}"`,
+      };
+    case "curve":
+      return { element: "path", attributes: ` d="${attribute(curvePath(band))}"` };
+    case "corner":
+      return { element: "path", attributes: ` d="${attribute(cornerPath(band))}"` };
+    default:
+      // Loudly, like the builders that made these records: a kind this does not
+      // know would otherwise be drawn as a curve with undefined coordinates —
+      // a plausible-looking shape in the wrong place, which is the one failure
+      // a document nobody diffs must not have.
+      throw new Error(
+        `a band of kind "${band.kind}" is not one this emitter can draw. ` +
+          "Every kind band-data.mjs collects has to be written here.",
+      );
+  }
+}
+
+/**
+ * A band's outline: along the upper edge, down by the thickness, back along the
+ * lower edge, closed.
+ *
+ * Both cubics' control ordinates repeat the endpoints and the lower edge is the
+ * upper edge shifted by `BAND_THICKNESS`, so the six numbers plus the constant
+ * say the whole shape. `pgb`'s `assertGrammar` checks that redundancy on the way
+ * back in, over the document this writes.
+ */
+function curvePath({ x0, y0, x1, y1, controlTop, controlBottom }) {
+  const bottom0 = y0 + BAND_THICKNESS;
+  const bottom1 = y1 + BAND_THICKNESS;
+  return (
+    `M ${x0} ${y0}` +
+    ` C ${controlTop} ${y0} ${controlTop} ${y1} ${x1} ${y1}` +
+    ` V ${bottom1}` +
+    ` C ${controlBottom} ${bottom1} ${controlBottom} ${bottom0} ${x0} ${bottom0}` +
+    " Z"
+  );
+}
+
+/**
+ * A reversal's quarter turn, from the near abscissa out to the bend and back.
+ *
+ * The two turns are the same shape read in opposite directions - the top one
+ * reaches to the far abscissa first and the bottom one to the near - and the two
+ * *directions* are mirror images, which is what the sign is. Written as one
+ * builder rather than four, because four templates that must stay in step is how
+ * the layout wrote it and is the reason a corner is hard to read at all.
+ */
+function cornerPath({ x, y, radius, bend, turn, direction }) {
+  const sign = direction === "leftward" ? -1 : 1;
+  const middle = x + radius * sign;
+  const far = middle + bend * sign;
+  const bottom = y + BAND_THICKNESS;
+
+  if (turn === "bottom") {
+    return (
+      `M ${x} ${y} Q ${middle} ${y} ${middle} ${y - radius}` +
+      ` H ${far} Q ${far} ${bottom} ${x} ${bottom} Z `
+    );
+  }
+  return (
+    `M ${x} ${y} Q ${far} ${y} ${far} ${bottom + radius}` +
+    ` H ${middle} Q ${middle} ${bottom} ${x} ${bottom} Z `
+  );
+}
+
 function bandElement(band, strand) {
-  const geometry =
-    band.kind === "rect"
-      ? ` x="${attribute(band.x)}" y="${attribute(band.y)}"` +
-        ` width="${attribute(band.width)}" height="${attribute(band.height)}"`
-      : ` d="${attribute(band.path)}"`;
+  const { element, attributes: geometry } = bandGeometry(band);
 
   // A band paints an opacity when it has one. Corners never do, and neither do
   // the vertical rectangles of a reversal.
@@ -59,7 +147,6 @@ function bandElement(band, strand) {
       ? css({ fill: cssColor(strand.color) })
       : css({ fill: cssColor(strand.color), "fill-opacity": band.alpha });
 
-  const element = band.kind === "rect" ? "rect" : "path";
   // The fill style, the strand id and the strand name, contiguous and in that
   // order: this run is what `pgb`'s parseBands matches on, and nothing may be
   // inserted into it.

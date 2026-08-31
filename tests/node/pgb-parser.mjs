@@ -96,11 +96,44 @@ export function readBands(document) {
     const isRect = match[1] !== undefined;
     matched.push(
       isRect
-        ? { isRect, height: +match[4], width: +match[3], id: +match[8], name: match[9] }
-        : { isRect, id: +match[31], name: match[32] },
+        ? {
+            isRect,
+            height: +match[4],
+            width: +match[3],
+            id: +match[8],
+            name: match[9],
+            ...flatGeometry(+match[1], +match[2], +match[3]),
+          }
+        : {
+            isRect,
+            id: +match[31],
+            name: match[32],
+            x0: +match[13],
+            y0: +match[14],
+            controlTop: +match[15],
+            x1: +match[19],
+            y1: +match[20],
+            controlBottom: +match[22],
+          },
     );
   }
   return { counted, matched };
+}
+
+/**
+ * A `<rect>` read as the band it is, exactly as `pgb` reads one.
+ *
+ * `pgb` has one band and two spellings of it: a `<rect>` is the degenerate case,
+ * so it recovers the same six values from it — the far end is the near end plus
+ * the width, both edges are level, and "any control abscissa reproduces it", for
+ * which it takes the midpoint. Transcribed rather than invented, because #23's
+ * claim is that the numbers the client recovers are the numbers the layout held,
+ * and that claim is only worth anything if this side reads the way the client does.
+ */
+function flatGeometry(x, y, width) {
+  const x1 = x + width;
+  const controls = x + (x1 - x) * 0.5;
+  return { x0: x, y0: y, x1, y1: y, controlTop: controls, controlBottom: controls };
 }
 
 /** The `<g class="track">` slice — everything before the segment boxes, as `pgb` cuts it. */

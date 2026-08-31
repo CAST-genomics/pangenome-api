@@ -108,6 +108,26 @@ bad B shows up as an error card rather than as a diff nobody ran.
 **C** — the path builder emits floats rather than strings, the binary body appears, and
 `pgb`'s parser changes for the first time.
 
+> *Amended 2026-08-31: **C's first half has landed** ([#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23)).*
+> The layout no longer builds a `d` attribute: `seqtubemap/band-data.mjs` collects the six
+> numbers it encoded — `x0, y0, x1, y1` and the two control abscissae — and
+> `emit-document.mjs` writes the drawing command out of them. The thickness is the constant
+> this ADR's survey found, said once rather than on every band, and a band of any other
+> thickness now throws where the layout that drew it is still in scope rather than reaching
+> a client that would refuse the whole document. **Output did not move**: all four goldens
+> and all five real subgraphs are byte-identical, and so is the synthetic reversal, so the
+> golden tests took no re-baselining. The band-data baselines were re-baselined, deliberately,
+> because they are what pins the representation that changed. The wire format and the
+> `format` parameter are still to come, in
+> [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24), and that is where `pgb`'s
+> parser changes.
+>
+> Two shapes are outside the six-value grammar and are collected as their own kinds rather
+> than forced into it: a reversal's **corners**, built from quadratics, and its **vertical
+> connectors**, which are as tall as the reversal is deep. `pgb` cannot read either one
+> today — that is [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52), which
+> predates this — and #24 is where what they mean on the band route gets decided.
+
 **D** — delete the `vg convert` / `vg view -j` round trip. Gated on measuring
 `subgraph_extract` on the live server; if upstream extraction dominates, this is noise.
 

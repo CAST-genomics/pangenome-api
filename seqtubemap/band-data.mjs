@@ -21,11 +21,10 @@
 //   bands     one entry per drawn shape, in document order - which is draw
 //             order, and therefore paint order: later bands draw on top.
 //             `strand` indexes into `strands`.
-//               { kind: "rect",   strand, x, y, width, height, alpha? }
-//               { kind: "curve",  strand, path, alpha? }
-//               { kind: "corner", strand, path }
-//             Curves and corners carry the path string the layout built; making
-//             those numbers too is a later increment.
+//               { kind: "rect",     strand, x0, y0, x1, y1, controlTop, controlBottom, alpha? }
+//               { kind: "curve",    strand, x0, y0, x1, y1, controlTop, controlBottom, alpha? }
+//               { kind: "corner",   strand, x, y, radius, bend, turn, direction }
+//               { kind: "connector", strand, x, y, width, height }
 //             `alpha` is the band's fill opacity, and is absent on the bands the
 //             document has never painted one on: corners, and the vertical
 //             rectangles of a reversal. That is a property of the shape rather
@@ -41,6 +40,37 @@
 //             a real subgraph carries no reference offset, so it gets no ruler
 //             (docs/adr/0001-additive-band-format.md).
 //   document  the picture's dimensions, including the viewBox string.
+//
+// A band is six numbers and a strand id.
+//
+// The layout used to build each band's `d` attribute as a finished drawing
+// command - `"M … C … V … C … Z"` - and `pgb` parsed it straight back into six
+// floats with a regular expression. The string was an encoding step in the
+// middle of a numeric pipeline, so #23 removed it: the numbers are collected
+// here and `emit-document.mjs` writes the drawing command out of them.
+//
+// The six are `x0, y0` and `x1, y1` - the two ends of the band's upper edge -
+// and `controlTop, controlBottom`, the control abscissae of the upper and lower
+// edges. Every surveyed band conforms to that grammar with a **constant
+// thickness** (`BAND_THICKNESS`), which is what makes six enough: the lower edge
+// is the upper edge shifted down by it, and both cubics' control ordinates
+// repeat the endpoints. That was measured across 127,101 strand paths, and it is
+// what `pgb` refuses a document over rather than what it hopes for
+// (`parseBands.ts`, ADR `0002` in that repository). A band the layout draws off
+// that grammar throws here, where the layout that produced it is still in scope,
+// rather than reaching a client that would refuse the whole document.
+//
+// `curve` and `rect` are one primitive in two spellings, not two shapes. A rect
+// is the degenerate band - level, so any control abscissa reproduces it and the
+// midpoint is taken - and `pgb` reads it back into the same six values. `kind`
+// survives because it says which element the document writes.
+//
+// **The two reversal shapes are outside that grammar**, and are their own kinds
+// rather than bands with impossible numbers. A corner is a quarter turn built
+// from quadratics; a vertical connector is a rect as tall as the reversal is
+// deep, which is not `BAND_THICKNESS` and is not meant to be. `pgb` cannot read
+// either one today and refuses any document containing one - which is issue #52,
+// and is where what they mean on the band route gets decided.
 //
 // Strand ids are dense and positional. A strand's `id` is the position the
 // layout gave it (reorderTracksForLayout in tubemap.js), it reaches the client
@@ -59,6 +89,155 @@
 // on the width and height, and 20 px of headroom above the topmost shape.
 const MARGIN = 50;
 const HEADROOM = 20;
+
+/**
+ * How thick every band in a tube map is.
+ *
+ * Constant, and load-bearing: it is the value that lets six numbers describe a
+ * band, so it is said once here rather than carried on every one of the 55,053
+ * bands a real subgraph draws. `pgb` holds the same constant and refuses a
+ * document whose bands are any other thickness (`THICKNESS`, parseBands.ts).
+ *
+ * The layout can in principle produce another: a strand carrying a `freq` field,
+ * or a read, is drawn narrower (`calculateTrackWidth`). No document this
+ * repository has ever seen contains one - every band of all five real subgraphs
+ * and every golden is exactly 15 - and this fork draws no reads at all, since
+ * `render.mjs` passes none. So the case is unreachable rather than merely
+ * unobserved, and the builders below throw on it rather than encode a band the
+ * numbers do not describe.
+ */
+export const BAND_THICKNESS = 15;
+
+/**
+ * One band of the layout's curved kind, as numbers.
+ *
+ * @param {object} shape
+ * @param {number} shape.strand         index into the strand table
+ * @param {number} shape.x0             near end of the upper edge
+ * @param {number} shape.y0
+ * @param {number} shape.x1             far end of the upper edge
+ * @param {number} shape.y1
+ * @param {number} shape.controlTop     control abscissa of the upper edge
+ * @param {number} shape.controlBottom  control abscissa of the lower edge
+ * @param {number} shape.thickness      checked against `BAND_THICKNESS`, not carried
+ * @param {number} [shape.alpha]        fill opacity, where the document paints one
+ */
+export function curveBand({
+  strand,
+  x0,
+  y0,
+  x1,
+  y1,
+  controlTop,
+  controlBottom,
+  thickness,
+  alpha,
+}) {
+  assertThickness(thickness, "curve");
+  return present({ kind: "curve", strand, x0, y0, x1, y1, controlTop, controlBottom, alpha });
+}
+
+/**
+ * The same band, drawn flat.
+ *
+ * Takes the layout's own spelling - a corner and an extent - and stores the six
+ * values every band has. The control abscissae are the midpoint, which is what
+ * `pgb` fills in for a `<rect>`: both edges are level, so any abscissa
+ * reproduces the shape and the two sides may as well agree on which.
+ *
+ * @param {object} shape
+ * @param {number} shape.strand
+ * @param {number} shape.x       left edge
+ * @param {number} shape.y       upper edge
+ * @param {number} shape.width
+ * @param {number} shape.height  checked against `BAND_THICKNESS`, not carried
+ * @param {number} [shape.alpha]
+ */
+export function rectBand({ strand, x, y, width, height, alpha }) {
+  assertThickness(height, "rect");
+
+  const x1 = x + width;
+
+  // The document writes a rect as an abscissa and a width, and the band data
+  // holds two abscissae, so the round trip turns on `(x + width) - x` giving
+  // back exactly `width`. It does for every band in every fixture here - the
+  // layout's coordinates are far below the magnitude where it stops - and a band
+  // that lands where it does not is a band whose width the document would round,
+  // which is the silent mis-encoding this whole change must not introduce.
+  if (x1 - x !== width) {
+    throw new Error(
+      `a band at x=${x} is ${width} units wide, which cannot be written down and read ` +
+        `back: x + width - x gives ${x1 - x}. The layout has produced coordinates too ` +
+        "large for a width to survive being carried as two abscissae.",
+    );
+  }
+
+  const middle = x + (x1 - x) * 0.5;
+
+  return present({
+    kind: "rect",
+    strand,
+    x0: x,
+    y0: y,
+    x1,
+    y1: y,
+    controlTop: middle,
+    controlBottom: middle,
+    alpha,
+  });
+}
+
+/**
+ * One quarter turn of a reversal.
+ *
+ * Not a band: it is built from quadratics and it is the shape `pgb` refuses a
+ * document over (#52). Its numbers are the layout's own parameters, which is
+ * what the document is written back out of.
+ *
+ * @param {object} shape
+ * @param {number} shape.strand
+ * @param {number} shape.x          abscissa the turn starts from
+ * @param {number} shape.y          the ordinate it turns at
+ * @param {number} shape.radius     the bend's radius
+ * @param {number} shape.bend       how far past the radius the turn reaches
+ * @param {number} shape.thickness  checked against `BAND_THICKNESS`, not carried
+ * @param {"top"|"bottom"} shape.turn            which end of the reversal this is
+ * @param {"rightward"|"leftward"} shape.direction  which way it reaches
+ */
+export function cornerShape({ strand, x, y, radius, bend, thickness, turn, direction }) {
+  assertThickness(thickness, "corner");
+  return { kind: "corner", strand, x, y, radius, bend, turn, direction };
+}
+
+/**
+ * A reversal's vertical connector: the rect that spans between its two turns.
+ *
+ * As tall as the reversal is deep - 19 and 39 units in the synthetic inversion
+ * the tests build - so it carries its own height rather than borrowing the
+ * band's. Like a corner, `pgb` cannot read it (#52).
+ *
+ * @param {object} shape
+ * @param {number} shape.strand
+ * @param {number} shape.x
+ * @param {number} shape.y
+ * @param {number} shape.width
+ * @param {number} shape.height
+ * @param {number} [shape.alpha]
+ */
+export function verticalConnector({ strand, x, y, width, height, alpha }) {
+  return present({ kind: "connector", strand, x, y, width, height, alpha });
+}
+
+function assertThickness(thickness, kind) {
+  if (thickness === BAND_THICKNESS) return;
+  throw new Error(
+    `a ${kind} band is ${thickness} units thick, and every band in a tube map is ` +
+      `${BAND_THICKNESS}. Six numbers describe a band only because the thickness is ` +
+      "constant, and pgb refuses a document whose bands are any other thickness. " +
+      "The layout draws a narrower band for a strand carrying a `freq` field and for a " +
+      "read, neither of which this fork renders.",
+  );
+}
 
 /** The document's dimensions for a layout that ended up with this extent. */
 export function documentDimensions({ maxXCoordinate, maxYCoordinate, minYCoordinate }) {
@@ -135,9 +314,17 @@ export class BandCollector {
     return this.strands[band.strand];
   }
 
-  /** Collect a band and return it, for the caller to bind and draw. */
+  /**
+   * Collect one shape, built by `curveBand`, `rectBand`, `cornerShape` or
+   * `verticalConnector` — which is where its numbers are checked against the
+   * grammar, before it is collected at all.
+   *
+   * Nothing is re-checked here. A record that reached this list some other way
+   * is caught at the other end instead: `emit-document.mjs` knows the four kinds
+   * and throws on a fifth, rather than drawing it as something plausible.
+   */
   band(band) {
-    this.bands.push(present(band));
+    this.bands.push(band);
     return band;
   }
 
