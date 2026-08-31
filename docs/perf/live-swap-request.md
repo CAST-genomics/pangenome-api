@@ -2,9 +2,6 @@
 
 Hi Cici — this replaces what I sent you before. Please don't do the earlier one.
 
-- Rendered version, which is the one to read: *(link to follow)*
-- Source of the rendered version: [`live-swap-request.html`](./live-swap-request.html)
-
 **What changed and why.** I'd asked for a second copy of the API on its own port, running
 alongside the live one. That was written on the assumption we could open a second port, and
 we can't. So I'm asking for something smaller in steps but more honest about what it touches:
