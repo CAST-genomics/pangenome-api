@@ -66,7 +66,7 @@ def test_a_present_derivative_is_read(main_module, walk_stand_in):
     ]
 
 
-def test_a_derivative_is_opened_once_per_process(main_module, walk_stand_in, monkeypatch):
+def test_a_derivative_is_opened_once_per_thread(main_module, walk_stand_in, monkeypatch):
     """Not once per request: the tabix index is paid for the first time only."""
     import pysam
 
@@ -84,3 +84,55 @@ def test_a_derivative_is_opened_once_per_process(main_module, walk_stand_in, mon
     list(derivative.fetch("chr1", 0, 200))
 
     assert opens == [str(walk_stand_in)]
+
+
+def test_two_threads_never_share_a_handle(main_module, walk_stand_in):
+    """The invariant pysam requires, and the one the live server broke.
+
+    A `pysam.TabixFile` is one htslib handle with one seek position, and `fetch`
+    hands back a lazy iterator, so the handle stays in use for as long as the
+    caller takes to read it — in `GenerateWalksMC`, minutes. Endpoints run in
+    FastAPI's threadpool, so two requests genuinely overlap; sharing one handle
+    between them interleaved the seeks and left it broken for the life of the
+    process. Every later request that read a walk derivative then failed, while
+    cached requests, which read none, kept working — which is exactly how the
+    `increment-b` trial wedged, and why only a restart cleared it.
+
+    Asserted on the handles rather than on a race, because a race that has to be
+    provoked makes a flaky test: what is checked is that there is nothing to
+    race over.
+    """
+    import threading
+
+    derivative = main_module.WalkDerivative(walk_stand_in, "a test")
+    handles = {}
+
+    def read_in_this_thread(name):
+        rows = list(derivative.fetch("chr1", 0, 200))
+        handles[name] = (derivative._open(), rows)
+
+    threads = [
+        threading.Thread(target=read_in_this_thread, args=(name,))
+        for name in ("first", "second")
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    first, second = handles["first"], handles["second"]
+    assert first[0] is not second[0], "two threads were handed the same tabix handle"
+    # And each thread read the file correctly through its own handle.
+    assert [row.split("\t")[:2] for row in first[1]] == [["chr1", "0"], ["chr1", "100"]]
+    assert first[1] == second[1]
+
+
+def test_one_thread_keeps_its_own_handle(main_module, walk_stand_in):
+    """The other half of it: per-thread, not per-call.
+
+    Opening a multi-gigabyte tabix index per `fetch` would be its own defect —
+    `GenerateWalksMC` calls `fetch` once per `S` line.
+    """
+    derivative = main_module.WalkDerivative(walk_stand_in, "a test")
+
+    assert derivative._open() is derivative._open()
