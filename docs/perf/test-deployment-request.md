@@ -1,5 +1,13 @@
 # A second copy of the API, for testing before we go live
 
+> **Withdrawn, 2026-08-31 — never carried out, kept for the record.** This asked for a
+> second copy of the API on its own port. We don't have a second port to use, so it was
+> never actionable. The request that replaces it is
+> [`live-swap-request.md`](./live-swap-request.md), which points the live server at `main`
+> briefly and puts it back instead. **Do not follow the steps below**, and note that this
+> document's promise that nothing touches the live server does not carry over — the
+> replacement does touch it, deliberately and reversibly.
+
 Hi Cici — one thing to set up, and I think it's about 20 minutes. Nothing here touches the
 live server.
 
