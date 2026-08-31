@@ -120,11 +120,31 @@ function css(declarations) {
 
 // The layout names colours as hex; a stylesheet says them as `rgb()`, and the
 // document has always carried the stylesheet's spelling.
+//
+// A channel is rounded to a whole number on the way out, because `pgb`'s grammar
+// matches `rgb\((\d+), (\d+), (\d+)\)` and refuses the whole document over a
+// single band it cannot read. A PCLAI scheme supplies its channels as floats —
+// the walks file carries them that way and `bandage_graph.py` parses them with
+// `float()` — so a region whose scheme holds e.g. 228.5 emits a colour no client
+// can parse. This is not new rounding: the emulated document rounded here too,
+// in jsdom's CSS serializer, half away from zero, and this reproduces that.
 function cssColor(color) {
   const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color);
-  if (!hex) return color; // already `rgb(r, g, b)` — what a PCLAI scheme supplies
+  if (!hex) return wholeChannels(color); // already `rgb(r, g, b)` — what a PCLAI scheme supplies
   const [r, g, b] = hex.slice(1).map((pair) => parseInt(pair, 16));
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+// `rgb(r, g, b)` with each channel a whole number in 0..255, as a stylesheet
+// would serialize it. Anything that is not that spelling is left alone.
+function wholeChannels(color) {
+  const rgb = /^rgb\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)$/.exec(String(color));
+  if (!rgb) return color;
+  const channels = rgb.slice(1).map((channel) => {
+    const value = Math.round(Number(channel));
+    return Math.min(255, Math.max(0, value));
+  });
+  return `rgb(${channels.join(", ")})`;
 }
 
 // A non-breaking space is written as an entity wherever it appears — in an
