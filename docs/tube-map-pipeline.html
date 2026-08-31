@@ -359,6 +359,92 @@ big region froze everybody else's browser.</p>
   seconds, is 8.2 &mdash; and grows faster than the data does.</figcaption>
 </figure>
 
+<h3 id="the-lookups">What those 381 lookups are actually reading</h3>
+
+<p>The hairline and the bar are not two ends of one file. <strong>They are two different
+files, read two completely different ways</strong>, and the distinction is the whole of
+increment&nbsp;E &mdash; so it is worth being exact about which is which.</p>
+
+<div class="tbl-scroll">
+<table>
+  <caption>The two calls inside "finding the region" (<code>main.py:743-744</code>), on the
+  10,000-base region above.</caption>
+  <thead>
+    <tr><th>Call</th><th>File it reads</th><th>How it reads it</th><th class="n">Cost</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>SubgraphMC</code></td>
+      <td>the indexed <code>.gbz</code> &mdash; 5.4&nbsp;GB, plus a 9.3&nbsp;GB database</td>
+      <td><b>one</b> query, for the whole region</td>
+      <td class="n">0.042 s</td>
+    </tr>
+    <tr>
+      <td><code>GenerateWalksMC</code></td>
+      <td>a <code>.walk.gz</code> &mdash; a separate, position-indexed table of where every
+      assembly sits on every node</td>
+      <td><b>one lookup per segment</b> &mdash; 381 of them</td>
+      <td class="n">30.035 s</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>The pangenome database is not slow and is not implicated. It hands over the segments and
+links of a 10,000-base region in 42 milliseconds and is not touched again. What it does not
+hand over is <em>which haplotype goes where</em> &mdash; the extracted file has segments and
+links and no paths at all. Supplying those is the second pass, and it is a different file
+with a different shape.</p>
+
+<p><strong>One lookup per segment, and each one is about every haplotype at once.</strong>
+The loop walks the extracted subgraph, and for each <code>S</code> line it asks the walk
+table for that one node id. The row that comes back lists where <em>all 464 haplotypes</em>
+sit at that node, comma-separated; the loop splits it apart and accumulates the coordinates
+into tables, and only at the very end walks those tables to write one <code>W</code> line per
+haplotype. So a 381-segment region performs 381 seeks into a compressed file and parses
+roughly 177,000 coordinate entries, in Python, a field at a time.</p>
+
+<p>That is why the cost is flat per segment rather than growing: 65&nbsp;ms at 13 segments,
+65 at 118, 79 at 381. Nothing about the work gets harder as the region grows &mdash; there is
+simply more of the same fixed overhead, paid once per segment. Multiply it out and a
+7,000-base region, around 250 segments, spends something like 18 seconds here before a single
+line is drawn.</p>
+
+<p><strong>The lookups do not have to be asked one at a time.</strong> The table is indexed
+by node id and accepts a <em>range</em>, and the node ids in an extracted subgraph turn out to
+be all but contiguous. Measured across the five real subgraphs committed to this repository:</p>
+
+<div class="tbl-scroll">
+<table>
+  <caption>Node ids per extracted subgraph, and how few range lookups would cover them.</caption>
+  <thead>
+    <tr><th>Region</th><th class="n">Segments</th><th class="n">Lookups today</th><th class="n">Contiguous runs</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>chr8:78,771,162 &mdash; 90 bases</td><td class="n">9</td><td class="n">9</td><td class="n">1</td></tr>
+    <tr><td>chr8:10,079,054 &mdash; 1,400 bases</td><td class="n">92</td><td class="n">92</td><td class="n">1</td></tr>
+    <tr><td>chr1:25,331,046 &mdash; 600 bases</td><td class="n">75</td><td class="n">75</td><td class="n">2</td></tr>
+    <tr><td>chr1:25,301,271 &mdash; 8,000 bases</td><td class="n">770</td><td class="n">770</td><td class="n">2</td></tr>
+    <tr><td>chr1:25,331,646 &mdash; 4,200 bases</td><td class="n">280</td><td class="n">280</td><td class="n">5</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>770 lookups where two would cover the same ground. And the batched form is not
+hypothetical: the older version-1 path in this same file already groups node ids into
+contiguous runs before fetching them (<code>main.py:200-202</code>). The version-2 path
+simply never picked it up.</p>
+
+<p><strong>What is still unmeasured, and it decides the size of the win.</strong> The
+65-to-79 milliseconds per segment is not yet split between the two things that happen inside it: the
+<em>lookup</em> &mdash; seeking and decompressing a block of the file, quite possibly the same
+block several times over for consecutive nodes &mdash; and the <em>parsing</em> of 464
+haplotypes' coordinates out of the row it returns. If the cost is the lookup, batching is
+most of the win and it is large. If it is the parsing, batching removes the seeks and the
+work stays, and E needs a different shape. Timing the two separately over one real region is
+a short script, but it needs the real walk file and so can only be run on the server. That is
+the investigation E is waiting on, and it should happen before any number is promised.</p>
+
 <h2>What was in the ten megabytes</h2>
 
 <p>Every band in the old format carried its strand's colour, its strand's full name, a
@@ -527,9 +613,14 @@ what matters.</p>
       <h3>Stop looking up 381 pieces one at a time<span class="chip next">Largest win left</span></h3>
       <p>30 of the 38.9 seconds, in code that costs a flat 79 milliseconds per piece however
       many pieces there are &mdash; the signature of a fixed overhead paid over and over,
-      not of hard work. It touches nothing the app can see, so it can proceed in parallel
-      with C. What it needs first is an investigation into whether those lookups can be
-      asked for in one go.</p>
+      not of hard work. The pieces are segments, and the lookups are against the
+      <code>.walk.gz</code> table rather than the pangenome database, which answers the whole
+      region in 42 milliseconds and is not implicated. The node ids being looked up are all
+      but contiguous, and the table takes a range, so the 770 lookups of an 8,000-base region
+      would be two &mdash; see <a href="#the-lookups">What those 381 lookups are actually reading</a>
+      above. It touches nothing the app can see, so it can proceed in parallel with C. What
+      it needs first is a measurement splitting the per-segment cost between the lookup and
+      the parsing, which decides whether batching is most of the win or only part of it.</p>
     </div>
   </div>
 
@@ -853,12 +944,14 @@ representations disappear.</p>
 
 <h3>What each hop is actually for</h3>
 
-<p><strong>The two GFA files</strong> are one extraction split in two. The graph query pulls
-the segments and links of the requested region out of the indexed <code>.gbz</code>; a
-second pass adds one <code>W</code> line per haplotype, by looking up each segment
-separately in a set of position-indexed files. That second pass is 30 of the 38.9 seconds,
-and it is the only stage whose output is cached &mdash; which is why a repeated region can
-come back fast, and why a 1,000-base request once beat a 300-base one.</p>
+<p><strong>The two GFA files</strong> are one extraction split in two, against two
+different sources. The graph query pulls the segments and links of the requested region out
+of the indexed <code>.gbz</code> in 0.042 seconds, and that file is then done with. The
+second pass adds one <code>W</code> line per haplotype, and it reads a <em>separate</em>
+file &mdash; a position-indexed <code>.walk.gz</code> table of where every assembly sits on
+every node &mdash; looking up each segment in it one at a time. That second pass is 30 of
+the 38.9 seconds, and it is the only stage whose output is cached &mdash; which is why a
+repeated region can come back fast, and why a 1,000-base request once beat a 300-base one.</p>
 
 <p><strong>The <code>.vg</code> and <code>.json</code> pair</strong> exists purely to change
 representation. The subgraph is written out, handed to <code>vg convert</code> to become
