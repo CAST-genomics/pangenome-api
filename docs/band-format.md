@@ -99,8 +99,8 @@ Python.
   "segments": [
     { "id": "79337767",
       "box": { "left": 11, "top": 11, "right": 76, "bottom": 5564, "radius": 9 },
-      "sequence": "AGAGCCTGTCTT…", "fill": "#ffffff", "fillOpacity": 0.4,
-      "stroke": "#000000", "strokeWidth": 2 }
+      "sequence": "AGAGCCTGTCTT…", "fill": "#ffffff", "fillOpacity": "0.4",
+      "stroke": "#000000", "strokeWidth": "2px" }
   ],
   "overlays": [],
   "reversals": { "corners": [], "connectors": [] },
@@ -167,6 +167,14 @@ The alternative was to add `box` beside `outline` and bump nothing, which the
 rule does allow. That was rejected: it would have kept the string in the format
 forever and left that first reader with two ways to find the same rectangle, one
 of them the parser this change exists to delete.
+
+`fill`, `fillOpacity`, `stroke` and `strokeWidth` are the box's appearance as the
+document spells it — the attribute values verbatim, strings and all, which is why
+`strokeWidth` carries its CSS unit (`"2px"`) and `fillOpacity` its decimal as
+text. They are on their way back out as attributes on the SVG route, so they
+travel as written rather than as numbers this format would have to spell back.
+A client that wants a number out of a dimension parses one, exactly as it would
+from the document.
 
 **`overlays`** — the ruler and the per-segment labels, when the render drew any:
 an element name, its attributes as ordered pairs, and its text. **Empty in every
