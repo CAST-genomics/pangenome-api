@@ -72,6 +72,27 @@ x-interval. A strand is made of many bands, so a band count counts shapes, not
 haplotypes.
 _Avoid_: ribbon, which reads as the whole strand.
 
+**band payload**:
+What `/seqtubemap?format=bands` returns: the same picture as the SVG document, said as
+the numbers themselves — a JSON header carrying the frame, the **strand** table and the
+segment boxes, then a columnar body of six `Float32`s, a `Uint16` and a `Uint8` per
+**band**. Specified in [`docs/band-format.md`](./docs/band-format.md). Additive: omitting
+`format` returns the document byte for byte. The band data is canonical and the document
+is a rendering of it.
+_Avoid_: "the binary format", which names how it is spelled rather than what it carries —
+the header is JSON.
+
+**reversal**:
+The shape a **strand** doubling back on itself draws: a pair of **corners** — quarter
+turns built from quadratics — and a **vertical connector**, a rectangle as tall as the
+reversal is deep rather than `thickness` tall. Outside the six-value **band** grammar, so
+they ride in the header's `reversals` rather than in the body, each with the `order` it
+occupied among the shapes the render drew. No production response contains one, and a
+client may reasonably refuse a response whose `reversals` are non-empty.
+_Avoid_: using it for an inverted haplotype. A reversal is a fact about the drawing; an
+inversion is a fact about the biology, and the haplotypes that traverse an inversion are
+drawn out of ordinary bands.
+
 **sequence tube map**:
 A base-resolution picture of what is inside one **node** — its **segments** laid
 along an axis with every **strand** threaded through them.
