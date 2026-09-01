@@ -18,6 +18,7 @@ import ssl
 import threading
 import traceback
 import numpy as np
+from typing import NamedTuple
 import os
 from panCT.panct.data import Region
 from panCT.panct.logging import getLogger
@@ -76,6 +77,35 @@ mc_hg38_gbz_v2 = Path(f"{data_path}/hprc-v2.0-mc-grch38.gbz")
 minigraph_hg38_gfa_v1 = Path(f"{data_path}/hprc-v1.0-minigraph-grch38.gfa")
 minigraph_hg38_gfa_v2 = Path(f"{data_path}/hprc-v2.0-minigraph-grch38.gfa")
 generate_svg_js_script = Path("./seqtubemap/generate-svg.mjs")
+generate_bands_js_script = Path("./seqtubemap/generate-bands.mjs")
+
+class SeqTubeMapFormat(NamedTuple):
+    """One thing `/seqtubemap` can return, and everything that differs about it.
+
+    The extension keeps the two renders apart in the cache, the media type is
+    what the client is told it received, and the stage name is what a failure
+    reports — the two run different scripts and can fail for different reasons,
+    so borrowing one name for both would misreport the cause.
+    """
+
+    extension: str
+    media_type: str
+    stage: str
+
+
+# `svg` is the default and is what the endpoint has always returned, byte for
+# byte: this parameter is additive, so the two repositories never have to deploy
+# together and the document stays available as the oracle the band payload is
+# checked against (docs/adr/0001-additive-band-format.md).
+#
+# `bands` is the same render said as numbers — a JSON header carrying the
+# dimensions, the strand table and the segment boxes, and a binary body carrying
+# six floats and a strand id per band. The format is specified in
+# `docs/band-format.md`.
+SEQTUBEMAP_FORMATS = {
+    "svg": SeqTubeMapFormat("svg", "image/svg+xml", "generate_svg"),
+    "bands": SeqTubeMapFormat("bands", "application/octet-stream", "generate_bands"),
+}
 
 
 class MissingWalkDerivative(RuntimeError):
@@ -595,6 +625,30 @@ def ConvertVgToJson(vg_file, json_file):
         proc = subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE)
     return _stage_succeeded(proc, "vg view -j")
 
+def _render_seq_tube_map(script, json_file, out_file, start, end, nodewidthoption, pclai_color_scheme):
+    """Run one of the Node renderers over a subgraph.
+
+    The two renderers take the same six arguments and differ only in which sink
+    they write — a document, or the band payload — so the invocation is written
+    once and the script is the argument.
+    """
+    cmd = [
+        "node",
+        "--max-old-space-size=8192",
+        str(script),
+        str(json_file),
+        str(out_file),
+        str(start),
+        str(end),
+        nodewidthoption
+    ]
+    if pclai_color_scheme is not None:
+        cmd.append(json.dumps(pclai_color_scheme))
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    return _stage_succeeded(proc, f"node {script.name}")
+
+
 def GenerateSeqTubeMapSvg(json_file, svg_file, start, end, nodewidthoption, pclai_color_scheme = None):
     """
     generate sequence tube map svg using the generate-svg javascript in ./seqtubemap
@@ -613,21 +667,27 @@ def GenerateSeqTubeMapSvg(json_file, svg_file, start, end, nodewidthoption, pcla
     passed : bool
         True if we were able to create the .svg file
     """
-    cmd = [
-        "node", 
-        "--max-old-space-size=8192",
-        str(generate_svg_js_script), 
-        str(json_file), 
-        str(svg_file), 
-        str(start), 
-        str(end), 
-        nodewidthoption
-    ]
-    if pclai_color_scheme is not None:
-        cmd.append(json.dumps(pclai_color_scheme))
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return _render_seq_tube_map(
+        generate_svg_js_script, json_file, svg_file, start, end, nodewidthoption, pclai_color_scheme
+    )
 
-    return _stage_succeeded(proc, "node generate-svg.mjs")
+
+def GenerateSeqTubeMapBands(json_file, bands_file, start, end, nodewidthoption, pclai_color_scheme = None):
+    """
+    generate the band payload using the generate-bands javascript in ./seqtubemap
+
+    The same render as `GenerateSeqTubeMapSvg`, written to the wire as the
+    numbers the layout computed rather than as a document that encodes them.
+    `docs/band-format.md` specifies what lands in `bands_file`.
+
+    Returns
+    -------
+    passed : bool
+        True if we were able to create the payload file
+    """
+    return _render_seq_tube_map(
+        generate_bands_js_script, json_file, bands_file, start, end, nodewidthoption, pclai_color_scheme
+    )
 
 def SubgraphMini(query_region, gfa_preprocessed, reference_gfa, log):
     # check gbz.db file and create subgraph
@@ -825,18 +885,37 @@ def seqtubemap(
     version: str = Query("v2", description='pangenome release version: `"v1"` or `"v2"`'),
     pathnumoption: str = Query("normal", description='options for the number of path: `"compressed"`(compress same path as one single path) or `"normal"` (show each path seperately)'),
     nodewidthoption: str = Query("compressed", description='Options for the width of sequence nodes:`"compressed"`(scale node width with log2 of number of bp) or `"normal"`(scale node width linearly with number of bp)'),
-    minigraphnode: int = Query(None, description="If the queried region is based on a minigraph node, record the node ID to enable Point Cloud Local Ancestry Inference coloring")
+    minigraphnode: int = Query(None, description="If the queried region is based on a minigraph node, record the node ID to enable Point Cloud Local Ancestry Inference coloring"),
+    format: str = Query("svg", description='What to return: `"svg"` (the drawing document, the default and unchanged) or `"bands"` (the band payload — a JSON header and a binary body, specified in `docs/band-format.md`)')
 ):
     
     log = getLogger(name="complexity", level="DEBUG")
     query_region = Region(chrom, start, end)
+
+    # Checked before anything is extracted, converted or rendered: a request
+    # naming a format this endpoint does not have is a request that cannot be
+    # answered, and answering it with the default instead would hand a client
+    # asking for numbers a document it cannot read, which is far harder to
+    # notice than a 400.
+    if format not in SEQTUBEMAP_FORMATS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"format={format!r} is not one this endpoint serves. "
+                f"Valid formats: {', '.join(sorted(SEQTUBEMAP_FORMATS))}."
+            ),
+        )
+    wanted = SEQTUBEMAP_FORMATS[format]
     
     preprocess_gfa_subgraph_no_walk = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_{version}_no_walk.gfa")
     preprocess_gfa_subgraph_w_walk = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_{version}_with_walk.gfa")
     postprocess_gfa_subgraph = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_path{pathnumoption}_{version}.gfa")
     vg_subgraph = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_path{pathnumoption}_{version}.vg")
     json_subgraph = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_path{pathnumoption}_{version}.json")
-    seqtubemap_svg = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_path{pathnumoption}_{version}.svg")
+    # The rendered answer, in whichever of the two encodings was asked for. The
+    # extension keeps them apart in the cache, so a region requested both ways
+    # does not have one render overwrite the other.
+    seqtubemap_render = Path(f"./cache/seqtubemap/mc/subgraph_{chrom}_{str(start)}_{str(end)}_path{pathnumoption}_{version}.{wanted.extension}")
       
     stages = {}
     # A cache hit is a subgraph with walks in it, not merely a file at the path:
@@ -892,13 +971,17 @@ def seqtubemap(
             elif version == "v2":
                 pclai_color_scheme = GetPclaiColorScheme(minigraphnode, minigraph_walks_v2_updated, log)
             
-    with stage_timing(stages, "generate_svg"):
-        rendered = GenerateSeqTubeMapSvg(json_subgraph, seqtubemap_svg, start, end, nodewidthoption, pclai_color_scheme)
-    if not rendered or not seqtubemap_svg.exists():
+    # Looked up here rather than held in `SEQTUBEMAP_FORMATS`, so that the two
+    # renders stay module-level names a test can stand in for; a function stored
+    # in the table would be the one captured at import, past any such stand-in.
+    generate = GenerateSeqTubeMapSvg if format == "svg" else GenerateSeqTubeMapBands
+    with stage_timing(stages, wanted.stage):
+        rendered = generate(json_subgraph, seqtubemap_render, start, end, nodewidthoption, pclai_color_scheme)
+    if not rendered or not seqtubemap_render.exists():
         raise stage_failed(
-            "generate_svg",
+            wanted.stage,
             query_region,
-            "the Node render exited non-zero or wrote no document; its stderr is "
+            "the Node render exited non-zero or wrote no output; its stderr is "
             "in the log above",
         )
 
@@ -911,11 +994,12 @@ def seqtubemap(
         f"[stage-timing] {chrom}:{start}-{end} span={end - start}bp {version} "
         f"path={pathnumoption} width={nodewidthoption} cached={subgraph_cached} "
         f"total={total}s {breakdown} "
-        f"json_mb={size_mb(json_subgraph)} svg_mb={size_mb(seqtubemap_svg)}"
+        f"json_mb={size_mb(json_subgraph)} format={format} "
+        f"render_mb={size_mb(seqtubemap_render)}"
     )
 
-    background_tasks.add_task(delete_files, [vg_subgraph, json_subgraph, seqtubemap_svg])
-    return FileResponse(seqtubemap_svg, media_type="image/svg+xml")
+    background_tasks.add_task(delete_files, [vg_subgraph, json_subgraph, seqtubemap_render])
+    return FileResponse(seqtubemap_render, media_type=wanted.media_type)
 
 
 # Synchronous on purpose: this handler blocks, so it belongs in FastAPI's

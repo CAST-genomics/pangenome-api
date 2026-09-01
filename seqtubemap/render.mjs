@@ -45,7 +45,8 @@ async function layout() {
  * @param {number} options.end         the requested region's last base
  * @param {string} options.nodeWidthOption  "compressed", "normal" or "small"
  * @param {object|null} [options.pclaiColorScheme]
- * @returns {{document: string, bandData: object}}
+ * @returns {{document: string, bandData: object}} `document` is built on first
+ *   access and not before, so a caller wanting only the band data builds none.
  */
 export async function renderTubeMap({
   inputFile,
@@ -83,5 +84,18 @@ export async function renderTubeMap({
 
   // The document and the band data cannot disagree about the picture, because
   // there is only one of them: the document *is* the band data, written out.
-  return { document: emitDocument(bandData), bandData };
+  //
+  // Written out on demand, though. The band route (`generate-bands.mjs`) never
+  // asks for it, and building it means concatenating up to 12.58 MB of string
+  // that nothing then reads — so it is a memoized getter rather than a field. A
+  // caller that takes it once pays what it always paid; a caller that never
+  // takes it pays nothing.
+  let document = null;
+  return {
+    bandData,
+    get document() {
+      if (document === null) document = emitDocument(bandData);
+      return document;
+    },
+  };
 }
