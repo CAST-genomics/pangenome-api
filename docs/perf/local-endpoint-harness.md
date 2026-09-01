@@ -9,6 +9,11 @@ from a unit test.
 This document records exactly how that was done, because the setup is not obvious, it is
 reproducible, and one part of it is a stand-in that materially limits what the results prove.
 
+> **Still reproducible, with one change.** The §5 recipe was re-read against `main` on
+> 2026-09-01 and still works. What moved since is the cache check in §3 — see the note there.
+> `main.py` line numbers have shifted throughout, so this document names functions rather than
+> lines wherever it can.
+
 **Nothing here touched production.** `release` — the branch the server follows
 ([`releasing.md`](../releasing.md)) — was not read, written, or deployed to. Both instances
 bound to `127.0.0.1` on ports **8100** and **8101**; production is `:8000` on
@@ -17,8 +22,7 @@ outside the repository, except one gitignored `cache/` directory that was delete
 
 The results are in [`increment-b.md`](./increment-b.md); this is the method.
 
-- Rendered version: <https://claude.ai/code/artifact/2f0fbe8f-187d-4cf2-b553-d71cfab68f08>
-- Source of the rendered version: [`local-endpoint-harness.html`](./local-endpoint-harness.html)
+- Designed version: [`local-endpoint-harness.html`](./local-endpoint-harness.html)
 
 ---
 
@@ -30,7 +34,7 @@ machine does not have:
 | what the endpoint wants | why it is missing here |
 | --- | --- |
 | the multi-gigabyte HPRC v2 `.gbz` graph | not distributable; lives on the server |
-| the `vg` binary, twice (`main.py:464`, `:486`) | vgteam ship a **Linux** static build; this is darwin/arm64 |
+| the `vg` binary, twice (`ConvertGfaToVg`, `ConvertVgToJson`) | vgteam ship a **Linux** static build; this is darwin/arm64 |
 | `panCT`, and `tools.path` / `data.path` in git config | developer setup step, unset in this checkout |
 | `adaptagrams` and `ogdf-python` | compiled inside the Docker image (see the `Dockerfile`), not on the host |
 
@@ -76,10 +80,10 @@ Both servers were up at the same time.
 This is the part worth understanding, because it is not a test hook — it is a **production
 code path**, used as intended.
 
-`main.py:735` reads:
+The endpoint's cache check reads:
 
 ```python
-subgraph_cached = preprocess_gfa_subgraph_w_walk.exists()
+subgraph_cached = subgraph_has_walks(preprocess_gfa_subgraph_w_walk)
 
 with stage_timing(stages, "subgraph_extract"):
     if not subgraph_cached:
@@ -91,7 +95,16 @@ If the extracted subgraph is already on disk, the endpoint skips extraction enti
 region is fast. It also means that **pre-placing a subgraph file is enough to make the rest of
 the pipeline run**.
 
-The path it looks for is built from the query parameters (`main.py:728`):
+> **Updated 2026-09-01.** At the time of this harness the check was
+> `preprocess_gfa_subgraph_w_walk.exists()`. PR
+> [#60](https://github.com/CAST-genomics/PangenomeAPI/pull/60) tightened it to
+> `subgraph_has_walks()` — a cache hit now means a subgraph with at least one `W` line, so a
+> half-written extraction can never be served as finished. **The trick still works**, because
+> the five committed fixtures are complete subgraphs with their walks in them; but a
+> hand-made or truncated `.gfa` dropped into `cache/` will now be re-extracted rather than
+> served, which on a machine with no graph data means the request fails.
+
+The path it looks for is built from the query parameters:
 
 ```
 ./cache/seqtubemap/mc/subgraph_{chrom}_{start}_{end}_{version}_with_walk.gfa
@@ -114,7 +127,9 @@ turns five committed fixtures into five servable regions. The `cache/` directory
 
 The second half of the same trick is [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19):
 the `.walk.gz` derivatives are opened by `WalkDerivative` the first time something reads one
-(`main.py:85`), rather than at import. A request with no `minigraphnode` reads none, so
+(`main.py:85`), rather than at import. (Since PR
+[#60](https://github.com/CAST-genomics/PangenomeAPI/pull/60) that open is per thread rather
+than per process, which changes nothing for this harness.) A request with no `minigraphnode` reads none, so
 `data.path` can point at an **empty directory** and the app still boots and serves.
 
 ---
@@ -173,7 +188,7 @@ and no claim here covers it.
 
 ### 4.4 The `vg` stand-in — the one that limits the conclusions
 
-`ConvertGfaToVg` and `ConvertVgToJson` (`main.py:447-489`) each run `subprocess.run` against
+`ConvertGfaToVg` and `ConvertVgToJson` each run `subprocess.run` against
 `vg`, unconditionally — there is no "skip if the output exists" branch to exploit, the way
 there is for extraction. Without a `vg` on `PATH` the request cannot proceed past `gfa_to_vg`.
 
@@ -185,10 +200,10 @@ So a shell script named `vg` was put first on `PATH`, implementing exactly the t
 set -euo pipefail
 REPO="${VG_SHIM_REPO:?VG_SHIM_REPO must point at the checkout to use}"
 case "${1:-}" in
-  convert)   # vg convert -g <in.gfa>  -> stdout   (main.py:464)
+  convert)   # vg convert -g <in.gfa>  -> stdout   (ConvertGfaToVg)
     printf 'GFA_SHIM\t%s\n' "$(cd "$(dirname "$3")" && pwd)/$(basename "$3")"
     ;;
-  view)      # vg view -j <in.vg>      -> stdout   (main.py:486)
+  view)      # vg view -j <in.vg>      -> stdout   (ConvertVgToJson)
     gfa=$(awk -F'\t' '/^GFA_SHIM/{print $2; exit}' "$3")
     out=$(mktemp -t vgshim); trap 'rm -f "$out"' EXIT
     node "$REPO/perf/gfa-to-vg-json.mjs" "$gfa" "$out" >/dev/null 2>&1

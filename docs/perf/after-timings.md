@@ -1,7 +1,6 @@
 # After the stage timings come back ✅ *closed 2026-08-27*
 
-Both halves of the deploy in [`deploy-request.md`](./deploy-request.md) came back — the log
-first, the five subgraphs after. The reading is
+Both halves of the 2026-08-27 deploy came back — the log first, the five subgraphs after. The reading is
 [§6 of `seqtubemap-latency.md`](./seqtubemap-latency.md); the raw log is
 `pangenome-api-sequence-tube-map-logs/seqtubmap-log.txt`.
 

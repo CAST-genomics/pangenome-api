@@ -19,9 +19,8 @@ rather than borrowed from the other repository.
 ## Provenance
 
 These are not synthetic. They come off the HPRC v2 minigraph-cactus graph on
-`pangenome-api.ucsd.edu`, requested by a colleague with server access following
-[`docs/perf/deploy-request.md`](../../../docs/perf/deploy-request.md), and copied out of the
-API's cache directory (`cache/seqtubemap/mc/`) exactly as the pipeline left them. The
+`pangenome-api.ucsd.edu`, pulled for us on 2026-08-27 by the colleague who runs the server,
+and copied out of the API's cache directory (`cache/seqtubemap/mc/`) exactly as the pipeline left them. The
 filenames are the server's own.
 
 Each file is the artifact `main.py:666-673` writes: `SubgraphMC` extracts the region from
