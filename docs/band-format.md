@@ -94,7 +94,7 @@ Python.
   },
   "strands": [
     { "id": 0, "name": "GRCh38#0#chr1", "color": [255, 115, 56],
-      "pclaiX": 0.12, "pclaiY": -0.43, "pclaiScore": 0.98 }
+      "pclaiX": 0.396, "pclaiY": -1.353, "pclaiScore": "993" }
   ],
   "segments": [
     { "id": "79337767", "outline": "M 11 20 Q 11 11 20 11 …",
@@ -129,6 +129,15 @@ layout's own ordering, dense from 0 with no gaps; `name` is the
 included; `color` is three whole channels in 0–255; the three `pclai*` fields are
 the strand's ancestry placement, and are `null` where the region has none. A
 strand's values appear here once, however many bands it draws.
+
+`pclaiX` and `pclaiY` are numbers, and they are coordinates in the ancestry
+cloud's own plane — nothing in this payload's geometry touches them.
+**`pclaiScore` is an opaque string**, not a number: it is usually an integer
+spelled as text (`"993"`), but real schemes also spell it `"impainted"`, on
+strands that *are* placed. That is a different kind of answer rather than a
+number with a bad value, so it travels verbatim and whoever displays it decides
+what the categories mean. A reader that parses it as a number either refuses
+real documents or turns a category into `NaN`.
 
 **`segments`** — the **segment** boxes, in draw order, each with the id, outline
 and sequence a client draws and labels from. The outline is a path command

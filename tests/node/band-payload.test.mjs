@@ -275,6 +275,31 @@ test("a reversal's corners and connectors keep their place in the draw order", a
   }
 });
 
+test("a strand's ancestry score travels verbatim, whatever it says", () => {
+  // `pclaiScore` looks like a number and is not one. Real schemes spell it
+  // `impainted` on strands that are placed — a different kind of answer, not a
+  // number with a bad value — and `pgb` carries it as an opaque string for
+  // exactly that reason (`parseBands.ts`). A payload that coerced it would
+  // either refuse those strands or turn a category into NaN, so this pins that
+  // the header carries what the layout handed over and nothing else.
+  const strands = [
+    { id: 0, name: "placed", color: "#ff0000", pclaiX: 0.396, pclaiY: -1.353, pclaiScore: "993" },
+    { id: 1, name: "impainted", color: "#00ff00", pclaiX: 0.1, pclaiY: 0.2, pclaiScore: "impainted" },
+    { id: 2, name: "nowhere", color: "#0000ff", pclaiX: null, pclaiY: null, pclaiScore: null },
+  ];
+
+  const { header } = decodeBandPayload(
+    encodeBandPayload({ document: {}, strands, bands: [], segments: [], overlays: [] }),
+  );
+
+  assert.deepEqual(
+    header.strands.map((strand) => strand.pclaiScore),
+    ["993", "impainted", null],
+  );
+  // The placement is numbers, and stays numbers.
+  assert.deepEqual(header.strands.map((strand) => strand.pclaiX), [0.396, 0.1, null]);
+});
+
 test("a strand table too large to address is refused, not wrapped", () => {
   const strands = Array.from({ length: MAX_STRAND_ROWS + 1 }, (_, id) => ({
     id,
