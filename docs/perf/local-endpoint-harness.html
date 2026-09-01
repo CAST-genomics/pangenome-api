@@ -570,8 +570,8 @@
       <strong>production code path</strong>, used as intended.</p>
 
       <div>
-        <p class="pre-title">main.py:735</p>
-        <pre><code>subgraph_cached = preprocess_gfa_subgraph_w_walk.exists()
+        <p class="pre-title">The endpoint's cache check</p>
+        <pre><code>subgraph_cached = subgraph_has_walks(preprocess_gfa_subgraph_w_walk)
 
 with stage_timing(stages, "subgraph_extract"):
     if not subgraph_cached:
@@ -582,6 +582,18 @@ with stage_timing(stages, "subgraph_extract"):
       no <code>.gbz</code>, no <code>gfabase</code>, no tabix lookups. That branch exists so a repeated region
       is fast. It also means <strong>pre-placing a subgraph file is enough to make the rest of the pipeline
       run.</strong></p>
+
+      <div class="note">
+        <p class="tag">Updated 2026-09-01</p>
+        <p>At the time of this harness the check was
+        <code>preprocess_gfa_subgraph_w_walk.exists()</code>. PR #60 tightened it to
+        <code>subgraph_has_walks()</code> — a cache hit now means a subgraph with at least one
+        <code>W</code> line, so a half-written extraction can never be served as finished.
+        <strong>The trick still works</strong>, because the five committed fixtures are complete
+        subgraphs with their walks in them; but a hand-made or truncated <code>.gfa</code> dropped
+        into <code>cache/</code> will now be re-extracted rather than served, which on a machine
+        with no graph data means the request fails.</p>
+      </div>
 
       <p class="col">The path it looks for is built from the query parameters, and the five fixtures in
       <code>tests/fixtures/seqtubemap/</code> were copied out of the production server's own cache directory
@@ -645,10 +657,10 @@ cp tests/fixtures/seqtubemap/*.gfa cache/seqtubemap/mc/</code></pre>
       <div>
         <p class="pre-title">$S/bin/vg — deliberately outside the repository</p>
         <pre><code>case "${1:-}" in
-  convert)   # vg convert -g &lt;in.gfa&gt;  -&gt; stdout   (main.py:464)
+  convert)   # vg convert -g &lt;in.gfa&gt;  -&gt; stdout   (ConvertGfaToVg)
     printf 'GFA_SHIM\t%s\n' "$(cd "$(dirname "$3")" &amp;&amp; pwd)/$(basename "$3")"
     ;;
-  view)      # vg view -j &lt;in.vg&gt;      -&gt; stdout   (main.py:486)
+  view)      # vg view -j &lt;in.vg&gt;      -&gt; stdout   (ConvertVgToJson)
     gfa=$(awk -F'\t' '/^GFA_SHIM/{print $2; exit}' "$3")
     out=$(mktemp -t vgshim); trap 'rm -f "$out"' EXIT
     node "$REPO/perf/gfa-to-vg-json.mjs" "$gfa" "$out" &gt;/dev/null 2&gt;&amp;1

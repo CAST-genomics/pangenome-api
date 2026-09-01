@@ -45,7 +45,7 @@ were the empty `<title>` on every band and every segment box.
 
 ## The fetch ceiling
 
-The point of the increment, at **production's own heap size** — `main.py:509` spawns the
+The point of the increment, at **production's own heap size** — `main.py:618` spawns the
 generator with `--max-old-space-size=8192`:
 
 ```sh
@@ -218,9 +218,27 @@ for extraction, and because the heap failure mode is gone. What a researcher act
 experiences still depends on the deploy — `release..main` is where that queue lives
 ([`releasing.md`](../releasing.md)).
 
-## What was not measured
+## On the real server, 2026-08-31
 
-The endpoint on the server. `generate_svg` is 8.2 s of a 38.9 s 10 kb request there, against a
-graph this machine does not have and through a `vg` this machine cannot run; confirming the
-production number needs a deploy, and `release..main` is where that queue lives
-([`releasing.md`](../releasing.md)).
+Everything above was measured on a developer machine. On 2026-08-31 the live server was
+pointed at `main` for a bounded window and `pgb` was driven against it by hand. **The increment's claim held where it counts: regions
+that used to exceed the frontend's 90 s timeout and never return now retrieve.**
+
+It also found the one thing none of the measurements above could. `pgb` refused the very first
+real region — `NonConformingDocument`, 6 of 1,626 drawables unmatched — over **fractional
+colour channels**: `rgb(0, 228.5, 178.5)`. The emulated document had been rounding them in
+jsdom's CSS serializer all along, so #22 deleted a rounding step nobody knew was load-bearing.
+No committed scheme holds a fractional channel, which is exactly why every golden, every
+fixture and the whole §"Checked against `pgb`'s own parser" pass missed it. Fixed in PR
+[#59](https://github.com/CAST-genomics/PangenomeAPI/pull/59), with a conformance test that
+shifts a real subgraph's scheme half a step off every channel. A second defect, unrelated to
+#22 and pre-dating it, surfaced in the same window: PR
+[#60](https://github.com/CAST-genomics/PangenomeAPI/pull/60).
+
+## What is still not measured
+
+The endpoint's *timings* on the server. `generate_svg` is 8.2 s of a 38.9 s 10 kb request
+there, against a graph this machine does not have and through a `vg` this machine cannot run.
+The trial was a look rather than a measurement — no `[stage-timing]` lines were captured while
+`main` was up — so confirming the production number still needs a deploy, and `release..main`
+is where that queue lives ([`releasing.md`](../releasing.md)).

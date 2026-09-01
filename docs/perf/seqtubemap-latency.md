@@ -4,21 +4,31 @@ Performance diagnosis of the sequence tube map endpoint. Measured 2026-08-27 aga
 live service at `pangenome-api.ucsd.edu:8000`, plus a local stage-timing harness
 (Node v26.7.0, darwin 25.5.0).
 
-- Rendered version: <https://claude.ai/code/artifact/71539dd1-fb13-44d0-8468-a3a96e726114>
-- Source of the rendered version: [`seqtubemap-latency.html`](./seqtubemap-latency.html)
+- Designed version: [`seqtubemap-latency.html`](./seqtubemap-latency.html), published at
+  <https://claude.ai/code/artifact/71539dd1-fb13-44d0-8468-a3a96e726114>. It covers §1-6 only —
+  §7-9 live here and were never in that render.
 - Harness: [`perf/`](../../perf/)
 
 **Headline:** a 10 kb region takes **120 seconds** and returns a **10 MB SVG** — and while
 it does, it takes the entire API down for every other caller.
 
 > **This is a dated measurement, not a description of the current code.** It is what the
-> service did on 2026-08-27, and it is the baseline everything since is read against. Two
-> increments have landed on `main` and neither is deployed, so the live numbers above are
-> still the live numbers: **A** made the endpoints synchronous, so one slow request no longer
-> stalls the others, and **B** deleted the browser emulation this document diagnoses — the
-> `import:jsdom+canvas`, `jsdom:construct-dom` and `serialize:outerHTML` stages below no
-> longer exist. What B changed, measured the same way, is in
-> [`increment-b.md`](./increment-b.md).
+> service did on 2026-08-27, and it is the baseline everything since is read against.
+> Increments **A** and **B** and the first half of **C** have landed on `main` and none of
+> them is deployed, so the live numbers above are still the live numbers: **A** made the
+> endpoints synchronous, so one slow request no longer stalls the others; **B** deleted the
+> browser emulation this document diagnoses — the `import:jsdom+canvas`,
+> `jsdom:construct-dom` and `serialize:outerHTML` stages below no longer exist; and **C**'s
+> first half ([#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23)) replaced the
+> `d=` strings §8 and §9 measure with the numbers behind them. What B changed, measured the
+> same way, is in [`increment-b.md`](./increment-b.md). `main` was tried on the live server
+> for a bounded window on 2026-08-31 and put back; no stage timings were captured while it
+> was up, so there is still no *after* column for §1 or §6.
+>
+> **Every `main.py` and `tubemap.js` line reference below is as of 2026-08-27** and most have
+> since moved — read them as "this is the code that was measured", not as pointers to follow.
+> The §9 excerpt in particular no longer exists in any form: #22 deleted the d3 sink and #23
+> deleted the `d` string it was binding.
 
 ---
 
@@ -195,8 +205,7 @@ SPINES=40,150,600 HAPS=464 ALT=0.08 node perf/cross.mjs
 ## 6. The gap, closed — server-side stage timings
 
 *Measured 2026-08-27 on the live server. Instrumentation is `stage_timing()` in `main.py`
-(PR #12), deployed and exercised by a colleague with server access; the request procedure is
-[`deploy-request.md`](./deploy-request.md), the raw log is
+(PR #12), deployed and exercised by the colleague who runs the server; the raw log is
 `pangenome-api-sequence-tube-map-logs/seqtubmap-log.txt`.*
 
 Three fresh regions, all `cached=False`, plus one `cached=True` request that arrived in the
