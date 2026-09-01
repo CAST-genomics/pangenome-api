@@ -46,10 +46,10 @@ trial*. The server has since been put back on `release`.
 
 | | |
 | --- | --- |
-| Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21), [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46), [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41), [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40), [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22), [#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45), [#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23) |
-| Frontier | **[#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24)** — increment C's wire format, unblocked by #23 |
+| Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21), [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46), [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41), [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40), [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22), [#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45), [#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23), [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24) |
+| Frontier | **[#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25)** — the contract test, unblocked by #24. Increment C is complete on this side of the wire; `pgb`'s parser is where it lands next |
 | Live | **Nothing.** The server follows `release`, so merging is not shipping; `git log release..main` — 59 commits — is what is waiting. The trial was a loan, not a promotion |
-| Defects, outside the increments | [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52), [#54](https://github.com/CAST-genomics/PangenomeAPI/issues/54), [#58](https://github.com/CAST-genomics/PangenomeAPI/issues/58) — all still open, all triaged, none blocking #24 |
+| Defects, outside the increments | [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52), [#54](https://github.com/CAST-genomics/PangenomeAPI/issues/54), [#58](https://github.com/CAST-genomics/PangenomeAPI/issues/58) — all still open, all triaged, none blocking #25. #52 is answered *on the band route* by #24, and stands on the SVG route — see below |
 
 ---
 
@@ -97,7 +97,7 @@ what each became.*
                         │
                         ├── #18 golden test ✅─┬── #21 capture ✅── #22 delete jsdom ✅
                         │                      │                         │
-                        │                      │                         └── #23 floats ✅── #24 ?format=bands ◀── HERE ── #25 contract test
+                        │                      │                         └── #23 floats ✅── #24 ?format=bands ✅── #25 contract test ◀── HERE
                         │                      │
                         │                      ├── #40 pclai golden ✅
                         │                      │
@@ -113,12 +113,12 @@ what each became.*
 #E  batch GenerateWalksMC — no ticket yet, no ADR behind it
 
 Defects, off the sequence and blocking nothing:
-#52 pgb refuses a reversal — #24 decides what a reversal means on the band route
+#52 pgb refuses a reversal — answered on the band route (header, not body); the SVG route is unchanged, so #52 stands there
 #54 concurrent extraction of one uncached region — corruption half fixed in PR #60
 #58 drop d3, and the dead read-track colouring that is its last user
 ```
 
-**The frontier is [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24)**, and nothing blocks it. Edges are GitHub's native issue
+**The frontier is [#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25)**, and nothing blocks it. Edges are GitHub's native issue
 dependencies, so a ticket whose blockers are all closed is grabbable without consulting this
 document.
 
@@ -449,19 +449,39 @@ outside the six-value grammar and are collected as their own kinds rather than f
 `pgb` can read neither today — that is [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52), which predates this — and #24 is where
 what they mean on the band route gets decided.
 
-### [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24) — `?format=bands`
+### [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24) — `?format=bands` ✅
 
-JSON header (viewBox + the ~464-row strand table) plus a binary body of `Float32 × 6 +
-Uint16` per band, with segment boxes carrying id, outline and sequence. Per-strand values
-appear **once** instead of once per band, and a fixed-width body copies straight into `pgb`'s
-GPU instance buffer with no parse at all.
+JSON header (the dimensions, the strand table, the segment boxes) plus a binary body of
+`Float32 × 6 + Uint16` per band. Per-strand values appear **once** instead of once per band,
+and the geometry column is `pgb`'s GPU instance buffer with no parse step at all. The format
+is specified in [`docs/band-format.md`](band-format.md), written to be enough to write a
+parser against without reading the server.
 
-**Additive.** Omit the parameter and you get today's response, byte for byte. The two repos
-never deploy in lockstep, and the SVG stays as the oracle.
+**Additive.** Omit the parameter and you get today's response, byte for byte — checked over
+the endpoint, not merely intended. An unrecognised `format` is refused with a 400 before any
+stage runs, rather than quietly served as SVG.
 
-> Projected at ~1.5 MB against 10.07 MB — **arithmetic from the band count and record width,
-> not a measurement.** The ticket asks for the real figure. It is the one number in these
-> documents that is not a direct observation.
+**The projection is now a measurement**, and it was right and slightly pessimistic: **1.25 MB
+against 9.97 MB** over the committed 7,967 bp subgraph, where this document predicted ~1.5 MB
+against 10.07 MB. Across the five real subgraphs the ratio runs 1.9× at 90 bp to 9.0× at
+44,795 bands — smallest where the response is smallest, because a 592-band payload is almost
+all strand table. `perf/band-payload-sizes.mjs` reproduces the table.
+
+| region | span | bands | SVG | band payload | ratio |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| chr8:78,771,162-78,771,252 | 90 bp | 592 | 0.13 MB | 0.07 MB | 1.9× |
+| chr1:25,331,046-25,331,646 | 600 bp | 8,089 | 2.25 MB | 0.28 MB | 8.1× |
+| chr8:10,079,054-10,080,461 | 1.4 kb | 13,246 | 3.61 MB | 0.43 MB | 8.4× |
+| chr1:25,301,271-25,309,238 | 8.0 kb | 35,020 | 9.97 MB | **1.25 MB** | 8.0× |
+| chr1:25,331,646-25,335,796 | 4.2 kb | 44,795 | 12.58 MB | 1.40 MB | 9.0× |
+
+Three things the increment decided that the ticket left to it. The body is **columnar** —
+interleaved, a 26-byte record admits no `Float32Array` view, so the client would copy the
+fields apart one at a time, which is the parse step being deleted. A strand's colour travels
+as **three whole channels** rather than CSS, so the rounding that caused the live chr7 refusal
+happens once on the server. And a reversal's corners and connectors ride in the **header**,
+each carrying its position in the draw order — which is [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52)'s
+answer on this route, and needs nothing new from `pgb`.
 
 ### [#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25) — Contract test
 

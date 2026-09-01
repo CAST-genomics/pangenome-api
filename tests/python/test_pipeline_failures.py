@@ -226,27 +226,35 @@ def test_a_walkless_cache_entry_is_re_extracted(client, cache, main_module, monk
     assert "gfa_to_vg" in response.json()["detail"]
 
 
+# The renders, stubbed together wherever a test is about some other stage.
+RENDERS = ("ConvertGfaToVg", "ConvertVgToJson", "GenerateSeqTubeMapSvg", "GenerateSeqTubeMapBands")
+
+
 @pytest.mark.parametrize(
-    "stage, stubbed",
+    "stage, stubbed, params",
     [
-        ("gfa_to_vg", "ConvertGfaToVg"),
-        ("vg_to_json", "ConvertVgToJson"),
-        ("generate_svg", "GenerateSeqTubeMapSvg"),
+        ("gfa_to_vg", "ConvertGfaToVg", REQUEST),
+        ("vg_to_json", "ConvertVgToJson", REQUEST),
+        ("generate_svg", "GenerateSeqTubeMapSvg", REQUEST),
+        # The band route's render is a different script and can fail for its own
+        # reasons — a document too large for a 16-bit strand id, for one — so it
+        # has to name itself rather than borrow the document route's name.
+        ("generate_bands", "GenerateSeqTubeMapBands", {**REQUEST, "format": "bands"}),
     ],
 )
-def test_a_failing_stage_names_itself(client, cache, main_module, monkeypatch, stage, stubbed):
+def test_a_failing_stage_names_itself(client, cache, main_module, monkeypatch, stage, stubbed, params):
     """Each stage in turn, because each one used to fail the same anonymous way.
 
-    All three already returned a boolean nobody read. The response now carries
+    All of them already returned a boolean nobody read. The response now carries
     the name of the one that returned False, and the tool's own stderr goes to
     the log next to it.
     """
     shutil.copy(SUBGRAPH, cache / SUBGRAPH.name)
-    for name in ("ConvertGfaToVg", "ConvertVgToJson", "GenerateSeqTubeMapSvg"):
+    for name in RENDERS:
         monkeypatch.setattr(main_module, name, lambda *args, **kwargs: True)
     monkeypatch.setattr(main_module, stubbed, lambda *args, **kwargs: False)
 
-    response = client.get("/seqtubemap", params=REQUEST)
+    response = client.get("/seqtubemap", params=params)
 
     assert response.status_code == 502
     assert stage in response.json()["detail"]
@@ -260,7 +268,7 @@ def test_a_render_that_writes_no_document_is_reported(client, cache, main_module
     built rather than by it.
     """
     shutil.copy(SUBGRAPH, cache / SUBGRAPH.name)
-    for name in ("ConvertGfaToVg", "ConvertVgToJson", "GenerateSeqTubeMapSvg"):
+    for name in RENDERS:
         monkeypatch.setattr(main_module, name, lambda *args, **kwargs: True)
 
     response = client.get("/seqtubemap", params=REQUEST)

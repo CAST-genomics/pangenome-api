@@ -35,7 +35,7 @@
 // band's `d` attribute already built; now it hands over the six numbers the
 // attribute encoded, and the drawing command is written here — so this module is
 // the one place a band becomes a drawing at all.
-import { BAND_THICKNESS } from "./band-data.mjs";
+import { BAND_THICKNESS, rgbChannels } from "./band-data.mjs";
 
 /** The document this band data describes, in full. */
 export function emitDocument(bandData) {
@@ -216,22 +216,8 @@ function css(declarations) {
 // can parse. This is not new rounding: the emulated document rounded here too,
 // in jsdom's CSS serializer, half away from zero, and this reproduces that.
 function cssColor(color) {
-  const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color);
-  if (!hex) return wholeChannels(color); // already `rgb(r, g, b)` — what a PCLAI scheme supplies
-  const [r, g, b] = hex.slice(1).map((pair) => parseInt(pair, 16));
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-// `rgb(r, g, b)` with each channel a whole number in 0..255, as a stylesheet
-// would serialize it. Anything that is not that spelling is left alone.
-function wholeChannels(color) {
-  const rgb = /^rgb\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)$/.exec(String(color));
-  if (!rgb) return color;
-  const channels = rgb.slice(1).map((channel) => {
-    const value = Math.round(Number(channel));
-    return Math.min(255, Math.max(0, value));
-  });
-  return `rgb(${channels.join(", ")})`;
+  const channels = rgbChannels(color);
+  return channels === null ? color : `rgb(${channels.join(", ")})`;
 }
 
 // A non-breaking space is written as an entity wherever it appears — in an

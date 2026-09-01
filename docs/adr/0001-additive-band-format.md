@@ -128,6 +128,47 @@ bad B shows up as an error card rather than as a diff nobody ran.
 > today — that is [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52), which
 > predates this — and #24 is where what they mean on the band route gets decided.
 
+> *Amended 2026-09-01: **C has landed** ([#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24)).*
+> `/seqtubemap?format=bands` returns a JSON header and a binary body; the format is
+> specified in [`docs/band-format.md`](../band-format.md), written to be enough to write a
+> parser against without reading the server. Omitting the parameter returns the document
+> byte for byte, and an unrecognised `format` is refused with a 400 before any stage runs
+> rather than quietly served as SVG.
+>
+> **The projection was right and slightly pessimistic.** This ADR predicted "roughly 1.5 MB
+> against the SVG's 10.07 MB" from the band count and the record width. The nearest thing
+> that can be measured from a checkout is the committed 7,967 bp subgraph, whose document is
+> 9.97 MB — a document of the size the projection was about, rather than a region of the span
+> it named — and its payload is **1.25 MB**. The five real subgraphs run
+> 1.9× at 90 bp to 9.0× at 44,795 bands, and the ratio is smallest where the response is
+> smallest: the 90 bp region draws 592 bands over 464 strands, so its payload is almost all
+> strand table. `perf/band-payload-sizes.mjs` reproduces the table.
+>
+> Three decisions the ADR left open, and how they went:
+>
+> * **The body is columnar, not one interleaved record per band.** Interleaved, the record
+>   is 26 bytes, and a `Float32Array` cannot be viewed over a buffer at an offset that is
+>   not a multiple of 4 — so a client would have to copy the fields apart one at a time,
+>   which is the parse step this whole change exists to delete. Split into a float32
+>   column, a uint16 column and a uint8 column, each is one view over the bytes that
+>   arrived, and the geometry column *is* the instance buffer.
+> * **A strand's colour travels as three whole channels**, not as CSS. The layout spells a
+>   colour two ways and a PCLAI scheme can supply fractional channels — the live chr7
+>   failure of 2026-08-28 — so the rounding happens once, on the server, in the same
+>   function the document rounds with.
+> * **The reversal shapes ride in the header, not the body** ([#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52)),
+>   each carrying the position it held in the draw order, because paint order is document
+>   order. No production response contains one, and a client may reasonably refuse a
+>   response whose `reversals` are non-empty rather than implement two shapes it will not
+>   meet. This is what #24 was to decide, and it decides it without asking `pgb` to grow
+>   anything.
+>
+> One byte per band is carried beyond the ticket's record: which element the document draws
+> the band as. A client can ignore it — the six numbers are the whole shape either way —
+> and it is what makes the SVG reconstructible from the payload, so *"the band data is
+> canonical and the document is a rendering of it"* is a fact the tests check rather than
+> an intention.
+
 **D** — delete the `vg convert` / `vg view -j` round trip. Gated on measuring
 `subgraph_extract` on the live server; if upstream extraction dominates, this is noise.
 

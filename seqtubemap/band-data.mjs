@@ -393,3 +393,27 @@ export function assertDenseStrandIds(strands) {
     }
   }
 }
+
+/**
+ * A colour's three channels, each a whole number in 0..255 — or null for a
+ * spelling this does not recognise, which a caller then carries verbatim.
+ *
+ * Here rather than in either sink, because both need it and neither owns it.
+ * The document writes a colour as CSS `rgb(r, g, b)`; the band payload writes
+ * it as three numbers, since a client building a GPU buffer wants numbers and
+ * asking it to parse the two spellings the layout uses — hex from the palettes,
+ * `rgb()` from a PCLAI scheme, whose channels can be fractional — would be
+ * handing it the parse step that format exists to delete. One rounding, in one
+ * place, so the two encodings cannot disagree about a colour.
+ */
+export function rgbChannels(color) {
+  const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(color);
+  if (hex) return hex.slice(1).map((pair) => parseInt(pair, 16));
+
+  const rgb = /^rgb\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)$/.exec(String(color));
+  if (!rgb) return null;
+  return rgb.slice(1).map((channel) => {
+    const value = Math.round(Number(channel));
+    return Math.min(255, Math.max(0, value));
+  });
+}
