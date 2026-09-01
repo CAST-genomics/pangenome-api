@@ -27,9 +27,8 @@ for (const name of realCases) {
     strands: bandData.strands.length,
     bands: bandData.bands.length,
     segments: bandData.segments.length,
-    outlines: bandData.segments.reduce(
-      (total, segment) => total + (segment.outline?.length ?? 0),
-      0,
+    boxes: Buffer.byteLength(
+      JSON.stringify(bandData.segments.map((segment) => segment.box)),
     ),
     // The two things the header spends its bytes on, measured as the JSON they
     // become, so the breakdown in `docs/band-format.md` is reproducible rather
@@ -51,7 +50,7 @@ for (const row of rows) {
       `svg ${mb(row.svg).padStart(9)}  payload ${mb(row.payload).padStart(9)}  ` +
       `${(row.svg / row.payload).toFixed(1)}x  ` +
       `[header ${mb(row.header)}: ${row.segments} segment boxes at ${mb(row.segmentJson)} ` +
-      `(${mb(row.outlines)} outline, ${mb(row.sequences)} sequence), ` +
+      `(${mb(row.boxes)} box, ${mb(row.sequences)} sequence), ` +
       `${row.strands}-row strand table at ${mb(row.strandJson)}; body ${mb(row.body)}]`,
   );
 }

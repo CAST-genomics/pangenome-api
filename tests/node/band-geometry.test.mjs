@@ -21,6 +21,7 @@ import {
   cornerShape,
   curveBand,
   rectBand,
+  segmentBox,
   verticalConnector,
 } from "../../seqtubemap/band-data.mjs";
 import { emitDocument } from "../../seqtubemap/emit-document.mjs";
@@ -221,3 +222,84 @@ function assertRecoveredExactly(document, bandData) {
   // it just performed.
   assert.equal(emitDocument(JSON.parse(JSON.stringify(bandData))), document);
 }
+
+// A segment box lost its drawing command in #66, for the same reason a band lost
+// its own in #23: every one of them is a rounded rectangle and the layout has
+// the five numbers before it builds the string. What is checked here is the same
+// claim as above, one shape down — that the numbers and the picture agree — read
+// back out of the document by a parser that knows nothing about how it was
+// written.
+for (const name of realCases) {
+  test(`every segment box of ${name} is the rectangle its numbers say`, async () => {
+    const { document, bandData } = await renderReal(name);
+    const drawn = readSegmentBoxes(document);
+
+    assert.equal(drawn.length, bandData.segments.length, "the document and the band data disagree on the box count");
+    assert.ok(drawn.length > 0, "the document draws no segment boxes");
+
+    let twoArc = 0;
+    for (const [at, box] of drawn.entries()) {
+      const { box: numbers } = bandData.segments[at];
+      assert.deepEqual(box.corners, numbers, `segment box ${at} is not the rectangle it travels as`);
+      if (box.spelling === "two-arc") twoArc += 1;
+    }
+
+    // The spelling that has no straight run along its top or bottom edge — a box
+    // exactly two corners wide — is most of them, and is the one a client parsing
+    // the string had to carry a second grammar for. Both spellings have to appear
+    // here, or this covers one of them.
+    assert.ok(twoArc > 0, "no box was drawn in the two-arc spelling");
+    assert.ok(twoArc < drawn.length, "every box was drawn in the two-arc spelling");
+  });
+}
+
+/**
+ * The segment boxes a document draws, recovered from the path commands.
+ *
+ * Deliberately naive: it takes the coordinate pairs of the path and reads the
+ * rectangle off their extremes, knowing nothing about the order the arcs and
+ * straight runs are written in. That is what makes it an independent check of
+ * the five numbers rather than the emitter's own arithmetic played back.
+ */
+function readSegmentBoxes(document) {
+  const group = document.slice(document.indexOf('<g class="node">'));
+  return [...group.matchAll(/<path id="[^"]*" d="([^"]*)"/g)].map(([, d]) => {
+    const numbers = d.match(/-?\d+(?:\.\d+)?/g).map(Number);
+    const xs = numbers.filter((_, at) => at % 2 === 0);
+    const ys = numbers.filter((_, at) => at % 2 === 1);
+    const [left, right] = [Math.min(...xs), Math.max(...xs)];
+    const [top, bottom] = [Math.min(...ys), Math.max(...ys)];
+    return {
+      // The path opens on the left edge, a radius below the top corner, so the
+      // radius is readable without knowing which arc command drew it.
+      corners: { left, top, right, bottom, radius: ys[0] - top },
+      // Which spelling drew it: a straight run between the first two corners
+      // means the box is wider than the two of them, and there is a top edge
+      // to draw. Without one the two arcs meet and the command has no `L`
+      // there at all.
+      spelling: / L /.test(d.split(" Q ")[1]) ? "three-arc" : "two-arc",
+    };
+  });
+}
+
+test("a box the layout draws that is not a rounded rectangle throws where the layout is still in scope", () => {
+  // The five numbers say a rounded rectangle or they say nothing: a box
+  // narrower than the two corners it is drawn with is not a shape this can
+  // encode, and a client handed those numbers would draw a rectangle the server
+  // never drew. Caught here, where the layout that produced it is in scope, for
+  // the same reason a band of the wrong thickness is.
+  const box = { left: 11, top: 11, right: 76, bottom: 5564, radius: 9 };
+  assert.deepEqual(segmentBox(box), box);
+
+  // Exactly two corners wide is a box — it is the spelling most real boxes are
+  // drawn in — and narrower than that is not.
+  assert.deepEqual(segmentBox({ ...box, right: 29 }).right, 29);
+  assert.throws(() => segmentBox({ ...box, right: 28 }), /not a rounded rectangle/);
+  assert.throws(() => segmentBox({ ...box, bottom: 28 }), /not a rounded rectangle/);
+  assert.throws(() => segmentBox({ ...box, left: 100 }), /not a rounded rectangle/);
+
+  // And a number that is not one, which is how a box built from an undefined
+  // layout quantity would otherwise reach the wire as `null`.
+  assert.throws(() => segmentBox({ ...box, top: undefined }), /top/);
+  assert.throws(() => segmentBox({ ...box, radius: 0 }), /radius/);
+});

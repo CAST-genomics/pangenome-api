@@ -267,8 +267,16 @@ def test_the_segment_boxes_travel_with_their_sequences(payload):
     segments = header["segments"]
     assert {segment["sequence"] for segment in segments} == set(expected.values())
     for segment in segments:
-        assert segment["outline"].startswith("M ")
         assert segment["id"]
+        # Since #66 a box is the five numbers it always was, not the path
+        # command they were built into: the client draws the rectangle rather
+        # than parsing one back out of a string.
+        assert "outline" not in segment
+        box = segment["box"]
+        assert all(isinstance(box[edge], (int, float)) for edge in
+                   ("left", "top", "right", "bottom", "radius"))
+        assert box["right"] - box["left"] >= 2 * box["radius"]
+        assert box["bottom"] - box["top"] >= 2 * box["radius"]
 
 
 def test_the_band_payload_is_a_fraction_of_the_document(bands_client, payload):
