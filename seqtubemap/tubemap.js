@@ -62,6 +62,7 @@ import {
   cornerShape,
   curveBand,
   rectBand,
+  segmentBox,
   verticalConnector,
 } from "./band-data.mjs";
 import deepEqual from "deep-equal";
@@ -3144,67 +3145,51 @@ function drawReversalsByColor(corners, rectangles, type) {
   });
 }
 
-// draws nodes by building svg-path for border and filling it with transparent white
+// Collects the segment boxes, as the five numbers each one is.
+//
+// A box is a rounded rectangle: `node.x, node.y` is its top-left corner inset by
+// the radius, it runs `pixelWidth` further right when the segment is wide enough
+// to have a straight top edge at all, and `contentHeight` further down for the
+// strands stacked inside it. This used to build the path command those numbers
+// describe and hand it over finished; since #66 the numbers travel and
+// `emit-document.mjs` writes the command, which is where a box becomes a drawing
+// and the only place it does.
+
+/**
+ * The radius every segment box's four corners are drawn with.
+ *
+ * Here rather than beside `BAND_THICKNESS` in band-data.mjs, and travelling on
+ * each box rather than once in the header, because it is not the same kind of
+ * constant. The thickness is load-bearing — it is what lets six numbers describe
+ * a band, so the format says it once and refuses a band of any other — whereas a
+ * box carries its own corners and a client draws whatever radius it is handed.
+ * This is the layout's choice of how round to draw a segment, and nothing
+ * downstream depends on the number.
+ */
+const SEGMENT_RADIUS = 9;
 
 function drawNodes(dNodes) {
-  let x;
-  let y;
-
-  dNodes.forEach((node) => {
-    // top left arc
-    node.d = `M ${node.x - 9} ${node.y} Q ${node.x - 9} ${node.y - 9} ${
-      node.x
-    } ${node.y - 9}`;
-    x = node.x;
-    y = node.y - 9;
-
-    // top straight
-    if (node.width > 1) {
-      x += node.pixelWidth;
-      node.d += ` L ${x} ${y}`;
-    }
-
-    // top right arc
-    node.d += ` Q ${x + 9} ${y} ${x + 9} ${y + 9}`;
-    x += 9;
-    y += 9;
-
-    // right straight
-    if (node.contentHeight > 0) {
-      y += node.contentHeight - 0;
-      node.d += ` L ${x} ${y}`;
-    }
-
-    // bottom right arc
-    node.d += ` Q ${x} ${y + 9} ${x - 9} ${y + 9}`;
-    x -= 9;
-    y += 9;
-
-    // bottom straight
-    if (node.width > 1) {
-      x -= node.pixelWidth;
-      node.d += ` L ${x} ${y}`;
-    }
-
-    // bottom left arc
-    node.d += ` Q ${x - 9} ${y} ${x - 9} ${y - 9}`;
-    x -= 9;
-    y -= 9;
-
-    // left straight
-    if (node.contentHeight > 0) {
-      y -= node.contentHeight - 0;
-      node.d += ` L ${x} ${y}`;
-    }
-  });
-
   console.log("config:", config);
 
   dNodes.forEach((node) => {
+    // Each straight run is there only when the layout has something to span with
+    // it: a segment one unit wide is two corners meeting, and a segment no
+    // strand passes through has no height between them. Both are the layout's
+    // own conditions, and `segmentBox` is what refuses the result if the five
+    // numbers stop describing a rounded rectangle.
+    const run = node.width > 1 ? node.pixelWidth : 0;
+    const rise = node.contentHeight > 0 ? node.contentHeight : 0;
     const colors = colorNodes(node.name);
+
     bandCollector.segment({
       id: node.name,
-      outline: node.d,
+      box: segmentBox({
+        left: node.x - SEGMENT_RADIUS,
+        top: node.y - SEGMENT_RADIUS,
+        right: node.x + run + SEGMENT_RADIUS,
+        bottom: node.y + rise + SEGMENT_RADIUS,
+        radius: SEGMENT_RADIUS,
+      }),
       sequence: node.seq,
       fill: colors["fill"],
       fillOpacity: colors["fill-opacity"],

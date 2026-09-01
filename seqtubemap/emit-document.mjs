@@ -170,8 +170,59 @@ function segmentElement(segment) {
     "stroke-width": segment.strokeWidth,
   });
   return (
-    `<path id="${attribute(segment.id)}" d="${attribute(segment.outline)}"` +
+    `<path id="${attribute(segment.id)}" d="${attribute(segmentOutline(segment.box))}"` +
     `${attr("sequence", segment.sequence)} style="${attribute(style)}"></path>`
+  );
+}
+
+/**
+ * A segment box's outline: four quarter-circle corners, joined by the straight
+ * runs the box is long enough to have.
+ *
+ * Written here since #66, out of the five numbers the box travels as — the same
+ * move #23 made for the bands, and for the same reason. The layout used to build
+ * this string itself and hand it over finished.
+ *
+ * **A run appears only where there is room for one.** A box exactly `2 · radius`
+ * wide is two corners meeting, with no top or bottom edge between them, and the
+ * document writes no `L` for an edge of no length. That is not a rare case: it
+ * is how most segment boxes of a real subgraph are drawn, since most segments
+ * are short.
+ *
+ * **This moved the SVG route's bytes, by one ulp, in a handful of places**, and
+ * the goldens were re-baselined for it. The layout used to walk the outline as a
+ * running position — `x += pixelWidth`, `x += 9`, then back down again — so it
+ * printed the same edge twice, one ulp apart, whenever those steps did not undo
+ * each other exactly: `225.85714285714286` along the top and `225.8571428571429`
+ * along the bottom of one box. Four to eight numbers per golden document, each
+ * within 1.5e-16 of what it was, and no command anywhere changed. A box has one
+ * left edge, so a document written from the numbers writes it once — which is
+ * the whole of #66's argument, arriving in the SVG route as well: the string was
+ * never quite the numbers.
+ *
+ * The same rounding is why the run test is `>` and not `>` some tolerance. One
+ * box of the five real subgraphs — 1 of 1,219 — comes out 18 + 4.5e-13 wide
+ * where its two corners are 18, because neither `x - 9` nor `x + 9` is exact,
+ * so it is written with two straight runs of that length instead of none. A
+ * tolerance would spell that box the shorter way, and it would be the first of
+ * the nine tolerant comparisons this ticket exists to delete from the client.
+ * The numbers are what the box is; this draws what they say.
+ */
+function segmentOutline({ left, top, right, bottom, radius }) {
+  const run = right - left > 2 * radius;
+  const rise = bottom - top > 2 * radius;
+
+  // Clockwise from the top-left corner's lower end, which is where the layout
+  // started it and therefore where the bytes start it.
+  return (
+    `M ${left} ${top + radius} Q ${left} ${top} ${left + radius} ${top}` +
+    (run ? ` L ${right - radius} ${top}` : "") +
+    ` Q ${right} ${top} ${right} ${top + radius}` +
+    (rise ? ` L ${right} ${bottom - radius}` : "") +
+    ` Q ${right} ${bottom} ${right - radius} ${bottom}` +
+    (run ? ` L ${left + radius} ${bottom}` : "") +
+    ` Q ${left} ${bottom} ${left} ${bottom - radius}` +
+    (rise ? ` L ${left} ${top + radius}` : "")
   );
 }
 

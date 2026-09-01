@@ -97,7 +97,8 @@ Python.
       "pclaiX": 0.396, "pclaiY": -1.353, "pclaiScore": "993" }
   ],
   "segments": [
-    { "id": "79337767", "outline": "M 11 20 Q 11 11 20 11 …",
+    { "id": "79337767",
+      "box": { "left": 11, "top": 11, "right": 76, "bottom": 5564, "radius": 9 },
       "sequence": "AGAGCCTGTCTT…", "fill": "#ffffff", "fillOpacity": 0.4,
       "stroke": "#000000", "strokeWidth": 2 }
   ],
@@ -139,10 +140,33 @@ number with a bad value, so it travels verbatim and whoever displays it decides
 what the categories mean. A reader that parses it as a number either refuses
 real documents or turns a category into `NaN`.
 
-**`segments`** — the **segment** boxes, in draw order, each with the id, outline
-and sequence a client draws and labels from. The outline is a path command
-because a segment box is a rounded rectangle rather than a band; there are three
-orders of magnitude fewer of them than bands.
+**`segments`** — the **segment** boxes, in draw order, each with the id, box and
+sequence a client draws and labels from. A `box` is a **rounded rectangle**: its
+four edges and the radius its four corners are drawn with, all in the document's
+own coordinates and its own double precision. Draw it as a rounded rectangle;
+there is nothing else to it.
+
+It travelled as a path command until #66 — `"M 11 20 Q 11 11 20 11 L 67 11 …"` —
+which is the same numbers with a drawing built around them, and cost a client a
+second parser: a regular expression, and a tolerance, because the server printed
+the same edge two ways one ulp apart, and a second grammar, because a box
+exactly `2 · radius` wide has no straight run along its top or bottom edge and
+the command omits those two `L`s. Most boxes are that shape (479 of 768 in the
+8.0 kb region), so neither spelling was the rare one. The numbers say the box
+once, and the SVG route still writes the same command out of them.
+
+**`version` stays 1 across that change**, which the rule above would not
+normally allow: `outline` did not become optional, it went, and that is a change
+to what a reader finds. The rule is there to protect readers, and this format has
+none — no client has ever consumed a v1 payload, and the reader `pgb` is writing
+now is the first. A version bumped for a change nobody can observe would spend
+the one signal this format has on nothing. **The exception closes with the first
+released reader**; after that the rule binds as written.
+
+The alternative was to add `box` beside `outline` and bump nothing, which the
+rule does allow. That was rejected: it would have kept the string in the format
+forever and left that first reader with two ways to find the same rectangle, one
+of them the parser this change exists to delete.
 
 **`overlays`** — the ruler and the per-segment labels, when the render drew any:
 an element name, its attributes as ordered pairs, and its text. **Empty in every
@@ -194,7 +218,7 @@ The geometry is `Float32`. The layout computes in doubles, so a coordinate
 arrives rounded: `138.71428571428573` becomes `138.7142791748047`. That is the
 format's one lossy step and it is deliberate — a GPU instance buffer is float32,
 so the rounding would happen on the client anyway. Everything else (the
-dimensions, the strand table, the segment outlines) travels at full precision as
+dimensions, the strand table, the segment boxes) travels at full precision as
 JSON.
 
 ### The shapes that are not bands
@@ -238,14 +262,14 @@ Five real subgraphs, rendered through `renderTubeMap` and encoded both ways,
 | region | span | strands | bands | SVG | band payload | ratio |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | chr8:78,771,162-78,771,252 | 90 bp | 464 | 592 | 0.13 MB | 0.07 MB | 1.9× |
-| chr1:25,331,046-25,331,646 | 600 bp | 369 | 8,089 | 2.25 MB | 0.28 MB | 8.1× |
-| chr8:10,079,054-10,080,461 | 1.4 kb | 463 | 13,246 | 3.61 MB | 0.43 MB | 8.4× |
-| chr1:25,301,271-25,309,238 | 8.0 kb | 383 | 35,020 | 9.97 MB | **1.25 MB** | 8.0× |
-| chr1:25,331,646-25,335,796 | 4.2 kb | 1,201 | 44,795 | 12.58 MB | 1.40 MB | 9.0× |
+| chr1:25,331,046-25,331,646 | 600 bp | 369 | 8,089 | 2.25 MB | 0.27 MB | 8.5× |
+| chr8:10,079,054-10,080,461 | 1.4 kb | 463 | 13,246 | 3.61 MB | 0.41 MB | 8.8× |
+| chr1:25,301,271-25,309,238 | 8.0 kb | 383 | 35,020 | 9.97 MB | **1.10 MB** | 9.0× |
+| chr1:25,331,646-25,335,796 | 4.2 kb | 1,201 | 44,795 | 12.58 MB | 1.35 MB | 9.3× |
 
 ADR 0001 projected "roughly 1.5 MB against the current 10.07 MB" at the 10 kb
 region from the band count and the record width. Measured on the 8.0 kb subgraph
-that stands for it: **1.25 MB against 9.97 MB**. The projection was right and
+that stands for it: **1.10 MB against 9.97 MB**. The projection was right and
 slightly pessimistic.
 
 The ratio is smallest on the smallest region, and that is the shape of the win
@@ -254,11 +278,18 @@ payload is almost entirely the strand table — said once, but said in full. Whe
 the response is large enough to be a problem, the bands dominate and the strand
 table is a rounding error.
 
-On the 8.0 kb region the header is 0.35 MB of the 1.25 MB and the body is
-0.90 MB. What the header spends it on is the **segment boxes** — 0.30 MB for
-768 of them, of which 0.21 MB is their outlines, written as path commands — with
-the 383-row strand table at 0.045 MB and the sequences themselves at 0.011 MB.
-So the per-strand redundancy this format set out to remove is gone, and what is
-left on the JSON side is the segment outlines: a smaller, later question than
-the one this format answers, and one that touches three orders of magnitude
-fewer shapes than the bands do.
+On the 8.0 kb region the header is 0.20 MB of the 1.10 MB and the body is
+0.90 MB. What the header spends it on is still the **segment boxes** — 0.16 MB
+for 768 of them, of which 0.06 MB is the five numbers each box is — with the
+383-row strand table at 0.045 MB and the sequences themselves at 0.011 MB.
+
+That header was **0.35 MB** before #66, when a box travelled as the path command
+those numbers were built into: 0.21 MB of the 0.30 MB the boxes cost was the
+commands. Sending the numbers took **0.15 MB off the header** and 0.15 MB off the
+whole response, which is where the 8.0× on this row became 9.0×. The saving is
+smaller than the outlines were, because the numbers are not free: five keys and
+five full-precision doubles are 0.06 MB of the 0.21 MB the strings were.
+
+So the per-strand redundancy this format set out to remove is gone, and so is
+the last string a client had to parse. What the JSON side spends its bytes on
+now is the numbers themselves.

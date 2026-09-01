@@ -228,6 +228,56 @@ export function verticalConnector({ strand, x, y, width, height, alpha }) {
   return present({ kind: "connector", strand, x, y, width, height, alpha });
 }
 
+/**
+ * One segment box, as the five numbers that describe it.
+ *
+ * Every box the layout draws is a rounded rectangle — four quarter-circle
+ * corners of one radius, joined by straight runs — and it has these five numbers
+ * before it builds anything. It used to travel as the path command they were
+ * built into (`M 11 20 Q 11 11 20 11 …`), which a client took apart again with a
+ * regular expression: the same encoding step in the middle of a numeric pipeline
+ * that #23 removed from the bands, one shape down (#66). The numbers travel and
+ * `emit-document.mjs` writes the drawing command out of them.
+ *
+ * A box narrower or shorter than the two corners it is drawn with is not a
+ * rounded rectangle, and five numbers that say one thing while the layout drew
+ * another is the silent mis-encoding this must not introduce. So it throws here,
+ * where the layout that produced it is still in scope, rather than reaching a
+ * client that would draw a shape the server never drew.
+ *
+ * @param {object} box
+ * @param {number} box.left    the box's edges, in the document's own coordinates
+ * @param {number} box.top
+ * @param {number} box.right
+ * @param {number} box.bottom
+ * @param {number} box.radius  the corner radius, the same at all four corners
+ */
+export function segmentBox({ left, top, right, bottom, radius }) {
+  for (const [name, value] of Object.entries({ left, top, right, bottom, radius })) {
+    if (!Number.isFinite(value)) {
+      throw new Error(
+        `a segment box's ${name} is ${value}, which is not a number. A box travels as ` +
+          "five numbers, so a layout quantity that never arrived would otherwise reach " +
+          "the client as null and be drawn as a rectangle nobody laid out.",
+      );
+    }
+  }
+  if (radius <= 0) {
+    throw new Error(
+      `a segment box has a corner radius of ${radius}, and every box the layout draws ` +
+        "is drawn with rounded corners. A radius that is not positive describes no arc.",
+    );
+  }
+  if (right - left < 2 * radius || bottom - top < 2 * radius) {
+    throw new Error(
+      `a segment box ${right - left} wide and ${bottom - top} tall is not a rounded ` +
+        `rectangle with a corner radius of ${radius}: its two corners alone are ` +
+        `${2 * radius}. The layout has drawn a box these five numbers do not describe.`,
+    );
+  }
+  return { left, top, right, bottom, radius };
+}
+
 function assertThickness(thickness, kind) {
   if (thickness === BAND_THICKNESS) return;
   throw new Error(

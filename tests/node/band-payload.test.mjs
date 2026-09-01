@@ -244,7 +244,7 @@ test("the numbers a client reads are the numbers pgb recovers from the document"
   }
 });
 
-test("segment boxes travel whole, with their sequences", async () => {
+test("segment boxes travel whole, as numbers rather than as a drawing command", async () => {
   const { bandData } = await renderReal(realCases[0]);
   const { header } = decodeBandPayload(encodeBandPayload(bandData));
 
@@ -252,9 +252,22 @@ test("segment boxes travel whole, with their sequences", async () => {
   assert.ok(header.segments.length > 0);
   for (const segment of header.segments) {
     assert.equal(typeof segment.id, "string");
-    assert.ok(segment.outline.startsWith("M "), segment.outline);
     assert.match(segment.sequence, /^[ACGTN]+$/);
+
+    // The whole of #66: a box is the five numbers the layout had, and the path
+    // command it used to be written as is gone from the payload entirely.
+    assert.equal(segment.outline, undefined, "a segment still carries a path command");
+    for (const field of ["left", "top", "right", "bottom", "radius"]) {
+      assert.equal(typeof segment.box[field], "number", `${segment.id} has no ${field}`);
+    }
+    assert.ok(segment.box.right > segment.box.left, segment.id);
+    assert.ok(segment.box.bottom > segment.box.top, segment.id);
   }
+
+  // Nothing anywhere in the payload is a path command any more: the bands lost
+  // theirs in #23 and this was the last of them.
+  const text = Buffer.from(encodeBandPayload(bandData)).toString("latin1");
+  assert.ok(!text.includes("outline"), "the payload still carries an outline");
 });
 
 test("a reversal's corners and connectors keep their place in the draw order", async () => {
