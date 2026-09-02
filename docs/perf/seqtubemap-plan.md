@@ -113,8 +113,13 @@ untouched.
 the interview, and it is entirely independent of A–D: it sits upstream of layout, touches
 no wire format, and `pgb` cannot observe it. That makes it schedulable in parallel with the
 band work rather than in sequence with it — but not startable without first establishing
-whether a single batched query can replace the per-node one. That investigation is the
+whether a single batched query can replace the per-segment one. That investigation is the
 prerequisite, not the fix.
+
+> **Amended 2026-09-02.** E has since been grilled, and the sentence above is a record of
+> where Step 0 left it rather than where it stands. It is now #74 (measure the split) and #75
+> (stop the per-segment reads), and whether it wants an ADR is a question #74 answers. Status
+> lives in [the roadmap](../seqtubemap-roadmap.md), per this document's own rule.
 
 ## Step 4 — Verify
 
