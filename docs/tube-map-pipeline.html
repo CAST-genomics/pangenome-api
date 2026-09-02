@@ -367,7 +367,7 @@ increment&nbsp;E &mdash; so it is worth being exact about which is which.</p>
 
 <div class="tbl-scroll">
 <table>
-  <caption>The two calls inside "finding the region" (<code>main.py:743-744</code>), on the
+  <caption>The two calls inside "finding the region" (<code>main.py:933-934</code>), on the
   10,000-base region above.</caption>
   <thead>
     <tr><th>Call</th><th>File it reads</th><th>How it reads it</th><th class="n">Cost</th></tr>
@@ -381,8 +381,8 @@ increment&nbsp;E &mdash; so it is worth being exact about which is which.</p>
     </tr>
     <tr>
       <td><code>GenerateWalksMC</code></td>
-      <td>a <code>.walk.gz</code> &mdash; a separate, position-indexed table of where every
-      assembly sits on every node</td>
+      <td>a <code>.walk.gz</code> &mdash; a separate, segment-indexed table of where every
+      assembly sits on every segment</td>
       <td><b>one lookup per segment</b> &mdash; 381 of them</td>
       <td class="n">30.035 s</td>
     </tr>
@@ -396,13 +396,153 @@ hand over is <em>which haplotype goes where</em> &mdash; the extracted file has 
 links and no paths at all. Supplying those is the second pass, and it is a different file
 with a different shape.</p>
 
-<p><strong>One lookup per segment, and each one is about every haplotype at once.</strong>
-The loop walks the extracted subgraph, and for each <code>S</code> line it asks the walk
-table for that one node id. The row that comes back lists where <em>all 464 haplotypes</em>
-sit at that node, comma-separated; the loop splits it apart and accumulates the coordinates
-into tables, and only at the very end walks those tables to write one <code>W</code> line per
-haplotype. So a 381-segment region performs 381 seeks into a compressed file and parses
-roughly 177,000 coordinate entries, in Python, a field at a time.</p>
+<h3>The two files, byte for byte</h3>
+
+<p>Both halves are small enough to show. This is a real extraction &mdash;
+<code>chr8:78,771,162</code>, 90 bases, nine segments &mdash; committed to this repository
+as a test fixture.</p>
+
+<p><strong>What comes out of the database</strong> is sequence and structure, and nothing
+about people:</p>
+
+<figure>
+  <div class="plate">
+    <svg viewBox="0 0 880 250" role="img" aria-label="An extracted GFA showing S lines carrying a segment id and its bases, and L lines carrying which segment may follow which. There are no W lines.">
+      <text x="0" y="14" font-family="Archivo, sans-serif" font-size="11" font-weight="600" letter-spacing="1.4" fill="#585E59">THE EXTRACTED SUBGRAPH &mdash; 9 S LINES, 11 L LINES, 0 W LINES</text>
+
+      <text x="0" y="44" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1D1A">S<tspan x="26">181810309</tspan><tspan x="122">AACTTCATGAAATCACCACTTTCCTAGGTAAAGCTACTTCTCTAGTGG&hellip;</tspan></text>
+      <text x="0" y="62" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1D1A">S<tspan x="26">181810310</tspan><tspan x="122">A</tspan></text>
+      <text x="0" y="80" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1D1A">S<tspan x="26">181810311</tspan><tspan x="122">C</tspan></text>
+      <text x="0" y="98" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1D1A">S<tspan x="26">181810312</tspan><tspan x="122">T</tspan></text>
+      <text x="0" y="116" font-family="IBM Plex Mono, monospace" font-size="12" fill="#9DA098">&#8942;</text>
+      <text x="0" y="140" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1D1A">L<tspan x="26">181810309</tspan><tspan x="122">+</tspan><tspan x="146">181810310</tspan><tspan x="242">+</tspan><tspan x="266">0M</tspan></text>
+      <text x="0" y="158" font-family="IBM Plex Mono, monospace" font-size="12" fill="#1A1D1A">L<tspan x="26">181810309</tspan><tspan x="122">+</tspan><tspan x="146">181810311</tspan><tspan x="242">+</tspan><tspan x="266">0M</tspan></text>
+
+      <line x1="26" y1="196" x2="115" y2="196" stroke="#8F3222" stroke-width="1"/>
+      <line x1="26" y1="196" x2="26" y2="190" stroke="#8F3222" stroke-width="1"/>
+      <line x1="115" y1="196" x2="115" y2="190" stroke="#8F3222" stroke-width="1"/>
+      <text x="26" y="212" font-family="Archivo, sans-serif" font-size="11" fill="#8F3222">the segment id</text>
+      <text x="26" y="228" font-family="EB Garamond, serif" font-size="12" font-style="italic" fill="#585E59">the only thing the walk table is indexed on</text>
+
+      <line x1="122" y1="196" x2="560" y2="196" stroke="#585E59" stroke-width="1"/>
+      <line x1="122" y1="196" x2="122" y2="190" stroke="#585E59" stroke-width="1"/>
+      <line x1="560" y1="196" x2="560" y2="190" stroke="#585E59" stroke-width="1"/>
+      <text x="122" y="212" font-family="Archivo, sans-serif" font-size="11" fill="#585E59">its bases</text>
+    </svg>
+  </div>
+  <figcaption>Nine segments and no paths. <b>Nothing here names a person.</b> An
+  <code>S</code> line is one segment &mdash; one lozenge on the finished map. An
+  <code>L</code> line says which segment may follow which. The finished file will carry
+  <b>464 <code>W</code> lines</b>, one per strand, and every one of them has to be
+  manufactured by the second pass.</figcaption>
+</figure>
+
+<p><strong>What the walk table holds</strong> is the missing half, and it is shaped
+unusually. It is a <code>tabix</code> index &mdash; ordinarily a <em>genomic</em> index,
+chromosome plus start plus end. Here the chromosome column is a constant <code>.</code> and
+the position column is the <strong>segment id</strong>. It is a genomic index repurposed as
+a segment-id index, and <code>fetch(".", id-1, id)</code> means "give me the one row for
+this one segment".</p>
+
+<div class="tbl-scroll">
+<table>
+  <caption>One row of <code>hprc-v2.0-mc-grch38-v2.2.walk.gz</code>, tab-separated, as
+  <code>_write_walks_mc</code> unpacks it (<code>main.py:340</code>).</caption>
+  <thead>
+    <tr><th class="n">Col</th><th>Holds</th><th>Example</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="n">1</td><td>a placeholder chromosome, always the same</td><td><code>.</code></td></tr>
+    <tr><td class="n">2</td><td><b>the segment id</b> &mdash; what tabix indexes on</td><td><code>181810309</code></td></tr>
+    <tr><td class="n">3</td><td>length of that segment, in bases</td><td><code>145</code></td></tr>
+    <tr><td class="n">4</td><td><b>every haplotype at this segment</b>, comma-separated &mdash;
+      each entry <code>assembly|contig:coord:strand</code></td>
+      <td><code>HG00544#2|CM089383.1:17162:+,HG00621#1|&hellip;:9931:+,&hellip;</code> &times;464</td></tr>
+    <tr><td class="n">5</td><td>repeat placements, or <code>.</code> when there are none</td><td><code>.</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>Column 4 is the whole payload, and it is enormous.</strong> One row lists where
+<em>all 464 haplotypes</em> sit at that one segment. At roughly thirty characters an entry,
+a single row is on the order of fourteen kilobytes of text &mdash; and the loop asks for one
+row at a time, 381 times.</p>
+
+<h3>The loop, step by step</h3>
+
+<p>Here is the whole of <code>GenerateWalksMC</code>, in order. Steps 2 through 6 are the
+body of the loop, and they run once per segment.</p>
+
+<div class="steps">
+  <div class="step">
+    <div class="letter">1</div>
+    <div>
+      <h3>Open the walk-less GFA and read one line</h3>
+      <p>The file that came out of the database, streamed a line at a time. An
+      <code>L</code> or <code>H</code> line is copied straight through and the loop moves on.
+      An <code>S</code> line is work.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="letter">2</div>
+    <div>
+      <h3>Take the segment id out of column 2</h3>
+      <p><code>181810309</code>. One integer.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="letter">3</div>
+    <div>
+      <h3>Seek into the compressed walk file for that one id<span class="chip next">79 ms, once per segment</span></h3>
+      <p><code>fetch(".", id-1, id)</code>. Consult the tabix index, seek to the block that
+      holds the row, decompress that block, hand back the row. <b>This step and the next one
+      are the whole 30 seconds</b>, paid 381 times; which of the two carries it is the
+      measurement E is waiting on, below.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="letter">4</div>
+    <div>
+      <h3>Tear the row apart in Python</h3>
+      <p>Split on tabs into five columns. Split column 4 on commas into ~464 entries. Split
+      each entry on <code>|</code>, then on <code>:</code>, into assembly, contig, coordinate
+      and strand, and <code>int()</code> the coordinate. Across the region that is roughly
+      <b>177,000 entries</b>, a field at a time.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="letter">5</div>
+    <div>
+      <h3>Accumulate into the coordinate tables</h3>
+      <p>Every entry appends to <code>coord_table[assembly][contig]</code> &mdash; three
+      parallel lists holding the interval <code>(coord, coord+length)</code>, the segment id,
+      and the strand. Column 5's repeats go into a second table, with a linear scan to reject
+      duplicates already recorded.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="letter">6</div>
+    <div>
+      <h3>Copy the <code>S</code> line out unchanged, and go back to step 2</h3>
+      <p>381 times.</p>
+    </div>
+  </div>
+  <div class="step">
+    <div class="letter">7</div>
+    <div>
+      <h3>Only now, write the strands</h3>
+      <p>With the file exhausted: for each assembly and contig, fold the repeats back in,
+      sort the intervals by start, break the run wherever one interval's end is not the next
+      one's start, and emit one <code>W</code> line per unbroken run &mdash;
+      <code>W&nbsp;CHM13&nbsp;0&nbsp;chr8&nbsp;79202498&nbsp;79202786&nbsp;&gt;181810309&gt;181810311&gt;181810312&hellip;</code>.
+      This part is fast, and it is why a crash midway leaves a structurally valid GFA with no
+      paths in it.</p>
+    </div>
+  </div>
+</div>
+
+<p class="pull">381 seeks, to assemble 464 answers, out of a file that was already sorted in
+the order we wanted to read it.</p>
 
 <p>That is why the cost is flat per segment rather than growing: 65&nbsp;ms at 13 segments,
 65 at 118, 79 at 381. Nothing about the work gets harder as the region grows &mdash; there is
@@ -410,35 +550,53 @@ simply more of the same fixed overhead, paid once per segment. Multiply it out a
 7,000-base region, around 250 segments, spends something like 18 seconds here before a single
 line is drawn.</p>
 
-<p><strong>The lookups do not have to be asked one at a time.</strong> The table is indexed
-by node id and accepts a <em>range</em>, and the node ids in an extracted subgraph turn out to
-be all but contiguous. Measured across the five real subgraphs committed to this repository:</p>
+<h3 id="contiguity">Why the lookups can be batched &mdash; and in what space</h3>
+
+<p><strong>The lookups do not have to be asked one at a time.</strong> The table accepts a
+<em>range</em>, and the segment ids in an extracted subgraph turn out to be all but
+contiguous.</p>
+
+<p>It is worth being exact about what is contiguous, because the obvious reading is the
+wrong one. <strong>The segments do not tile the genome side by side.</strong> A pangenome
+subgraph is a graph with bubbles: at a variant site, two or more segments occupy the
+<em>same</em> reference coordinates, and each haplotype takes one of them. In the fixture
+above, segments <code>181810310</code> and <code>181810311</code> are a single base each,
+<code>A</code> and <code>C</code> &mdash; the two alleles of one SNP. The finished walks
+prove it: CHM13 goes <code>&gt;309&gt;311&gt;312</code> and GRCh38 goes
+<code>&gt;309&gt;310&gt;312</code>. No strand traverses both, and no arrangement of them
+into a gapless row of coordinates exists.</p>
+
+<p><strong>What <em>is</em> nearly gapless is the integers.</strong> The graph builder
+assigned segment ids in order along the reference, so extracting a region pulls out an almost
+unbroken run of them &mdash; and an unbroken run of ids is precisely what one range lookup
+asks for. Measured across the five real subgraphs committed to this repository:</p>
 
 <div class="tbl-scroll">
 <table>
-  <caption>Node ids per extracted subgraph, and how few range lookups would cover them.</caption>
+  <caption>Segment ids per extracted subgraph, and how few range lookups would cover them.
+  Two of the five are literally consecutive integers.</caption>
   <thead>
-    <tr><th>Region</th><th class="n">Segments</th><th class="n">Lookups today</th><th class="n">Contiguous runs</th></tr>
+    <tr><th>Region</th><th class="n">Segments</th><th>Id range</th><th class="n">Span</th><th class="n">Lookups today</th><th class="n">Contiguous runs</th></tr>
   </thead>
   <tbody>
-    <tr><td>chr8:78,771,162 &mdash; 90 bases</td><td class="n">9</td><td class="n">9</td><td class="n">1</td></tr>
-    <tr><td>chr8:10,079,054 &mdash; 1,400 bases</td><td class="n">92</td><td class="n">92</td><td class="n">1</td></tr>
-    <tr><td>chr1:25,331,046 &mdash; 600 bases</td><td class="n">75</td><td class="n">75</td><td class="n">2</td></tr>
-    <tr><td>chr1:25,301,271 &mdash; 8,000 bases</td><td class="n">770</td><td class="n">770</td><td class="n">2</td></tr>
-    <tr><td>chr1:25,331,646 &mdash; 4,200 bases</td><td class="n">280</td><td class="n">280</td><td class="n">5</td></tr>
+    <tr><td>chr8:78,771,162 &mdash; 90 bases</td><td class="n">9</td><td><code>181810309&ndash;317</code></td><td class="n">9</td><td class="n">9</td><td class="n">1</td></tr>
+    <tr><td>chr8:10,079,054 &mdash; 1,400 bases</td><td class="n">92</td><td><code>182992415&ndash;506</code></td><td class="n">92</td><td class="n">92</td><td class="n">1</td></tr>
+    <tr><td>chr1:25,331,046 &mdash; 600 bases</td><td class="n">75</td><td><code>79337767&ndash;921</code></td><td class="n">155</td><td class="n">75</td><td class="n">2</td></tr>
+    <tr><td>chr1:25,301,271 &mdash; 8,000 bases</td><td class="n">770</td><td><code>79335081&ndash;857</code></td><td class="n">777</td><td class="n">770</td><td class="n">2</td></tr>
+    <tr><td>chr1:25,331,646 &mdash; 4,200 bases</td><td class="n">280</td><td><code>79332638&ndash;79338206</code></td><td class="n">5569</td><td class="n">280</td><td class="n">5</td></tr>
   </tbody>
 </table>
 </div>
 
 <p>770 lookups where two would cover the same ground. And the batched form is not
-hypothetical: the older version-1 path in this same file already groups node ids into
-contiguous runs before fetching them (<code>main.py:200-202</code>). The version-2 path
-simply never picked it up.</p>
+hypothetical: the older version-1 path in this same file already groups segment ids into
+contiguous runs and fetches a run at a time (<code>main.py:231-234</code> builds the runs,
+<code>main.py:244</code> fetches them). The version-2 path simply never picked it up.</p>
 
 <p><strong>What is still unmeasured, and it decides the size of the win.</strong> The
-65-to-79 milliseconds per segment is not yet split between the two things that happen inside it: the
+65-to-79 milliseconds per segment is not yet split between steps&nbsp;3 and&nbsp;4 above: the
 <em>lookup</em> &mdash; seeking and decompressing a block of the file, quite possibly the same
-block several times over for consecutive nodes &mdash; and the <em>parsing</em> of 464
+block several times over for consecutive segments &mdash; and the <em>parsing</em> of 464
 haplotypes' coordinates out of the row it returns. If the cost is the lookup, batching is
 most of the win and it is large. If it is the parsing, batching removes the seeks and the
 work stays, and E needs a different shape. Timing the two separately over one real region is
@@ -623,7 +781,7 @@ what matters.</p>
       many pieces there are &mdash; the signature of a fixed overhead paid over and over,
       not of hard work. The pieces are segments, and the lookups are against the
       <code>.walk.gz</code> table rather than the pangenome database, which answers the whole
-      region in 42 milliseconds and is not implicated. The node ids being looked up are all
+      region in 42 milliseconds and is not implicated. The segment ids being looked up are all
       but contiguous, and the table takes a range, so the 770 lookups of an 8,000-base region
       would be two &mdash; see <a href="#the-lookups">What those 381 lookups are actually reading</a>
       above. It touches nothing the app can see, so it can proceed in parallel with C. What
