@@ -240,5 +240,14 @@ shifts a real subgraph's scheme half a step off every channel. A second defect, 
 The endpoint's *timings* on the server. `generate_svg` is 8.2 s of a 38.9 s 10 kb request
 there, against a graph this machine does not have and through a `vg` this machine cannot run.
 The trial was a look rather than a measurement — no `[stage-timing]` lines were captured while
-`main` was up — so confirming the production number still needs a deploy, and `release..main`
-is where that queue lives ([`releasing.md`](../releasing.md)).
+`main` was up.
+
+**It no longer needs a deploy.** On 2026-09-02 the server moved to `main` for good, so the
+code measured here is the code running; confirming the production number now needs somebody to
+read the log rather than somebody to ship. The queue this section used to point at is gone.
+
+## Afterwards
+
+This document stops at **B**. The state it describes is tagged `increment-b` on `origin`;
+**C** — the numbers published as a format, and `pgb` reading them off the live server — is
+[`increment-c.md`](./increment-c.md), tagged `increment-c`.

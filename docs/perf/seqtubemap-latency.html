@@ -316,19 +316,21 @@
   </header>
 
   <div class="dated">
-    <span class="tag">A dated measurement, not a description of the current code</span>
+    <span class="tag">A dated measurement — and, since 2 September 2026, a historical one</span>
     <p>This is what the service did on <strong>27 August 2026</strong>, and it is the baseline
-    everything since is read against. Increments <strong>A</strong> and <strong>B</strong> and the
-    first half of <strong>C</strong> have landed on <code>main</code> and none of them is deployed,
-    so the live numbers below are still the live numbers: <strong>A</strong> made the endpoints
-    synchronous, so one slow request no longer stalls the others; <strong>B</strong> deleted the
-    browser emulation this document diagnoses, so the <code>import:jsdom+canvas</code>,
-    <code>jsdom:construct-dom</code> and <code>serialize:outerHTML</code> stages below no longer
-    exist; and <strong>C</strong>'s first half replaced the <code>d=</code> path strings section 03
-    weighs with the numbers behind them.</p>
-    <p><code>main</code> was tried on the live server for a bounded window on 31 August 2026 and put
-    back. No stage timings were captured while it was up, so there is still no <em>after</em> column
-    for section 01 or 06.</p>
+    everything since is read against. <strong>It is no longer what the service does.</strong> The
+    server moved to <code>main</code> on <strong>2 September 2026</strong> and stayed there, so
+    increments <strong>A</strong>, <strong>B</strong> and <strong>C</strong> are all live:
+    <strong>A</strong> made the endpoints synchronous, so one slow request no longer stalls the
+    others; <strong>B</strong> deleted the browser emulation this document diagnoses, so the
+    <code>import:jsdom+canvas</code>, <code>jsdom:construct-dom</code> and
+    <code>serialize:outerHTML</code> stages below no longer exist; and <strong>C</strong> replaced
+    the <code>d=</code> path strings section 03 weighs with the numbers behind them, and published
+    them as a second format the app now reads.</p>
+    <p>So the numbers below are <em>before</em> numbers with no <em>after</em> beside them. Neither
+    live window produced one — 31 August and 2 September were both looks rather than measurements,
+    and no stage timings were captured during either. Sections 01 and 06 are the two that want
+    re-running, and nothing is stopping that now except somebody doing it.</p>
     <p><strong>Every <code>main.py</code> line reference below is as of 27 August 2026</strong> and
     all of them have since moved — read them as "this is the code that was measured", not as
     pointers to follow.</p>

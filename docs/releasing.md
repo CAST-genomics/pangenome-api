@@ -1,5 +1,40 @@
 # Releasing: `release` is the branch that's live
 
+> ## ⚠️ Not what the server is doing, as of 2026-09-02
+>
+> **The live server runs `main`.** `release` is 71 commits behind and is no longer a claim
+> about anything.
+>
+> **Why, and it is not drift.** There is one server and one port. The hosting facility does
+> not offer a second port, so there is no way to stand up an in-development instance beside
+> the live one — the only way to exercise a change against real graph data is to point the
+> live server at `main` for a window. That is what happened on 2026-08-31 for increment B and
+> again on 2026-09-02 so that `pgb` could read the band format. The second window did not
+> end, partly because confidence in `main` kept growing and partly because nothing forced it
+> to.
+>
+> **That constraint is an argument for this document, not against it.** A testing window
+> needs a way home, and `release` is the way home. What has gone wrong is not the discipline
+> but the gap: `release` points at a commit nobody has run since August, so the rollback in
+> *Rolling back* would replace working code with the 120-second version. **Fix that first,
+> whatever else is decided** — promote `release` to `main`'s tip, which changes nothing about
+> what is running and costs one fast-forward.
+>
+> **Then the standing decision**, which is a human one: switch the server back to tracking
+> `release` (this document applies unchanged, and the banner comes out), or accept that
+> `main` is what deploys and rewrite this around tags — see *What this deliberately isn't,
+> yet*, whose reason for ruling tags out is weaker now that milestone tags exist anyway
+> (`increment-b`, `increment-c`).
+>
+> **Worth one question before accepting the constraint:** if anything fronts the API — nginx,
+> Apache, a campus proxy — a path prefix or a second hostname on the existing `:8000` gives
+> the same isolation without a new port. Facilities usually restrict inbound ports rather
+> than processes.
+>
+> Meanwhile **rule 2 below still binds**: nobody commits on the server. A server checkout of
+> `main` that has drifted is worse than one of `release` that has, because there is no second
+> branch to diff it against.
+
 A small change to how the API gets deployed, and the first step toward doing releases
 properly. Doug and Cici both work off this document.
 

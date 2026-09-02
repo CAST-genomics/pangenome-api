@@ -12,18 +12,22 @@ live service at `pangenome-api.ucsd.edu:8000`, plus a local stage-timing harness
 **Headline:** a 10 kb region takes **120 seconds** and returns a **10 MB SVG** — and while
 it does, it takes the entire API down for every other caller.
 
-> **This is a dated measurement, not a description of the current code.** It is what the
-> service did on 2026-08-27, and it is the baseline everything since is read against.
-> Increments **A** and **B** and the first half of **C** have landed on `main` and none of
-> them is deployed, so the live numbers above are still the live numbers: **A** made the
-> endpoints synchronous, so one slow request no longer stalls the others; **B** deleted the
-> browser emulation this document diagnoses — the `import:jsdom+canvas`,
-> `jsdom:construct-dom` and `serialize:outerHTML` stages below no longer exist; and **C**'s
-> first half ([#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23)) replaced the
-> `d=` strings §8 and §9 measure with the numbers behind them. What B changed, measured the
-> same way, is in [`increment-b.md`](./increment-b.md). `main` was tried on the live server
-> for a bounded window on 2026-08-31 and put back; no stage timings were captured while it
-> was up, so there is still no *after* column for §1 or §6.
+> **This is a dated measurement, and as of 2026-09-02 it is also a historical one.** It is
+> what the service did on 2026-08-27, and it is the baseline everything since is read
+> against — but the service no longer runs that code. The server moved to `main` on
+> 2026-09-02 and stayed there, so increments **A**, **B** and **C** are all live: **A** made
+> the endpoints synchronous, so one slow request no longer stalls the others; **B** deleted
+> the browser emulation this document diagnoses — the `import:jsdom+canvas`,
+> `jsdom:construct-dom` and `serialize:outerHTML` stages below no longer exist; and **C**
+> replaced the `d=` strings §8 and §9 measure with the numbers behind them, and published
+> them as [`?format=bands`](../band-format.md). What B changed is in
+> [`increment-b.md`](./increment-b.md); what C changed is in
+> [`increment-c.md`](./increment-c.md).
+>
+> **The §1 and §6 numbers below are therefore no longer what a caller gets, and no
+> replacement has been measured.** Neither live window captured `[stage-timing]` lines, so
+> there is still no *after* column — but that is now somebody's afternoon rather than a
+> blocked task, because the server runs the current code continuously.
 >
 > **Every `main.py` and `tubemap.js` line reference below is as of 2026-08-27** and most have
 > since moved — read them as "this is the code that was measured", not as pointers to follow.

@@ -468,8 +468,9 @@
     <div class="banner">
       <span class="tag">Isolation</span>
       <div>
-        <p><strong>Production was never involved.</strong> The <code>release</code> branch — the one the
-        server follows — was not read, written, or deployed to. Both instances bound to
+        <p><strong>Production was never involved.</strong> The <code>release</code> branch — at the time,
+        the one the server followed; it has run <code>main</code> since 2 September 2026 — was not
+        read, written, or deployed to. Both instances bound to
         <code>127.0.0.1</code> on ports <strong>8100</strong> and <strong>8101</strong>; production is
         <code>:8000</code> on <code>pangenome-api.ucsd.edu</code>.</p>
         <p>Everything the harness created lives outside the repository, except one gitignored

@@ -170,7 +170,7 @@
   <p class="lede">A researcher clicks one spot on the pangenome and asks to see inside it.
   Here is what the server used to do to answer that, what it cost, and what it does
   instead.</p>
-  <p class="dateline">Written 2026-08-28 &middot; every number on this page is measured, and each one says where it was measured</p>
+  <p class="dateline">Written 2026-08-28, revised 2026-09-02 when the change went live &middot; every number on this page is measured, and each one says where it was measured</p>
 </header>
 
 <h2>The picture being asked for</h2>
@@ -257,7 +257,7 @@ travelled to get there.</p>
       <text x="278" y="254" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" fill="#1D6B5B">sends</text>
 
       <rect x="310" y="230" width="250" height="66" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
-      <text x="435" y="257" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">1.5 MB of numbers</text>
+      <text x="435" y="257" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">1.10 MB of numbers</text>
       <text x="435" y="273" text-anchor="middle" font-family="Archivo, sans-serif" font-size="12" font-weight="500" fill="#1A1D1A">crosses the network</text>
       <text x="435" y="289" text-anchor="middle" font-family="EB Garamond, serif" font-size="11" font-style="italic" fill="#585E59">each strand's colour sent once</text>
 
@@ -497,8 +497,8 @@ labels</strong>.</p>
   </div>
   <figcaption>Measured across five real documents spanning 0.29 MB to 13.56 MB; the shape
   holds across all of them, at between <b>41% and 47% redundant</b>. Sending each strand's
-  colour and name once, rather than once per band, is most of the difference between 10 MB
-  and 1.5 MB &mdash; and it costs nothing, because there are only ~464 strands.</figcaption>
+  colour and name once, rather than once per band, is most of the difference between 9.97 MB
+  and 1.10 MB &mdash; and it costs nothing, because there are only ~464 strands.</figcaption>
 </figure>
 
 <h2>Why the big nodes failed at all</h2>
@@ -596,14 +596,22 @@ what matters.</p>
     </div>
   </div>
 
-  <div class="step">
+  <div class="step done">
     <div class="letter">C</div>
     <div>
-      <h3>Publish the numbers<span class="chip next">Next</span></h3>
-      <p>Positions become numbers rather than drawing instructions, the strand table moves
-      to the top of the response, and the new format appears as an option on the existing
-      address. Roughly 1.5 MB where today's is 10 MB. This is the step where the app
-      changes, and the only one that needs both projects.</p>
+      <h3>Publish the numbers<span class="chip built">Built</span></h3>
+      <p>Positions became numbers rather than drawing instructions, the strand table moved
+      to the top of the response, and the new format appeared as an option on the existing
+      address. <strong>1.10 MB where the old one is 9.97 MB</strong>, measured over the same
+      region rather than projected &mdash; better than the 1.5 MB this page predicted. On
+      2&nbsp;September 2026 the app read that format off the live server and drew from it,
+      which is the first time anything but a test has. This was the only step that needed
+      both projects to move, and both have.</p>
+      <p>Writing the app's reader sent three corrections back the other way &mdash; three
+      places where the written description of the format and the thing actually being sent
+      had quietly disagreed, each found by a person reading the description rather than the
+      code. That is what the description is for, and it is also why the remaining piece is a
+      test that runs in both projects and fails when they drift apart.</p>
     </div>
   </div>
 
@@ -641,7 +649,7 @@ what matters.</p>
 
 <figure>
   <div class="plate">
-    <svg viewBox="0 0 880 176" role="img" aria-label="Dependency order of the five steps: A leads to B leads to C, which is the only step requiring the app to change. E and D are independent of the chain and of each other.">
+    <svg viewBox="0 0 880 176" role="img" aria-label="Dependency order of the five steps: A leads to B leads to C, which was the only step requiring the app to change and is now built. E and D are independent of the chain and of each other, and neither is built.">
       <defs>
         <marker id="ar-dep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#585E59"/>
@@ -659,9 +667,9 @@ what matters.</p>
       <line x1="218" y1="60" x2="296" y2="60" stroke="#585E59" stroke-width="1.2" marker-end="url(#ar-dep)"/>
       <text x="257" y="52" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" fill="#585E59">is C's yardstick</text>
 
-      <circle cx="324" cy="60" r="24" fill="#FCFCFA" stroke="#8F3222" stroke-width="1.4"/>
-      <text x="324" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="16" font-weight="600" fill="#8F3222">C</text>
-      <text x="324" y="104" text-anchor="middle" font-family="EB Garamond, serif" font-size="12" font-style="italic" fill="#8F3222">the app changes here</text>
+      <circle cx="324" cy="60" r="24" fill="#DDEAE5" stroke="#1D6B5B" stroke-width="1.4"/>
+      <text x="324" y="66" text-anchor="middle" font-family="Archivo, sans-serif" font-size="16" font-weight="600" fill="#1D6B5B">C</text>
+      <text x="324" y="104" text-anchor="middle" font-family="EB Garamond, serif" font-size="12" font-style="italic" fill="#1D6B5B">the app changed here</text>
 
       <line x1="420" y1="24" x2="420" y2="140" stroke="#D3D6D0" stroke-width="1"/>
 
@@ -677,34 +685,36 @@ what matters.</p>
     </svg>
   </div>
   <figcaption>Only three of the five steps are in a line, and only one of them &mdash; C
-  &mdash; requires the two projects to move together. <b>That is the point of splitting it
-  this way:</b> the two largest wins, B and E, land without the app shipping anything at
-  all.</figcaption>
+  &mdash; required the two projects to move together. <b>That is the point of splitting it
+  this way:</b> the two largest wins, B and E, land without the app shipping anything at all
+  &mdash; and B was live and working for two days before the app knew anything had
+  changed.</figcaption>
 </figure>
 
 <h2>The pipeline, format by format</h2>
 
 <p>Everything above is the argument. This is the machinery: every representation the data
 takes between the graph on disk and the pixels on screen, in all three versions of the
-pipeline &mdash; what is deployed, what is on <code>main</code>, and what C, D and E are
-aiming at.</p>
+pipeline &mdash; what used to be deployed, what is deployed now, and what D and E are still
+aiming at. The middle column moved from the right-hand one on 2&nbsp;September 2026, when the
+server took C and stopped going back.</p>
 
 <p>Read it down a column and you follow one request. Read it across and you watch
 representations disappear.</p>
 
 <figure>
   <div class="plate">
-<svg viewBox="0 0 880 1112" role="img" aria-label="The chain of data formats a tube map request passes through, in three versions: as deployed today, as it stands on the main branch after increments A and B, and as intended after increments C, D and E. Each version removes representations from the chain.">
+<svg viewBox="0 0 880 1112" role="img" aria-label="The chain of data formats a tube map request passes through, in three versions: as deployed until September 2026, as the picture route now runs after increments A and B, and as the numbers route runs after increment C with increments D and E still to come. Each version removes representations from the chain.">
 <defs><marker id="fl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#585E59"/></marker><marker id="fl-n" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#1D6B5B"/></marker></defs>
 <rect x="0" y="18" width="268" height="3" fill="#8F3222"/>
 <text x="0" y="42" font-family="Archivo, sans-serif" font-size="12" font-weight="600" font-style="normal" fill="#8F3222" text-anchor="start" letter-spacing="1.4">BEFORE</text>
-<text x="0" y="58" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">what is deployed today</text>
+<text x="0" y="58" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">what was deployed until 2 Sept 2026</text>
 <rect x="306" y="18" width="268" height="3" fill="#1D6B5B"/>
-<text x="306" y="42" font-family="Archivo, sans-serif" font-size="12" font-weight="600" font-style="normal" fill="#1D6B5B" text-anchor="start" letter-spacing="1.4">NOW ON main</text>
-<text x="306" y="58" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">increments A and B — not deployed</text>
+<text x="306" y="42" font-family="Archivo, sans-serif" font-size="12" font-weight="600" font-style="normal" fill="#1D6B5B" text-anchor="start" letter-spacing="1.4">LIVE NOW</text>
+<text x="306" y="58" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">the picture route — A and B, deployed</text>
 <rect x="612" y="18" width="268" height="3" fill="#1D6B5B"/>
-<text x="612" y="42" font-family="Archivo, sans-serif" font-size="12" font-weight="600" font-style="normal" fill="#1D6B5B" text-anchor="start" letter-spacing="1.4">INTENDED</text>
-<text x="612" y="58" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">increments C, D and E</text>
+<text x="612" y="42" font-family="Archivo, sans-serif" font-size="12" font-weight="600" font-style="normal" fill="#1D6B5B" text-anchor="start" letter-spacing="1.4">STILL INTENDED</text>
+<text x="612" y="58" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">the numbers route — C is live; D and E are not</text>
 <rect x="0" y="96" width="268" height="58" fill="#FCFCFA" stroke="#1A1D1A" stroke-width="1"/>
 <text x="10" y="116" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1A1D1A" text-anchor="start">.gbz</text>
 <text x="260" y="114" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">PYTHON</text>
@@ -917,7 +927,7 @@ representations disappear.</p>
 <text x="622" y="872" font-family="IBM Plex Mono, monospace" font-size="12.5" font-weight="500" font-style="normal" fill="#1D6B5B" text-anchor="start">HTTP</text>
 <text x="872" y="870" font-family="Archivo, sans-serif" font-size="8.5" font-weight="600" font-style="normal" fill="#9DA098" text-anchor="end" letter-spacing="0.8">WIRE</text>
 <text x="622" y="887" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="normal" fill="#1D6B5B" text-anchor="start">JSON header + binary body</text>
-<text x="622" y="901" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">~1.5 MB projected</text>
+<text x="622" y="901" font-family="EB Garamond, serif" font-size="10" font-weight="400" font-style="italic" fill="#585E59" text-anchor="start">1.10 MB measured</text>
 <line x1="746.0" y1="910" x2="746.0" y2="994" stroke="#9DA098" stroke-width="1" stroke-dasharray="3 4"/>
 <text x="746.0" y="969.0" font-family="EB Garamond, serif" font-size="11" font-weight="400" font-style="italic" fill="#9DA098" text-anchor="middle">nothing to parse</text>
 <line x1="746.0" y1="910" x2="746.0" y2="1018" stroke="#1D6B5B" stroke-width="1.2" marker-end="url(#fl-n)"/>
@@ -964,8 +974,10 @@ uninstalled is how that gets demonstrated rather than claimed.</p>
 <p><strong>The emulated document</strong> is where the numbers used to go to be turned into
 text. Increment B replaced it with the collector in <code>seqtubemap/band-data.mjs</code>,
 which is now the only description of the picture that exists &mdash; the document is written
-out from it by <code>emit-document.mjs</code>, not alongside it. Bands still carry curves as
-path strings there; increment C is what makes them six floats.</p>
+out from it by <code>emit-document.mjs</code>, not alongside it. Bands carried curves as
+path strings there until increment C, which made them six floats &mdash; and the picture came
+out byte-for-byte identical, which is how a change of representation proves it changed
+nothing else.</p>
 
 <p><strong>The <code>.svg</code> file</strong> is written to disk so that it can be opened
 and streamed back, then deleted by a background task. It is the clearest single example of
@@ -998,9 +1010,9 @@ each other. That is filed separately and is not part of this rework.</p>
 
 <h2>What has actually been measured</h2>
 
-<p>A and B are built. Run through the real endpoint against five real regions, with the
-picture checked against the app's own reading code &mdash; not a description of it &mdash;
-the results:</p>
+<p>A, B and C are built and live. The table below is B &mdash; run through the real endpoint
+against five real regions, with the picture checked against the app's own reading code, not a
+description of it:</p>
 
 <div class="tbl-scroll">
 <table>
@@ -1027,15 +1039,26 @@ produced nothing now renders in 6.4 seconds. The responses are byte-for-byte wha
 minus the three redundant things that were removed, and all five satisfy the app's parser
 exactly &mdash; the app recovers <em>identical</em> arrays of numbers from before and after.</p>
 
-<p>All of that is with the format unchanged. C is where the 10 MB becomes 1.5 MB.</p>
+<p>All of that is with the format unchanged. C is where the 10 MB becomes
+<strong>1.10 MB</strong> &mdash; measured, now, over the same 8,000-base region, and holding
+between 1.9&times; smaller at the smallest region and 9.3&times; at the largest. The ratio is
+smallest where the response is smallest, because a short region's response is nearly all
+strand table, and the strand table is the part that does not shrink with the picture.</p>
 
 <div class="note">
-  <p><strong>None of this is live yet.</strong> The service is deployed from a separate
-  release branch, and 43 commits &mdash; A, B, the first tests and the first automated
-  checks &mdash; are waiting behind it. The 120-second, 43%-failure numbers at the top of
-  this page are still what a researcher gets today.</p>
-  <p>The next thing that changes a researcher's experience is not writing more code. It is a
-  deploy.</p>
+  <p><strong>This is live, as of 2&nbsp;September 2026.</strong> For most of this project's
+  life the sentence here read <em>none of this is live yet</em> &mdash; the service was
+  deployed from a separate release branch and everything described above was queued behind
+  it. That queue is gone: the server now runs the same code this page describes, and it is
+  staying there.</p>
+  <p>So the 120-second and 43%-failure numbers at the top of this page are <em>history</em>.
+  They are what a researcher got, measured on 27&nbsp;August 2026, and they remain the
+  baseline everything here is read against.</p>
+  <p>One honest gap. Nobody has yet timed the live service <em>since</em> the change &mdash;
+  both times it was looked at, it was looked at rather than measured. The improvements above
+  were all measured off the server, on regions small enough to reproduce there. What the
+  service now does on a large region, in seconds, against a real graph, is the one number
+  this page cannot give you.</p>
 </div>
 
 <footer>
@@ -1043,6 +1066,8 @@ exactly &mdash; the app recovers <em>identical</em> arrays of numbers from befor
   <ul>
     <li><a href="./perf/seqtubemap-latency.md">docs/perf/seqtubemap-latency.md</a> &mdash; the diagnosis: timings, byte census, memory split</li>
     <li><a href="./perf/increment-b.md">docs/perf/increment-b.md</a> &mdash; what deleting the invisible browser bought</li>
+    <li><a href="./perf/increment-c.md">docs/perf/increment-c.md</a> &mdash; what publishing the numbers bought, and the day the app read them</li>
+    <li><a href="./band-format.md">docs/band-format.md</a> &mdash; the format itself, in enough detail to write a reader against</li>
     <li><a href="./adr/0001-additive-band-format.md">docs/adr/0001-additive-band-format.md</a> &mdash; the decision, and the alternatives rejected</li>
     <li><a href="./perf/seqtubemap-plan.md">docs/perf/seqtubemap-plan.md</a> &mdash; the order of events, and what has been closed</li>
     <li><a href="../CONTEXT.md">CONTEXT.md</a> and <a href="https://claude.ai/code/artifact/eb3ad4a1-d1cb-44b9-a3b8-7c6e7cc12726">docs/lexicon.html</a> &mdash; the vocabulary used here</li>
