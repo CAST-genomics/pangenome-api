@@ -1,0 +1,758 @@
+<title>Click to Tube Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --paper:     #F7F7F4;
+    --ink:       #1A1D1A;
+    --ink-soft:  #585E59;
+    --ink-faint: #8B918C;
+    --rule:      #D3D6D0;
+    --plate:     #FCFCFA;
+    --client:    #8F3222;
+    --server:    #1D6B5B;
+    --client-wash:#F0E0DB;
+    --server-wash:#DDEAE5;
+
+    --measure: 62ch;
+    --s--2: clamp(.70rem, .69rem + .05vw, .74rem);
+    --s--1: clamp(.80rem, .78rem + .10vw, .86rem);
+    --s-0:  clamp(1.06rem, 1.02rem + .18vw, 1.18rem);
+    --s-1:  clamp(1.26rem, 1.16rem + .45vw, 1.5rem);
+    --s-2:  clamp(1.5rem, 1.28rem + .95vw, 2.05rem);
+    --s-3:  clamp(2.0rem, 1.55rem + 2.0vw, 3.15rem);
+
+    --grotesk: "Archivo", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --serif:   "EB Garamond", ui-serif, Georgia, Cambria, serif;
+    --mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #121513; --ink: #E9EBE6; --ink-soft: #9BA29C; --ink-faint: #6E756F;
+      --rule: #2A2E2A; --plate: #181C19;
+      --client: #CC7259; --server: #63AE99;
+      --client-wash: #3A2620; --server-wash: #1E322C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #121513; --ink: #E9EBE6; --ink-soft: #9BA29C; --ink-faint: #6E756F;
+    --rule: #2A2E2A; --plate: #181C19;
+    --client: #CC7259; --server: #63AE99;
+    --client-wash: #3A2620; --server-wash: #1E322C;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: var(--s-0);
+    line-height: 1.58;
+    margin: 0;
+    padding: 0 1.5rem 7rem;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 78rem; margin: 0 auto; }
+
+  /* ── page frame ─────────────────────────────────────────── */
+  header { padding: 4.5rem 0 0; max-width: 62rem; }
+  .eyebrow {
+    font-family: var(--grotesk); font-size: var(--s--1); font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft);
+    margin: 0 0 1.4rem;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 500; font-size: var(--s-3);
+    line-height: 1.04; letter-spacing: -.015em; text-wrap: balance;
+    margin: 0 0 1.4rem; max-width: 15ch;
+  }
+  .lede { font-size: var(--s-1); line-height: 1.45; color: var(--ink-soft); margin: 0 0 1rem; max-width: 54ch; }
+  .dateline {
+    font-family: var(--grotesk); font-size: var(--s--1); color: var(--ink-soft);
+    margin: 2.4rem 0 0; padding-top: 1rem; border-top: 1px solid var(--rule);
+    max-width: 54ch;
+  }
+
+  main { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 3rem; }
+  main > * { grid-column: 1; }
+  @media (min-width: 76rem) {
+    main { grid-template-columns: minmax(0, var(--measure)) 15rem; }
+    .side { grid-column: 2; align-self: start; margin: .35rem 0 1rem; }
+  }
+  .full { grid-column: 1 / -1; }
+
+  h2 {
+    font-family: var(--grotesk); font-weight: 500; font-size: var(--s-2);
+    line-height: 1.14; letter-spacing: -.015em; text-wrap: balance;
+    margin: 4rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--rule);
+  }
+  h2 .num {
+    display: block; font-size: var(--s--1); font-weight: 600; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-faint); margin-bottom: .5rem;
+  }
+  h3 {
+    font-family: var(--grotesk); font-weight: 600; font-size: var(--s-0);
+    letter-spacing: -.005em; margin: 2rem 0 .45rem;
+  }
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+  strong { font-weight: 500; }
+  em.term { font-style: normal; font-weight: 500; }
+  code, .mono { font-family: var(--mono); font-size: .84em; }
+  a { color: inherit; text-decoration-color: var(--rule); text-underline-offset: .2em; }
+  a:hover { text-decoration-color: currentColor; }
+  a:focus-visible { outline: 2px solid var(--server); outline-offset: 3px; }
+
+  .side {
+    font-size: var(--s--1); line-height: 1.5; color: var(--ink-soft);
+    border-left: 2px solid var(--rule); padding-left: .9rem;
+    margin: 0 0 1.4rem; max-width: var(--measure);
+  }
+  .side b { font-family: var(--grotesk); font-weight: 600; font-size: var(--s--2);
+    letter-spacing: .1em; text-transform: uppercase; display: block;
+    color: var(--ink-faint); margin-bottom: .3rem; }
+
+  /* ── sequence diagram ───────────────────────────────────── */
+  .seqwrap { overflow-x: auto; margin: 2rem 0 1.2rem; padding-bottom: .4rem; }
+  .seq { min-width: 48rem; }
+  .lanes {
+    display: grid; grid-template-columns: repeat(var(--lanes), 1fr);
+    border-bottom: 1px solid var(--ink); padding-bottom: .5rem;
+  }
+  .lanes span {
+    font-family: var(--grotesk); font-size: var(--s--2); font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase; text-align: center;
+    line-height: 1.3; padding: 0 .4rem; text-wrap: balance;
+  }
+  .lanes .c { color: var(--client); }
+  .lanes .s { color: var(--server); }
+  .body { position: relative; padding: 1.1rem 0 .6rem; }
+  .rail {
+    position: absolute; inset: 0; display: grid;
+    grid-template-columns: repeat(calc(var(--lanes) * 2), 1fr);
+    pointer-events: none;
+  }
+  .rail i { grid-column: calc(var(--i) * 2); border-left: 1px dashed var(--rule); }
+
+  .msg {
+    position: relative; display: grid;
+    grid-template-columns: repeat(calc(var(--lanes) * 2), 1fr);
+    margin-bottom: 1.15rem;
+  }
+  .hop {
+    grid-column: calc(var(--a) * 2) / calc(var(--b) * 2);
+    display: flex; flex-direction: column; justify-content: flex-end;
+  }
+  .msg.rev .hop { grid-column: calc(var(--b) * 2) / calc(var(--a) * 2); }
+  .hop em {
+    font-family: var(--grotesk); font-style: normal; font-size: var(--s--2);
+    line-height: 1.35; text-align: center; color: var(--ink-soft);
+    padding: 0 .5rem .18rem; word-break: break-word;
+  }
+  .hop em b { font-weight: 600; color: var(--ink); }
+  .hop i {
+    display: block; height: 0; border-top: 1px solid var(--ink-soft); position: relative;
+  }
+  .hop i::after {
+    content: ""; position: absolute; right: -1px; top: -3.5px;
+    border-left: 7px solid var(--ink-soft);
+    border-top: 3.5px solid transparent; border-bottom: 3.5px solid transparent;
+  }
+  .msg.rev .hop i::after {
+    right: auto; left: -1px;
+    border-left: 0; border-right: 7px solid var(--ink-soft);
+  }
+  .msg.ret .hop i { border-top-style: dashed; }
+  .msg.c .hop i, .msg.c .hop i::after { border-color: var(--client); }
+  .msg.c .hop i::after { border-top-color: transparent; border-bottom-color: transparent; }
+  .msg.c .hop em { color: var(--client); }
+  .msg.s .hop i, .msg.s .hop i::after { border-color: var(--server); }
+  .msg.s .hop i::after { border-top-color: transparent; border-bottom-color: transparent; }
+  .msg.s .hop em { color: var(--server); }
+
+  /* a message a participant sends to itself: a note anchored on its lifeline */
+  .msg.self .hop { justify-content: center; }
+  .msg.self .hop em {
+    text-align: left; border-left: 2px solid var(--rule);
+    background: var(--plate); padding: .3rem .6rem; margin-left: 0;
+  }
+  .msg.self .hop i { display: none; }
+  .msg.self.rev .hop em { border-left: 0; border-right: 2px solid var(--rule); text-align: right; }
+
+  .phase {
+    display: flex; align-items: center; gap: .8rem;
+    margin: 1.6rem 0 1.1rem; position: relative;
+  }
+  .phase::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
+  .phase span {
+    font-family: var(--grotesk); font-size: var(--s--2); font-weight: 600;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  .phase.alt span { color: var(--server); }
+
+  figcaption, .cap {
+    font-family: var(--grotesk); font-size: var(--s--1); color: var(--ink-soft);
+    line-height: 1.45; max-width: 58ch; margin-top: .6rem;
+  }
+  figcaption b, .cap b { color: var(--ink); font-weight: 600; }
+  figure { margin: 0 0 2.4rem; }
+
+  /* ── tables ─────────────────────────────────────────────── */
+  .tablewrap { overflow-x: auto; margin: 1.4rem 0 2rem; }
+  table { border-collapse: collapse; width: 100%; font-size: var(--s--1); min-width: 34rem; }
+  th, td {
+    text-align: left; vertical-align: top; padding: .5rem .9rem .5rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  thead th {
+    font-family: var(--grotesk); font-size: var(--s--2); font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint);
+    border-bottom: 1px solid var(--ink);
+  }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td code, th code { font-size: .95em; }
+
+  /* ── byte layout plate ──────────────────────────────────── */
+  .plate {
+    background: var(--plate); border: 1px solid var(--rule);
+    padding: 1.1rem 1.2rem; font-family: var(--mono); font-size: var(--s--1);
+    line-height: 1.7; overflow-x: auto; margin: 1.2rem 0 2rem;
+  }
+  .plate .row { display: grid; grid-template-columns: 11rem 1fr; gap: 1rem;
+    padding: .3rem 0; border-bottom: 1px solid var(--rule); }
+  .plate .row:last-child { border-bottom: 0; }
+  .plate .lbl { color: var(--ink-faint); }
+  .plate .hi { color: var(--server); }
+
+  /* ── the fork ───────────────────────────────────────────── */
+  .fork { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); margin: 1.6rem 0 1rem; }
+  @media (min-width: 46rem) { .fork { grid-template-columns: 1fr 1fr; } }
+  .fork > div { background: var(--plate); padding: 1.1rem 1.2rem; }
+  .fork h4 {
+    font-family: var(--grotesk); font-size: var(--s--1); font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase; margin: 0 0 .6rem;
+  }
+  .fork .doc h4 { color: var(--client); }
+  .fork .bands h4 { color: var(--server); }
+  .fork dl { margin: 0; font-size: var(--s--1); }
+  .fork dt { font-family: var(--grotesk); font-size: var(--s--2); letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-faint); margin-top: .7rem; }
+  .fork dt:first-child { margin-top: 0; }
+  .fork dd { margin: .1rem 0 0; line-height: 1.45; }
+
+  /* ── timing bars ────────────────────────────────────────── */
+  .bars { margin: 1.4rem 0 1rem; max-width: 46rem; }
+  .bar-row { display: grid; grid-template-columns: 12rem 1fr; gap: .9rem; align-items: baseline;
+    padding: .55rem 0; border-bottom: 1px solid var(--rule); }
+  .bar-row .who { font-family: var(--grotesk); font-size: var(--s--1); color: var(--ink); }
+  .bar-row .who small { display: block; color: var(--ink-faint); font-size: var(--s--2); }
+  .bar-stack { display: grid; gap: .3rem; }
+  .bar { display: grid; grid-template-columns: 1fr auto; gap: .6rem; align-items: center; }
+  .bar .track { height: .62rem; position: relative; }
+  .bar .fill { display: block; height: 100%; }
+  .bar.was .fill { background: var(--client-wash); border-bottom: 2px solid var(--client); }
+  .bar.now .fill { background: var(--server-wash); border-bottom: 2px solid var(--server); }
+  .bar .val { font-family: var(--mono); font-size: var(--s--2); font-variant-numeric: tabular-nums;
+    color: var(--ink-soft); white-space: nowrap; }
+  .bars-key { font-family: var(--grotesk); font-size: var(--s--2); letter-spacing: .08em;
+    text-transform: uppercase; color: var(--ink-faint); display: flex; gap: 1.4rem; margin-bottom: .5rem; }
+  .bars-key .k-was { color: var(--client); }
+  .bars-key .k-now { color: var(--server); }
+
+  /* ── invariant list ─────────────────────────────────────── */
+  .inv { list-style: none; padding: 0; margin: 1.2rem 0 2rem; max-width: 62rem; }
+  .inv li { border-top: 1px solid var(--rule); padding: .7rem 0; display: grid; gap: .15rem .9rem; }
+  @media (min-width: 52rem) { .inv li { grid-template-columns: 1fr 18rem; } }
+  .inv b { font-weight: 500; }
+  .inv span { font-family: var(--mono); font-size: var(--s--2); color: var(--ink-soft); }
+
+  footer {
+    margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--rule);
+    font-family: var(--grotesk); font-size: var(--s--1); color: var(--ink-soft);
+    max-width: 62rem;
+  }
+  footer ul { list-style: none; padding: 0; margin: .8rem 0 0; display: grid; gap: .35rem; }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">PangenomeAPI &middot; interaction reference</p>
+  <h1>Click to Tube&nbsp;Map</h1>
+  <p class="lede">One right-click in the 3D graph, and the route it travels: two
+  repositories, three processes, five file formats, and one collector that every
+  drawn shape passes through.</p>
+  <p class="dateline">Drawn against the pipeline as it stands after the seqtubemap
+  refactor &mdash; the invisible browser deleted, the geometry collected as numbers,
+  the band payload served as an additive second encoding. 2&nbsp;September&nbsp;2026.
+  Rendered at <a href="https://claude.ai/code/artifact/ca74cc4a-c68c-452a-9682-3c8480705b36">claude.ai/code/artifact/ca74cc4a</a>.
+  Vocabulary is <a href="../CONTEXT.md">CONTEXT.md</a>: the coarse thing clicked in
+  3D is a <em class="term">node</em>, the fine vertices inside the map are
+  <em class="term">segments</em>, a haplotype&rsquo;s route is a
+  <em class="term">strand</em>, and one strand crossing one x-interval is a
+  <em class="term">band</em>.</p>
+</header>
+
+<main>
+
+<h2 class="full"><span class="num">The whole route</span>What happens between the click and the picture</h2>
+
+<figure class="full">
+<div class="seqwrap">
+  <div class="seq" style="--lanes:6">
+    <div class="lanes">
+      <span class="c">Researcher</span>
+      <span class="c">pgb</span>
+      <span class="s">/seqtubemap</span>
+      <span class="s">gbz &middot; tabix &middot; vg</span>
+      <span class="s">node render</span>
+      <span class="s">BandCollector</span>
+    </div>
+    <div class="body">
+      <div class="rail" aria-hidden="true">
+        <i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i>
+        <i style="--i:4"></i><i style="--i:5"></i><i style="--i:6"></i>
+      </div>
+
+      <div class="msg c" style="--a:1;--b:2"><div class="hop"><em>right-click node <b>5519+</b></em><i></i></div></div>
+      <div class="msg self" style="--a:2;--b:4"><div class="hop"><em>tubeMapTargetForNode &rarr; <b>chrom, start, end, minigraphnode</b> &mdash; or the menu item is disabled</em></div></div>
+      <div class="msg c" style="--a:2;--b:3"><div class="hop"><em>GET &hellip;<b>&amp;format=bands</b></em><i></i></div></div>
+
+      <div class="phase"><span>Extract &mdash; skipped when the cached GFA already carries W lines</span></div>
+
+      <div class="msg self" style="--a:3;--b:5"><div class="hop"><em>validate <b>format</b> before anything is extracted; then ask whether the cached subgraph has walks in it</em></div></div>
+      <div class="msg s" style="--a:3;--b:4"><div class="hop"><em>extract region on GRCh38 from the v2 <b>.gbz</b></em><i></i></div></div>
+      <div class="msg s rev ret" style="--a:3;--b:4"><div class="hop"><em>subgraph: S and L lines, no walks</em><i></i></div></div>
+      <div class="msg s" style="--a:3;--b:4"><div class="hop"><em>tabix fetch, <b>one seek per segment</b></em><i></i></div></div>
+      <div class="msg s rev ret" style="--a:3;--b:4"><div class="hop"><em>assembly rows &rarr; W lines, written last, renamed into place atomically</em><i></i></div></div>
+
+      <div class="phase"><span>Convert</span></div>
+
+      <div class="msg s" style="--a:3;--b:4"><div class="hop"><em><b>vg convert -g</b> &nbsp;then&nbsp; <b>vg view -j</b></em><i></i></div></div>
+      <div class="msg s rev ret" style="--a:3;--b:4"><div class="hop"><em>vg JSON</em><i></i></div></div>
+      <div class="msg s" style="--a:3;--b:4"><div class="hop"><em>tabix fetch PCLAI colours for this minigraph node</em><i></i></div></div>
+
+      <div class="phase alt"><span>Render &mdash; one Node process, no browser</span></div>
+
+      <div class="msg s" style="--a:3;--b:5"><div class="hop"><em>spawn <b>generate-bands.mjs</b> &mdash; six arguments, the same six either generator takes</em><i></i></div></div>
+      <div class="msg self" style="--a:5;--b:6"><div class="hop"><em>vgExtractNodes &middot; vgExtractTracks &middot; reorderTracksForLayout</em></div></div>
+      <div class="msg s" style="--a:5;--b:6"><div class="hop"><em>create() &rarr; layout passes &rarr; every draw call <b>collects</b></em><i></i></div></div>
+      <div class="msg s rev ret" style="--a:5;--b:6"><div class="hop"><em>strands &middot; bands &middot; segments &middot; overlays &middot; frame</em><i></i></div></div>
+      <div class="msg self rev" style="--a:5;--b:3"><div class="hop"><em>encodeBandPayload &mdash; and <b>no document is built</b>, because nothing asked for one</em></div></div>
+      <div class="msg s rev ret" style="--a:3;--b:5"><div class="hop"><em>.bands written</em><i></i></div></div>
+
+      <div class="phase"><span>Answer</span></div>
+
+      <div class="msg c rev" style="--a:2;--b:3"><div class="hop"><em>200 &nbsp;<b>application/octet-stream</b></em><i></i></div></div>
+      <div class="msg self rev" style="--a:3;--b:1"><div class="hop"><em>log one <b>[stage-timing]</b> line; delete the .vg, the .json and the render in the background</em></div></div>
+      <div class="msg self rev" style="--a:2;--b:1"><div class="hop"><em>parseBandPayload &rarr; TubeMapReading &mdash; or refuse the whole map</em></div></div>
+      <div class="msg c rev" style="--a:1;--b:2"><div class="hop"><em>the map</em><i></i></div></div>
+    </div>
+  </div>
+</div>
+<figcaption><b>Solid lines are calls; dashed lines are what comes back.</b> Rust is
+the client half, teal the server half. The four boxed steps are work a participant
+does without leaving its own lifeline &mdash; and three of the four are refusals: a
+bad format, an ineligible node, an unreadable response.</figcaption>
+</figure>
+
+<h2 class="full"><span class="num">1</span>The click is a gate, not a request</h2>
+
+<p>The click never reaches the network directly. It reaches an eligibility check,
+and the check is not optional: the API answers an unknown <code>minigraphnode</code>
+with <strong>200 and a plausible-looking map of different data</strong>. There is no
+error to detect at request time, so an ineligible node has to be stopped in the
+client or not at all.</p>
+
+<aside class="side"><b>Why disabled, not hidden</b>Fifteen of the forty-five nodes
+in <code>cici.json</code> have no GRCh38 placement. A menu item that vanishes for a
+third of the graph is indistinguishable from a mis-click, so the item stays and
+carries its reason: <em>Sequence Tube Map &mdash; no GRCh38 placement</em>.</aside>
+
+<figure class="full">
+<div class="seqwrap">
+  <div class="seq" style="--lanes:5">
+    <div class="lanes">
+      <span class="c">Researcher</span>
+      <span class="c">3D raycast</span>
+      <span class="c">tubeMapMenuCommand</span>
+      <span class="c">pangenomeURL</span>
+      <span class="c">tube map panel</span>
+    </div>
+    <div class="body">
+      <div class="rail" aria-hidden="true">
+        <i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i>
+        <i style="--i:4"></i><i style="--i:5"></i>
+      </div>
+      <div class="msg" style="--a:1;--b:2"><div class="hop"><em>right-click</em><i></i></div></div>
+      <div class="msg" style="--a:2;--b:3"><div class="hop"><em>intersection &mdash; which may carry no node at all</em><i></i></div></div>
+      <div class="msg" style="--a:3;--b:4"><div class="hop"><em>tubeMapTargetForNode(node)</em><i></i></div></div>
+      <div class="msg self" style="--a:4;--b:5"><div class="hop"><em>strip the orientation: <b>&quot;5519+&quot; &rarr; &quot;5519&quot;</b></em></div></div>
+      <div class="msg self" style="--a:4;--b:5"><div class="hop"><em>the GRCh38 entry in <code>assemblies</code>, else parse <code>default_range</code>, else <b>null</b></em></div></div>
+      <div class="msg rev ret" style="--a:3;--b:4"><div class="hop"><em>target, or null</em><i></i></div></div>
+      <div class="msg c" style="--a:1;--b:3"><div class="hop"><em>click the enabled item</em><i></i></div></div>
+      <div class="msg c" style="--a:3;--b:5"><div class="hop"><em>open(target)</em><i></i></div></div>
+      <div class="msg c rev" style="--a:4;--b:5"><div class="hop"><em>buildSeqTubeMapURL(target, TUBE_MAP_ENCODING)</em><i></i></div></div>
+    </div>
+  </div>
+</div>
+<figcaption>Only <code>assemblies</code> is searched, never
+<code>duplicatedAssemblies</code>: a node that maps to several regions names no single
+interval to ask for, which is precisely the question whose wrong answer looks right.</figcaption>
+</figure>
+
+<h3>What is fixed in the URL, and why</h3>
+
+<div class="tablewrap full">
+<table>
+  <thead><tr><th>Parameter</th><th>Value</th><th>Why it is sent</th></tr></thead>
+  <tbody>
+    <tr><td><code>chrom, start, end</code></td><td>the node&rsquo;s GRCh38 interval</td><td>the <strong>region</strong> &mdash; the address of every request</td></tr>
+    <tr><td><code>minigraphnode</code></td><td><code>5519</code>, never <code>5519+</code></td><td>enables PCLAI colouring; an unknown id is <em>not</em> rejected</td></tr>
+    <tr><td><code>version</code></td><td><code>v2</code></td><td>already the default &mdash; but a default that is not pinned is a default that can move</td></tr>
+    <tr><td><code>pathnumoption</code></td><td><code>normal</code></td><td>only its <em>presence</em> is load-bearing: drop it and 369 strands come back as 46</td></tr>
+    <tr><td><code>nodewidthoption</code></td><td><code>compressed</code></td><td>already the default; an unrecognised value is a 500</td></tr>
+    <tr><td><code>format</code></td><td><code>bands</code>, appended last</td><td>the only one that varies; the document URL is character for character what it always was</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>A flag, never a fallback.</strong> The obvious design &mdash; ask for
+bands, fall back to the document &mdash; is a trap on this API specifically. Its
+failures arrive at 33&ndash;100&nbsp;s with no CORS headers, indistinguishable in the
+browser from a network error, against a patience of 90&nbsp;s. A fallback would spend
+up to ninety seconds before the second request began, on exactly the large nodes the
+whole effort exists for. So the viewer never probes and never learns what the server
+supports; it is told, by one constant, and that constant was flipped on
+2&nbsp;September&nbsp;2026.</p>
+
+<h2 class="full"><span class="num">2</span>Region to vg JSON</h2>
+
+<p>The handler is synchronous on purpose: it blocks, so it belongs in FastAPI&rsquo;s
+threadpool rather than on the event loop. Every stage below is wrapped in a timer,
+and one <code>[stage-timing]</code> line per request carries the breakdown, so
+latency can be attributed with a <code>grep</code>.</p>
+
+<aside class="side"><b>A cache hit is a content check</b>The W lines are written
+last, after every S and L line, so an extraction that died partway leaves a
+structurally valid GFA describing a graph with <em>no paths in it</em> &mdash; which
+every downstream stage then fails on, each for a reason further from the cause.
+Checking for walks, plus an atomic rename, turns that into one retry.</aside>
+
+<aside class="side"><b>One tabix handle per thread</b>A <code>TabixFile</code> is one
+htslib handle with one seek position, and <code>fetch</code> returns a lazy iterator
+&mdash; held open per S line, for minutes on a large region. Two requests really do
+overlap on the threadpool, and sharing one handle interleaved the seeks and left it
+broken for the life of the process.</aside>
+
+<figure class="full">
+<div class="seqwrap">
+  <div class="seq" style="--lanes:5">
+    <div class="lanes">
+      <span class="c">pgb</span>
+      <span class="s">seqtubemap()</span>
+      <span class="s">cache</span>
+      <span class="s">gbz &middot; walk derivatives</span>
+      <span class="s">vg</span>
+    </div>
+    <div class="body">
+      <div class="rail" aria-hidden="true">
+        <i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i>
+        <i style="--i:4"></i><i style="--i:5"></i>
+      </div>
+      <div class="msg c" style="--a:1;--b:2"><div class="hop"><em>GET /seqtubemap</em><i></i></div></div>
+      <div class="msg self" style="--a:2;--b:4"><div class="hop"><em>unknown format &rarr; <b>400</b>, before anything is extracted, converted or rendered</em></div></div>
+      <div class="msg self" style="--a:2;--b:4"><div class="hop"><em>build the five cache paths &mdash; the extension is what keeps the two renders of one region apart</em></div></div>
+      <div class="msg s" style="--a:2;--b:3"><div class="hop"><em>does the subgraph carry W lines?</em><i></i></div></div>
+
+      <div class="phase"><span>On a miss</span></div>
+
+      <div class="msg s" style="--a:2;--b:4"><div class="hop"><em>extract_region_from_gbz(region, GRCh38)</em><i></i></div></div>
+      <div class="msg s rev ret" style="--a:3;--b:4"><div class="hop"><em>&hellip;_no_walk.gfa</em><i></i></div></div>
+      <div class="msg s" style="--a:2;--b:4"><div class="hop"><em>fetch(node id) once per S line</em><i></i></div></div>
+      <div class="msg s rev ret" style="--a:2;--b:4"><div class="hop"><em>assembly and coordinate rows</em><i></i></div></div>
+      <div class="msg s" style="--a:2;--b:3"><div class="hop"><em>write <code>.partial-&lt;pid&gt;-&lt;tid&gt;</code>, then <b>os.replace</b></em><i></i></div></div>
+
+      <div class="phase"><span>Fresh or cached, checked the same way</span></div>
+
+      <div class="msg self" style="--a:2;--b:4"><div class="hop"><em>still no W lines &rarr; <b>500</b>, naming the subgraph rather than the stage that will fail on it</em></div></div>
+      <div class="msg s" style="--a:2;--b:5"><div class="hop"><em>vg convert -g &nbsp;&middot;&nbsp; vg view -j</em><i></i></div></div>
+      <div class="msg s rev ret" style="--a:3;--b:5"><div class="hop"><em>.vg, then .json</em><i></i></div></div>
+      <div class="msg s" style="--a:2;--b:4"><div class="hop"><em>GetPclaiColorScheme(minigraphnode) &mdash; only on v2, only when a node was named</em><i></i></div></div>
+    </div>
+  </div>
+</div>
+</figure>
+
+<h2 class="full"><span class="num">3</span>vg JSON to band data</h2>
+
+<p>One Node process, and no browser in it. The layout used to bind its numbers to
+elements in an emulated document, which was 93.7% of the render&rsquo;s retained
+memory and existed only so the result could be serialized to text and parsed straight
+back into numbers by the client. Now every draw function <em>collects</em> what it was
+about to draw.</p>
+
+<aside class="side"><b>The one sequencing constraint left</b>The layout reads its
+config out of a global at module scope and throws if it is not there. So the config is
+installed first and <code>tubemap.js</code> is imported dynamically &mdash; once per
+process, not per render, because the module carries the layout&rsquo;s state and
+<code>create()</code> resets it before it draws.</aside>
+
+<figure class="full">
+<div class="seqwrap">
+  <div class="seq" style="--lanes:5">
+    <div class="lanes">
+      <span class="s">generate-bands.mjs</span>
+      <span class="s">generator-cli</span>
+      <span class="s">render.mjs</span>
+      <span class="s">tubemap.js</span>
+      <span class="s">BandCollector</span>
+    </div>
+    <div class="body">
+      <div class="rail" aria-hidden="true">
+        <i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i>
+        <i style="--i:4"></i><i style="--i:5"></i>
+      </div>
+      <div class="msg s" style="--a:1;--b:2"><div class="hop"><em>runGenerator(usage)</em><i></i></div></div>
+      <div class="msg self" style="--a:2;--b:4"><div class="hop"><em>parse six arguments &mdash; identical for both generators, so the endpoint can build one command line for both</em></div></div>
+      <div class="msg s" style="--a:2;--b:3"><div class="hop"><em>renderTubeMap({&hairsp;inputFile, start, end, nodeWidthOption, pclaiColorScheme&hairsp;})</em><i></i></div></div>
+      <div class="msg self" style="--a:3;--b:5"><div class="hop"><em>installLayoutConfig(), <b>then</b> await import(&quot;./tubemap.js&quot;)</em></div></div>
+      <div class="msg s" style="--a:3;--b:4"><div class="hop"><em>vgExtractNodes &rarr; segments &middot; vgExtractTracks &rarr; strands &middot; reorderTracksForLayout</em><i></i></div></div>
+      <div class="msg s" style="--a:3;--b:4"><div class="hop"><em>create({ nodes: segments, tracks: strands, reads: null, region, hideLegend })</em><i></i></div></div>
+      <div class="msg s" style="--a:4;--b:5"><div class="hop"><em>reset(), then setExtent, then one collect per drawn shape</em><i></i></div></div>
+      <div class="msg s rev ret" style="--a:3;--b:5"><div class="hop"><em>getBandData()</em><i></i></div></div>
+      <div class="msg s rev ret" style="--a:2;--b:3"><div class="hop"><em>{ bandData, <b>get document()</b> }</em><i></i></div></div>
+      <div class="msg self rev" style="--a:2;--b:1"><div class="hop"><em>handed over whole, never spread &mdash; spreading would build a 12.58&nbsp;MB document for the generator that does not want one</em></div></div>
+    </div>
+  </div>
+</div>
+</figure>
+
+<h3>Inside <code>createTubeMap</code></h3>
+
+<p>A fixed sequence of passes over the segments and strands, ending in draw calls
+whose order is paint order, which is document order, which is the order the emitter
+writes them in.</p>
+
+<div class="tablewrap full">
+<table>
+  <thead><tr><th>Pass</th><th>What it settles</th></tr></thead>
+  <tbody>
+    <tr><td><code>straightenTrack(0)</code></td><td>the <strong>pivot strand</strong> &mdash; GRCh38 where present &mdash; fixes segment order and orientation, and every other strand is threaded against it</td></tr>
+    <tr><td><code>generateNodeMap</code> &middot; <code>generateTrackIndexSequences</code> &middot; <code>generateNodeWidth</code></td><td>segments become indexable, strands become index sequences, widths follow the width option</td></tr>
+    <tr><td><code>generateNodeSuccessors</code> &rarr; <code>generateNodeDegree</code> &rarr; <code>generateNodeOrder</code></td><td>left-to-right order along the axis</td></tr>
+    <tr><td><code>switchNodeOrientation</code>, then order again</td><td>segments drawn the way the pivot runs, not the way they arrived</td></tr>
+    <tr><td><code>calculateTrackWidth</code> &middot; <code>generateLaneAssignment</code></td><td>vertical position: which lane each strand occupies where</td></tr>
+    <tr><td><code>generateNodeXCoords</code> &middot; <code>generateSVGShapesFromPath</code></td><td>the shapes themselves &mdash; rectangles, curves, corners, connectors</td></tr>
+    <tr><td><code>getImageDimensions</code> &rarr; <code>setExtent</code></td><td>the frame the collector will report</td></tr>
+    <tr><td>the six <code>draw&hellip;</code> calls, in order</td><td>haplotype rectangles, haplotype curves, reversals, step-3 rectangles, segment boxes, and &mdash; only in <code>normal</code> width mode &mdash; labels and a ruler</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>A band is six numbers and a strand id</h3>
+
+<p>Those six are <code>x0, y0</code> and <code>x1, y1</code>, the two ends of the
+band&rsquo;s upper edge, and <code>controlTop</code>, <code>controlBottom</code>, the
+control abscissae of the two cubics. Six is enough only because every band is exactly
+15 units thick &mdash; a constant measured across 127,101 strand paths, and the reason
+the lower edge does not have to be sent at all.</p>
+
+<div class="tablewrap full">
+<table>
+  <thead><tr><th>Collected shape</th><th>Kind</th><th>What it is</th></tr></thead>
+  <tbody>
+    <tr><td><code>rectBand</code></td><td><code>rect</code></td><td>the degenerate band &mdash; level, so any control abscissa reproduces it</td></tr>
+    <tr><td><code>curveBand</code></td><td><code>curve</code></td><td>the same six values; the kind says only which element the document writes</td></tr>
+    <tr><td><code>cornerShape</code></td><td><code>corner</code></td><td>a quarter turn built from quadratics &mdash; <strong>outside</strong> the six-value grammar</td></tr>
+    <tr><td><code>verticalConnector</code></td><td><code>connector</code></td><td>as tall as the reversal is deep, which is not the band thickness and is not meant to be</td></tr>
+    <tr><td><code>segmentBox</code></td><td>&mdash;</td><td>five numbers: left, top, right, bottom, radius</td></tr>
+    <tr><td>ruler, sequence labels</td><td>overlay</td><td>an element name and its attributes in order; no production response contains one</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Two invariants are checked here, where the layout that produced them is still in
+scope, rather than downstream where it is not. A band drawn off the grammar throws in
+the collector rather than reaching a client that would refuse the whole response. And
+strand ids are asserted dense: hidden strands are spliced out <em>after</em> ids are
+assigned, so a hole is possible, and <code>pgb</code> rejects an entire map whose ids
+do not run from zero upward with no gaps.</p>
+
+<h2 class="full"><span class="num">4</span>Two sinks, one collector</h2>
+
+<p>Everything above the collector computes numbers; everything below it encodes them.
+The document and the payload cannot disagree about the picture, because there is only
+one picture: the band data is canonical, and the document is a rendering of it.</p>
+
+<div class="fork full">
+  <div class="doc">
+    <h4>emitDocument &mdash; format=svg</h4>
+    <dl>
+      <dt>Media type</dt><dd><code>image/svg+xml</code></dd>
+      <dt>Geometry</dt><dd>a <code>d</code> attribute the client parses back into six floats with a regular expression</dd>
+      <dt>Per-strand values</dt><dd>colour, name and PCLAI placement re-serialized on each of ~55,053 bands &mdash; 41&ndash;47% of the response</dd>
+      <dt>Built</dt><dd>on first access to <code>render.document</code>, and never on the bands route</dd>
+      <dt>Read by</dt><dd><code>parseBands.ts</code> and <code>parseSegmentBoxes.ts</code>, because the document says the map and the boxes in two places</dd>
+    </dl>
+  </div>
+  <div class="bands">
+    <h4>encodeBandPayload &mdash; format=bands</h4>
+    <dl>
+      <dt>Media type</dt><dd><code>application/octet-stream</code></dd>
+      <dt>Geometry</dt><dd>the numbers themselves &mdash; a typed-array view over the received bytes, handed straight to the GPU</dd>
+      <dt>Per-strand values</dt><dd>once, in a table the bands point at; colour as three rounded channels rather than CSS</dd>
+      <dt>Built</dt><dd>always, and it is all that is built</dd>
+      <dt>Read by</dt><dd><code>parseBandPayload.ts</code>, which returns the reading whole</dd>
+    </dl>
+  </div>
+</div>
+
+<p class="cap full">Reversals ride in the header rather than the body: a corner
+is quadratics and a connector is not band-thick, so neither fits the six-value
+grammar. Each carries the position it occupied in the draw order, because paint order
+is document order.</p>
+
+<div class="plate full">
+<div class="row"><span class="f">uint32 LE</span><span class="lbl">byte length of the header</span></div>
+<div class="row"><span class="f hi">header &mdash; JSON</span><span class="lbl">frame, strand table, segment boxes, reversals</span></div>
+<div class="row"><span class="f">padding</span><span class="lbl">to the next multiple of 4</span></div>
+<div class="row"><span class="f hi">Float32 &times; 6 &times; n</span><span class="lbl">x0 &nbsp;y0 &nbsp;x1 &nbsp;y1 &nbsp;controlTop &nbsp;controlBottom</span></div>
+<div class="row"><span class="f hi">Uint16 &times; n</span><span class="lbl">strand id, indexing the table above</span></div>
+<div class="row"><span class="f hi">Uint8 &times; n</span><span class="lbl">rect, or curve</span></div>
+</div>
+
+<p><strong>Columnar, not one record per band.</strong> Interleaved, a band is a
+26-byte stride, and a <code>Float32Array</code> cannot view a buffer at an offset
+that is not a multiple of four &mdash; so a client would have to copy the fields apart
+one at a time with a <code>DataView</code>, which is exactly the parse step this
+format exists to delete. Split into columns, each column is a single view over the
+bytes that arrived.</p>
+
+<h2 class="full"><span class="num">5</span>Bytes back to a picture</h2>
+
+<aside class="side"><b>The encoding is not passed in</b>It is the shape of what
+arrived. The fetch reads the body as text or as bytes according to the flag the host
+set, so a string is a document and a byte array is a payload, and there is no third
+state in which the two could disagree about which one this is.</aside>
+
+<figure class="full">
+<div class="seqwrap">
+  <div class="seq" style="--lanes:5">
+    <div class="lanes">
+      <span class="s">seqtubemap()</span>
+      <span class="c">fetchDocument</span>
+      <span class="c">readTubeMap</span>
+      <span class="c">the two readers</span>
+      <span class="c">bandSurface</span>
+    </div>
+    <div class="body">
+      <div class="rail" aria-hidden="true">
+        <i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i>
+        <i style="--i:4"></i><i style="--i:5"></i>
+      </div>
+      <div class="msg self" style="--a:1;--b:3"><div class="hop"><em>the render exited zero <em>and</em> wrote a file, or it is a 500 naming the stage</em></div></div>
+      <div class="msg c ret rev" style="--a:2;--b:1"><div class="hop"><em>FileResponse, with the media type of the format that was asked for</em><i></i></div></div>
+      <div class="msg self" style="--a:1;--b:3"><div class="hop"><em>background: delete the .vg, the .json and the render</em></div></div>
+      <div class="msg self" style="--a:2;--b:4"><div class="hop"><em>one clock over both encodings &mdash; <b>90&nbsp;s</b>, above the slowest success ever measured</em></div></div>
+      <div class="msg c" style="--a:2;--b:3"><div class="hop"><em>readTubeMap(bytes) &nbsp;/&nbsp; readTubeMap(text)</em><i></i></div></div>
+      <div class="msg c" style="--a:3;--b:4"><div class="hop"><em>parseBandPayload &nbsp;or&nbsp; parseBands + parseSegmentBoxes</em><i></i></div></div>
+      <div class="msg c rev ret" style="--a:3;--b:4"><div class="hop"><em>TubeMapReading &mdash; identical either way</em><i></i></div></div>
+      <div class="msg c" style="--a:3;--b:5"><div class="hop"><em>the map and its boxes; a non-conforming response refuses <b>the whole map</b>, never part of it</em><i></i></div></div>
+    </div>
+  </div>
+</div>
+<figcaption>Everything downstream of <code>readTubeMap</code> &mdash; the surface, the
+picker, strand appearance, inversions, the PCLAI inset, strand labels, the segment
+overlay, the navigator &mdash; never learns which route ran.</figcaption>
+</figure>
+
+<h2 class="full"><span class="num">6</span>What the stages cost</h2>
+
+<p>Five stages are timed on every request. Two of them can be skipped: the extraction
+when the cached subgraph already carries walks, and the PCLAI lookup when no
+minigraph node was named. The other three always run.</p>
+
+<div class="bars full">
+  <div class="bars-key">
+    <span class="k-was">Before &mdash; with the emulated browser</span>
+    <span class="k-now">After</span>
+  </div>
+
+  <div class="bar-row">
+    <div class="who">90 bases<small>smallest measured</small></div>
+    <div class="bar-stack">
+      <div class="bar was"><span class="track"><span class="fill" style="width:25.4%"></span></span><span class="val">0.65 s</span></div>
+      <div class="bar now"><span class="track"><span class="fill" style="width:8.2%"></span></span><span class="val">0.21 s &nbsp;3.0&times;</span></div>
+    </div>
+  </div>
+  <div class="bar-row">
+    <div class="who">600 bases</div>
+    <div class="bar-stack">
+      <div class="bar was"><span class="track"><span class="fill" style="width:38.3%"></span></span><span class="val">0.98 s</span></div>
+      <div class="bar now"><span class="track"><span class="fill" style="width:10.9%"></span></span><span class="val">0.28 s &nbsp;3.5&times;</span></div>
+    </div>
+  </div>
+  <div class="bar-row">
+    <div class="who">1,400 bases</div>
+    <div class="bar-stack">
+      <div class="bar was"><span class="track"><span class="fill" style="width:48.0%"></span></span><span class="val">1.23 s</span></div>
+      <div class="bar now"><span class="track"><span class="fill" style="width:12.9%"></span></span><span class="val">0.33 s &nbsp;3.7&times;</span></div>
+    </div>
+  </div>
+  <div class="bar-row">
+    <div class="who">8,000 bases</div>
+    <div class="bar-stack">
+      <div class="bar was"><span class="track"><span class="fill" style="width:93.0%"></span></span><span class="val">2.38 s</span></div>
+      <div class="bar now"><span class="track"><span class="fill" style="width:28.9%"></span></span><span class="val">0.74 s &nbsp;3.2&times;</span></div>
+    </div>
+  </div>
+  <div class="bar-row">
+    <div class="who">4,200 bases<small>1,201 strands</small></div>
+    <div class="bar-stack">
+      <div class="bar was"><span class="track"><span class="fill" style="width:100%"></span></span><span class="val">2.56 s</span></div>
+      <div class="bar now"><span class="track"><span class="fill" style="width:23.0%"></span></span><span class="val">0.59 s &nbsp;4.3&times;</span></div>
+    </div>
+  </div>
+</div>
+
+<p class="full"><span class="mono" style="color:var(--ink-faint)">Two isolated
+instances of the real service, one on each side of the change, serving the same five
+regions, 28&nbsp;August&nbsp;2026. Bars share one scale ending at 2.56&nbsp;s.</span></p>
+
+<p>Alongside those: memory during a render fell from 1,851&nbsp;MB to 95&nbsp;MB, peak
+from 2,446&nbsp;MB to 473&nbsp;MB, and the fixed cost paid on every request &mdash;
+however small the region &mdash; fell by about 440&nbsp;milliseconds. All of that is
+with the format unchanged. The format is where the eight-thousand-base response goes
+from roughly 10&nbsp;MB to 1.10&nbsp;MB.</p>
+
+<h2 class="full"><span class="num">7</span>Invariants this route rests on</h2>
+
+<ul class="inv full">
+  <li><b>The band data is canonical; the document is a rendering of it</b><span>render.mjs &mdash; one collector, two sinks</span></li>
+  <li><b>A cache hit is a subgraph <em>with walks</em>, not a file at a path</b><span>subgraph_has_walks, main.py</span></li>
+  <li><b>A half-written subgraph never becomes a cache entry</b><span>GenerateWalksMC &mdash; partial file, then os.replace</span></li>
+  <li><b>One tabix handle per thread, and that is load-bearing</b><span>WalkDerivative._per_thread</span></li>
+  <li><b>Both generators take the same six arguments, by construction</b><span>generator-cli.mjs &middot; _render_seq_tube_map</span></li>
+  <li><b>An unknown format is refused before any work is done</b><span>seqtubemap(), first thing after the region</span></li>
+  <li><b>Every band is exactly one thickness</b><span>band-data.mjs &mdash; throws otherwise</span></li>
+  <li><b>Strand ids run 0&hellip;n&minus;1 with no gaps</b><span>assertDenseStrandIds</span></li>
+  <li><b>The document stays byte-compatible with pgb&rsquo;s parser</b><span>tests/node/document-conformance.test.mjs</span></li>
+  <li><b>An ineligible node is stopped in the client, never by the server</b><span>tubeMapTargetForNode</span></li>
+  <li><b>The viewer never probes for a format; it is told</b><span>TUBE_MAP_ENCODING</span></li>
+</ul>
+
+<footer class="full">
+  <p>Where each part of this lives.</p>
+  <ul>
+    <li><b>PangenomeAPI</b> &mdash; <code>main.py</code> (the endpoint, the cache, the stage timings, the two subprocess invocations) &middot; <code>gbz_utils.py</code> &middot; <code>seqtubemap/generate-bands.mjs</code>, <code>generate-svg.mjs</code>, <code>generator-cli.mjs</code>, <code>render.mjs</code>, <code>layout-config.mjs</code>, <code>tubemap.js</code>, <code>band-data.mjs</code>, <code>band-payload.mjs</code>, <code>emit-document.mjs</code></li>
+    <li><b>pgb</b> &mdash; <code>contextMenuService.js</code> &middot; <code>tubeMapMenuCommand.ts</code> &middot; <code>pangenomeURL.ts</code> &middot; <code>mountTubeMapPanel.ts</code> &middot; <code>tubemap/fetchDocument.ts</code>, <code>tubeMapEncoding.ts</code>, <code>readTubeMap.ts</code>, <code>parseBandPayload.ts</code>, <code>parseBands.ts</code>, <code>bandSurface.ts</code></li>
+    <li><b>Read next</b> &mdash; <a href="./band-format.md">docs/band-format.md</a>, the format in enough detail to write a reader against &middot; <a href="./adr/0001-additive-band-format.md">ADR 0001</a>, why it is additive &middot; <a href="./tube-map-pipeline.html">docs/tube-map-pipeline.html</a>, what the old way cost and where the time went &middot; <a href="./lexicon.html">docs/lexicon.html</a>, the vocabulary pointed at on a real map</li>
+    <li><b>This page in Markdown</b> &mdash; <a href="./seqtubemap-interaction.md">docs/seqtubemap-interaction.md</a>, with the same diagrams as Mermaid</li>
+  </ul>
+</footer>
+
+</main>
+</div>
