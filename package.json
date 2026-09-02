@@ -4,6 +4,7 @@
     "test": "node --max-old-space-size=8192 --test \"tests/node/**/*.test.mjs\"",
     "baseline:golden": "node tests/node/baseline-golden.mjs",
     "baseline:bands": "node --max-old-space-size=8192 tests/node/baseline-bands.mjs",
+    "fixtures:exchange": "node --max-old-space-size=8192 tests/node/exchange-fixtures.mjs",
     "render:fixtures": "node --max-old-space-size=8192 tests/node/render-fixtures.mjs"
   },
   "dependencies": {

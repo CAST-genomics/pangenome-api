@@ -217,6 +217,15 @@ picture, said in fewer bytes.
 The test compares the **decompressed** text, so nothing about zlib's output is pinned; a
 different zlib would produce different bytes on disk and the same green.
 
+## What `pgb` gets out of them — the fixture exchange
+
+These five inputs are also where the **cross-repo fixtures** come from. Both
+encodings of each render — the band payload and the document of the same render —
+are committed next door in [`../exchange/`](../exchange/README.md), under `pgb`'s
+own file names, and `pgb` commits a copy and parses it with its own reader (#25).
+Re-generate with `npm run fixtures:exchange` and copy across in the same window;
+that README says when.
+
 ## How these relate to `pgb`'s golden documents — checked, 2026-08-28
 
 An earlier version of this file claimed the five golden documents disagreed with each
