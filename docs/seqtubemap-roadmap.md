@@ -56,6 +56,13 @@ not. `release` has stopped being the deployed branch and is now a lagging pointe
 used to be live — see *What "live" means now*. Everything A, B and C bought is what a
 researcher gets today, which is the first time that sentence has been true.
 
+**And increment E is underway.** The largest single cost in the pipeline —
+`GenerateWalksMC`'s 30.1 s of a 38.9 s request — is ticketed for the first time, as
+[#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) and
+[#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75). #74 is the live one: it
+measures whether that cost is the tabix seek or the Python parse, which decides both the shape
+of #75 and whether E wants an ADR. Nothing has reported yet.
+
 **Milestones carry tags.** `increment-b` marks the state at which the browser emulation was
 gone and confirmed on the server; `increment-c` marks `f9b05f6`, the state `pgb` read band
 payloads from. Both are annotated and both are on `origin`; `git tag -n99 increment-c` is
@@ -65,6 +72,7 @@ the fullest single account of what **C** landed.
 | --- | --- |
 | Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21), [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46), [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41), [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40), [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22), [#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45), [#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23), [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24), [#66](https://github.com/CAST-genomics/PangenomeAPI/issues/66), [#70](https://github.com/CAST-genomics/PangenomeAPI/issues/70) |
 | Frontier | **[#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25)** — the contract test, and now the only unfinished part of **C**. `pgb`'s reader exists (`pgb`#151) and has read the real thing; what is missing is the test that keeps the two sides from drifting |
+| In progress | **[#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74)** — increment **E**, and grabbable independently of #25. It measures before it changes anything; [#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75) is blocked on it and [#76](https://github.com/CAST-genomics/PangenomeAPI/issues/76) wants a count out of the same run |
 | Live | **A, B and C.** The server runs `main` as of 2026-09-02 and no longer goes back. `release` is 71 commits behind and is no longer what is deployed |
 | Defects, outside the increments | [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52), [#54](https://github.com/CAST-genomics/PangenomeAPI/issues/54), [#58](https://github.com/CAST-genomics/PangenomeAPI/issues/58) — all still open, all triaged, none blocking #25. #52 is answered *on the band route* by #24, and stands on the SVG route — see below |
 
@@ -130,7 +138,7 @@ what each became.*
 #15 declare the fork ✅────── #21
 #16 timings + fixtures ✅──── #26
 #45 strip the debug logging ✅
-#74 measure the lookup/parse split ── #75 stop the per-segment reads   (increment E, blocked by nothing)
+#74 measure the lookup/parse split ◀── HERE ── #75 stop the per-segment reads   (increment E, blocked by nothing)
 
 Sent back by pgb's reader, all merged:
 #66 a segment box as five numbers, not a path command ✅
@@ -144,7 +152,10 @@ Defects, off the sequence and blocking nothing:
 #58 drop d3, and the dead read-track colouring that is its last user
 ```
 
-**The frontier is [#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25)**, and nothing blocks it. Edges are GitHub's native issue
+**Two things are grabbable: [#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25) and
+[#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74)**, and nothing blocks either.
+They are independent — #25 closes **C** across the repository boundary, #74 opens **E** upstream
+of anything `pgb` can observe. Edges are GitHub's native issue
 dependencies, so a ticket whose blockers are all closed is grabbable without consulting this
 document.
 
@@ -621,9 +632,10 @@ a repeated region fast, and Seam 2 depends on it to run without graph data.
 
 ## Increment E — stop reading the walk table one segment at a time
 
-**Ticketed 2026-09-02 as [#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) and
-[#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75), no ADR yet and possibly none
-needed.** It comes from Step 0's numbers rather than from the grilling, and it is the largest
+**Underway.** Ticketed 2026-09-02 as
+[#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) and
+[#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75); **#74 is where the work is**,
+and no ADR yet — possibly none needed, which is itself one of the things #74 decides. It comes from Step 0's numbers rather than from the grilling, and it is the largest
 single cost in the pipeline: `GenerateWalksMC` is a Python loop doing one tabix `fetch` per
 **segment** across 464 strands, at a flat **65-79 ms per segment**, and it is most of
 `subgraph_extract`'s 30.1 s of a 38.9 s request.
