@@ -14,6 +14,8 @@ Companion documents:
 - [`../seqtubemap-roadmap.md`](../seqtubemap-roadmap.md) — the build: tickets, increments, and where they stand
 - [`seqtubemap-latency.md`](./seqtubemap-latency.md) — the measured findings this plan acted on, and the before-baseline
 - [`increment-b.md`](./increment-b.md) — what **B** actually bought, before and after
+- [`increment-c.md`](./increment-c.md) — what **C** bought, and the day `pgb` read it
+- [`../band-format.md`](../band-format.md) — the wire format **C** publishes
 - [`local-endpoint-harness.md`](./local-endpoint-harness.md) — how to drive the endpoint with no graph data and no `vg`
 - [`perf/`](../../perf/) — the harness
 - Rendered report: <https://claude.ai/code/artifact/71539dd1-fb13-44d0-8468-a3a96e726114>

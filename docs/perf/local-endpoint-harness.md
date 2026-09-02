@@ -14,11 +14,12 @@ reproducible, and one part of it is a stand-in that materially limits what the r
 > `main.py` line numbers have shifted throughout, so this document names functions rather than
 > lines wherever it can.
 
-**Nothing here touched production.** `release` — the branch the server follows
-([`releasing.md`](../releasing.md)) — was not read, written, or deployed to. Both instances
-bound to `127.0.0.1` on ports **8100** and **8101**; production is `:8000` on
-`pangenome-api.ucsd.edu`. Everything the harness created lives in a session scratchpad
-outside the repository, except one gitignored `cache/` directory that was deleted afterwards.
+**Nothing here touched production.** `release` — at the time, the branch the server followed
+([`releasing.md`](../releasing.md); the server has run `main` since 2026-09-02) — was not
+read, written, or deployed to. Both instances bound to `127.0.0.1` on ports **8100** and
+**8101**; production is `:8000` on `pangenome-api.ucsd.edu`. Everything the harness created
+lives in a session scratchpad outside the repository, except one gitignored `cache/` directory
+that was deleted afterwards.
 
 The results are in [`increment-b.md`](./increment-b.md); this is the method.
 
@@ -376,8 +377,10 @@ minigraph walks file — a request with `minigraphnode` set would have gone look
 derivative that this data directory does not contain.
 
 **Absolute timings are a developer laptop, not the server.** The ratios are the transferable
-part. Production's own baseline is [`seqtubemap-latency.md`](./seqtubemap-latency.md) §1, and
-it will not move until something is promoted to `release`.
+part. Production's own baseline is [`seqtubemap-latency.md`](./seqtubemap-latency.md) §1. That
+baseline is now out of date rather than merely un-refreshed — the server has run this code
+since 2026-09-02 — and re-taking it needs `[stage-timing]` lines off the server, which this
+harness deliberately cannot produce.
 
 ---
 

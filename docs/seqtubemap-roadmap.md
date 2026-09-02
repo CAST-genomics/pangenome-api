@@ -16,6 +16,8 @@ This is the **build** document. Its companions:
 | [`docs/adr/0002`](./adr/0002-when-the-server-is-stood-up.md) | when the server gets stood up, and when it does not |
 | [`docs/perf/seqtubemap-plan.md`](./perf/seqtubemap-plan.md) | which skill drives each phase |
 | [`docs/releasing.md`](./releasing.md) | why merging is not shipping |
+| [`docs/band-format.md`](./band-format.md) | the wire format **C** publishes, in enough detail to write a parser against |
+| [`docs/perf/increment-c.md`](./perf/increment-c.md) | what **C** actually bought, and the day `pgb` read it |
 | [`docs/tube-map-pipeline.html`](./tube-map-pipeline.html) | the whole rework in one illustrated page — the two ways to draw a tube map |
 | [`tests/fixtures/seqtubemap/README.md`](../tests/fixtures/seqtubemap/README.md) | the five real subgraphs, and what they do and do not pin |
 | [#13](https://github.com/CAST-genomics/PangenomeAPI/issues/13) | the spec these tickets decompose |
@@ -28,27 +30,42 @@ found them false. That re-sequenced the coverage work ahead of
 three of which have since merged; see *Before #22*. Revised again 2026-09-01, after the
 live trial of increment **B** on 2026-08-31 and the merge of
 [#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23) and
-[#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45).
+[#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45). Revised again 2026-09-02,
+when `pgb` read band payloads off the live server and the server stopped going back to
+`release`.
 
 ## Where this stands
 
-Phase 0, increment **A**, increment **B** and the first half of **C** are merged. The browser
-emulation is gone: the document is written from the layout's own numbers, `jsdom` and `canvas`
-have left the dependency tree, and the ceiling moved — a region that died with `heap out of
-memory` at a 1 GB heap now renders in under a second. The figures are in
+Phase 0 and increments **A**, **B** and **C** are merged — all of **C** that lives in this
+repository, which is everything but the cross-repo contract test (#25). The browser emulation is gone: the
+document is written from the layout's own numbers, `jsdom` and `canvas` have left the
+dependency tree, and the ceiling moved — a region that died with `heap out of memory` at a
+1 GB heap now renders in under a second. The figures are in
 [`increment-b.md`](./perf/increment-b.md). Since #23 the geometry is carried as numbers rather
-than as a drawing command, so what remains of **C** is the wire format itself.
+than as a drawing command, and since #24 those numbers are published:
+`/seqtubemap?format=bands`, specified in [`band-format.md`](./band-format.md).
 
-**B has been tried on the real server.** On 2026-08-31 Cici pointed the live server at `main`
-for a short while and `pgb` drew against it: regions that used to exceed the frontend's 90 s timeout and never return now
-retrieve. Two defects surfaced during the trial and both were fixed inside it — see *The live
-trial*. The server has since been put back on `release`.
+**And `pgb` reads them off the live server.** On 2026-09-02 the app retrieved band payloads
+from the deployed API and drew from them — the first time the format has been exercised
+anywhere but a test. That closed the loop **C** exists for: the server publishes the numbers
+and the client consumes them, with no XML in between. The record is
+[`increment-c.md`](./perf/increment-c.md).
+
+**The server now runs `main`, and stays there.** The 2026-08-31 window was a loan; this is
+not. `release` has stopped being the deployed branch and is now a lagging pointer at what
+used to be live — see *What "live" means now*. Everything A, B and C bought is what a
+researcher gets today, which is the first time that sentence has been true.
+
+**Milestones carry tags.** `increment-b` marks the state at which the browser emulation was
+gone and confirmed on the server; `increment-c` marks `f9b05f6`, the state `pgb` read band
+payloads from. Both are annotated and both are on `origin`; `git tag -n99 increment-c` is
+the fullest single account of what **C** landed.
 
 | | |
 | --- | --- |
-| Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21), [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46), [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41), [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40), [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22), [#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45), [#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23), [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24) |
-| Frontier | **[#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25)** — the contract test, unblocked by #24. Increment C is complete on this side of the wire; `pgb`'s parser is where it lands next |
-| Live | **Nothing.** The server follows `release`, so merging is not shipping; `git log release..main` — 59 commits — is what is waiting. The trial was a loan, not a promotion |
+| Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21), [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46), [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41), [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40), [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22), [#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45), [#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23), [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24), [#66](https://github.com/CAST-genomics/PangenomeAPI/issues/66), [#70](https://github.com/CAST-genomics/PangenomeAPI/issues/70) |
+| Frontier | **[#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25)** — the contract test, and now the only unfinished part of **C**. `pgb`'s reader exists (`pgb`#151) and has read the real thing; what is missing is the test that keeps the two sides from drifting |
+| Live | **A, B and C.** The server runs `main` as of 2026-09-02 and no longer goes back. `release` is 71 commits behind and is no longer what is deployed |
 | Defects, outside the increments | [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52), [#54](https://github.com/CAST-genomics/PangenomeAPI/issues/54), [#58](https://github.com/CAST-genomics/PangenomeAPI/issues/58) — all still open, all triaged, none blocking #25. #52 is answered *on the band route* by #24, and stands on the SVG route — see below |
 
 ---
@@ -60,6 +77,9 @@ hide them in XML.**
 
 ## Why
 
+*Written in the present tense on 2026-08-27, and kept that way: this is the problem the whole
+programme was built against, and it is the state the service was in until 2026-09-02.*
+
 A researcher clicks a **minigraph node** to look inside it. Roughly 43% of the time nothing
 appears. When it works, a 10 kb region takes 120 seconds and delivers 10 MB — and the
 frontend gives up at 90, so for a large node the feature is simply unavailable, with no way
@@ -67,9 +87,9 @@ to tell in advance which nodes will work.
 
 And the failure is not contained. Both endpoints were `async def` while every stage blocks,
 so one slow tube map request stalled **every** other request to the server, including the
-`/json` the 3D graph depends on. (Fixed on `main` by
-[#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20); still live on the server,
-which follows `release`.)
+`/json` the 3D graph depends on. (Fixed by
+[#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), and live since the server
+moved to `main` on 2026-09-02.)
 
 One cause sits under all three symptoms. The server computes the geometry, then boots a
 headless browser, builds a jsdom document, and serializes it to XML — so that `pgb`, the
@@ -111,6 +131,11 @@ what each became.*
 #16 timings + fixtures ✅──── #26
 #45 strip the debug logging ✅
 #E  batch GenerateWalksMC — no ticket yet, no ADR behind it
+
+Sent back by pgb's reader, all merged:
+#66 a segment box as five numbers, not a path command ✅
+#70 the format doc said numbers where the payload sends strings ✅
+    (and PR #67, the same defect on pclaiScore)
 
 Defects, off the sequence and blocking nothing:
 #52 pgb refuses a reversal — answered on the band route (header, not body); the SVG route is unchanged, so #52 stands there
@@ -215,7 +240,7 @@ arrived.
 **The fix was deleting the word `async` twice.** Neither endpoint awaits anything; FastAPI
 runs a plain `def` endpoint in a threadpool automatically. The ticket existed for the *test* —
 issue a slow request and a fast one concurrently, assert the fast one does not wait. Merged,
-and **not yet live**: it is in `release..main` with everything else.
+and **live since 2026-09-02**, with everything else that had been queued behind `release`.
 
 ### [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19) — Lazy tabix opens ✅
 
@@ -415,8 +440,9 @@ during the trial rather than filed:
   no stage ever wrote — a failing stage now raises a 502 naming itself and the region, through
   the CORS middleware, so the panel can show the reason.
 
-**A trial is not a promotion.** The server is back on `release`, and `release..main` is still
-what is waiting. [`releasing.md`](./releasing.md) is the procedure.
+**That trial was not a promotion** — the server went back on `release` afterwards, and
+`release..main` stayed the queue for two more days. What ended it was not a decision to
+promote but **C** needing a live band route to be read against; see *What "live" means now*.
 
 ---
 
@@ -446,8 +472,10 @@ numbers the layout held. Exact equality, not a tolerance.
 
 A reversal's **corners** (quadratics, no `trackName`) and its **vertical connectors** are
 outside the six-value grammar and are collected as their own kinds rather than forced into it.
-`pgb` can read neither today — that is [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52), which predates this — and #24 is where
-what they mean on the band route gets decided.
+`pgb` can read neither on the SVG route — that is
+[#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52), which predates this — and #24
+decided what they mean on the band route: they ride in the header, each carrying its position
+in the draw order.
 
 ### [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24) — `?format=bands` ✅
 
@@ -461,19 +489,23 @@ parser against without reading the server.
 the endpoint, not merely intended. An unrecognised `format` is refused with a 400 before any
 stage runs, rather than quietly served as SVG.
 
-**The projection is now a measurement**, and it was right and slightly pessimistic: **1.25 MB
+**The projection is now a measurement**, and it was right and slightly pessimistic: **1.10 MB
 against 9.97 MB** over the committed 7,967 bp subgraph, where this document predicted ~1.5 MB
-against 10.07 MB. Across the five real subgraphs the ratio runs 1.9× at 90 bp to 9.0× at
+against 10.07 MB. Across the five real subgraphs the ratio runs 1.9× at 90 bp to 9.3× at
 44,795 bands — smallest where the response is smallest, because a 592-band payload is almost
 all strand table. `perf/band-payload-sizes.mjs` reproduces the table.
 
 | region | span | bands | SVG | band payload | ratio |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | chr8:78,771,162-78,771,252 | 90 bp | 592 | 0.13 MB | 0.07 MB | 1.9× |
-| chr1:25,331,046-25,331,646 | 600 bp | 8,089 | 2.25 MB | 0.28 MB | 8.1× |
-| chr8:10,079,054-10,080,461 | 1.4 kb | 13,246 | 3.61 MB | 0.43 MB | 8.4× |
-| chr1:25,301,271-25,309,238 | 8.0 kb | 35,020 | 9.97 MB | **1.25 MB** | 8.0× |
-| chr1:25,331,646-25,335,796 | 4.2 kb | 44,795 | 12.58 MB | 1.40 MB | 9.0× |
+| chr1:25,331,046-25,331,646 | 600 bp | 8,089 | 2.25 MB | 0.27 MB | 8.5× |
+| chr8:10,079,054-10,080,461 | 1.4 kb | 13,246 | 3.61 MB | 0.41 MB | 8.8× |
+| chr1:25,301,271-25,309,238 | 8.0 kb | 35,020 | 9.97 MB | **1.10 MB** | 9.0× |
+| chr1:25,331,646-25,335,796 | 4.2 kb | 44,795 | 12.58 MB | 1.35 MB | 9.3× |
+
+*Re-measured 2026-09-02, after [#66](https://github.com/CAST-genomics/PangenomeAPI/issues/66)
+took the segment outlines out of the header. The row that moved most is the 8.0 kb one, at
+768 segment boxes: 1.25 MB → 1.10 MB.*
 
 Three things the increment decided that the ticket left to it. The body is **columnar** —
 interleaved, a 26-byte record admits no `Float32Array` view, so the client would copy the
@@ -483,11 +515,81 @@ happens once on the server. And a reversal's corners and connectors ride in the 
 each carrying its position in the draw order — which is [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52)'s
 answer on this route, and needs nothing new from `pgb`.
 
+### What writing the reader sent back
+
+Three corrections came the other way while `pgb`'s reader was being written (`pgb`#151), and
+all three were found the same way: **by someone reading the spec instead of the encoder.**
+That is what a format document written to be read without the server is for, and it is the
+only part of this increment that could not have been found on this side.
+
+- **[#67](https://github.com/CAST-genomics/PangenomeAPI/pull/67) — `pclaiScore` is an opaque
+  string.** The spec's example wrote `0.98`. The band data carries it as text (`"993"`), and
+  real schemes also spell it `"impainted"` on strands that *are* placed — a different kind of
+  answer, not a number with a bad value. A reader taking the spec at its word either refuses
+  real documents or turns a category into `NaN`.
+
+- **[#70](https://github.com/CAST-genomics/PangenomeAPI/issues/70) — a segment's style fields
+  are strings.** `fillOpacity` and `strokeWidth` were documented as `0.4` and `2`; the payload
+  sends `"0.4"` and `"2px"`, because the four appearance fields come through `tubemap.js` as
+  the document's own attribute values. `pgb`'s `SegmentBox.stroke` does arithmetic with it, so
+  the spec as written laid a border of `NaN` width — silently, since `NaN` in a CSS length is
+  an ignored declaration rather than an error. **The document moved, not the payload:** no
+  encoder change, no bytes, and `version` stays 1.
+
+- **[#66](https://github.com/CAST-genomics/PangenomeAPI/issues/66) — a segment box travels as
+  numbers.** It had travelled as the path command that draws it —
+  `"M 11 20 Q 11 11 20 11 L 67 11 …"` — and every one is a rounded rectangle whose five
+  numbers the layout holds before it builds the string. Now those five travel, `outline`
+  replaced rather than joined. This is #23's argument one level down, and it removed the last
+  string in the payload a client had to parse back into numbers.
+
+  `version` stayed 1 deliberately: a version protects readers and this format has none yet, so
+  carrying both spellings would have kept the string in the format forever and left the reader
+  being written at that moment with two ways to find the same rectangle.
+
+  **The SVG route's bytes did move**, and the goldens were re-baselined. The layout walked the
+  outline as a running position, so it printed the same edge twice one ulp apart —
+  `225.85714285714286` along the top of a box, `225.8571428571429` along its bottom. Four to
+  eight numbers per golden document, each within 1.5e-16 of what it was, no command and no
+  element altered. That ulp is the same defect #66 cites as the reason `pgb` needed nine
+  tolerant comparisons, so no five numbers can reproduce those bytes; a tolerance there would
+  be the first of the comparisons the ticket exists to delete.
+
 ### [#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25) — Contract test
 
 Golden fixtures committed here; the test that parses them lives in `pgb`, where the parser
 lives, and runs in `pgb`'s CI. **Not a vendored copy of the parser** — two copies that must
 agree is precisely the failure mode this whole effort exists to remove.
+
+**The reader now exists and has read the real thing**, which changes what this ticket is for.
+It is no longer the step that proves the format works — 2026-09-02 did that, against the live
+server. It is the step that stops the two sides drifting apart afterwards, and the three
+corrections above are the evidence that they drift: each was a place where the spec and the
+encoder had already disagreed, and each was caught by a human rather than by a test.
+
+---
+
+## What "live" means now — `main` on the server, 2026-09-02
+
+**The server runs `main`, and is not going back.** The 2026-08-31 window was a loan against
+`release`; this is not a loan. `pgb` retrieved `?format=bands` payloads from the deployed API
+and drew from them, which is the first exercise of the format outside a test, and the first
+time any of A, B or C has been what a researcher actually gets.
+
+What that changes across this document:
+
+- **The "before" numbers are now past tense.** The 120 s, 10 MB, ~43%-of-clicks-fail figures
+  in *Why* describe what the service did on 2026-08-27 under `release`. They are the baseline,
+  not the present.
+- **`release` is no longer a claim about what is live.** It is a lagging pointer at what used
+  to be, 71 commits behind. [`releasing.md`](./releasing.md) describes a discipline the deploy
+  no longer follows, and says so at the top; whether to re-establish it, retire it, or promote
+  `release` to catch up is an open decision, and a human one.
+- **The after-column is now capturable.** `[stage-timing]` lines are being written by a server
+  running the current code, which is exactly what the 2026-08-31 trial could not provide. See
+  *Verifying the whole thing*.
+
+The state is tagged: `increment-c`, annotated, on `origin`, at `f9b05f6`.
 
 ---
 
@@ -545,8 +647,12 @@ is built from quadratics rather than cubics, and neither shape has ever painted 
 
 Found 2026-08-28 while verifying #22 against `pgb`'s real parser. **It predates #22, and #22
 moved it in neither direction.** #23 made the two shapes explicit kinds rather than bands with
-impossible numbers, which is the groundwork; [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24) is where what they mean on the
-band route gets decided.
+impossible numbers, which was the groundwork, and
+[#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24) answered it on the band route:
+corners and connectors ride in the header, each carrying its position in the draw order, and a
+client needs nothing new to skip or draw them. **On the SVG route #52 stands unchanged** — the
+document still contains shapes `parseBands.ts` refuses, and its gate still refuses the whole
+document over one of them. The route a client picks now decides whether the defect exists.
 
 ### [#54](https://github.com/CAST-genomics/PangenomeAPI/issues/54) — two requests extract the same uncached region at once
 
@@ -637,9 +743,26 @@ shared vocabulary with the PCLAI chart and the 3D graph.
 - ~~**Two documents in `pgb` make a forward claim**~~ — that #22 ships byte-compatible.
   **Answered: it held, and the amendments merged** as `pgb` PR #142. The forward claim is now a
   past-tense one, and the live trial exercised it against the real parser.
-- **Does a reversal reach a real region?** #52 says `pgb` refuses any document containing one,
-  and the live trial drew several regions without hitting it. Whether that is luck or whether
-  reversals are rare in this graph decides how urgent #52 is, and nobody has counted.
+- ~~**Will anything ever read `?format=bands`?**~~ **Answered 2026-09-02: `pgb` does, off the
+  live server.** The format's first consumer exists, which retires the risk that this
+  increment published a format nobody would adopt — the risk ADR 0001's additive design was
+  chosen to survive.
+- **Does a reversal reach a real region?** #52 says `pgb` refuses any *SVG* document
+  containing one, and two live windows have now drawn regions without hitting it. Whether that
+  is luck or whether reversals are rare in this graph still decides how urgent #52 is, and
+  nobody has counted. Less urgent than it was, in one specific way: the band route carries
+  corners and connectors in the header, so a client on that route is no longer refused by
+  them — which makes #52 a defect of the *old* route rather than of the picture.
+- **Is `release` re-established, retired, or caught up?** The server runs `main` as of
+  2026-09-02 and `release` is 71 commits behind, so the discipline in
+  [`releasing.md`](./releasing.md) describes something the deploy no longer does. Three
+  answers are available and it is a human decision, not a technical one. Until it is made,
+  "what is live" is again a moment rather than a branch — which is the exact problem that
+  document was written to fix.
+- **Which regions has `pgb` actually drawn from band data?** 2026-09-02 established that the
+  format works end to end. It did not establish coverage: nobody recorded which regions were
+  tried, whether any were in the fetch-ceiling regime, or how the payload behaved at 44,795
+  bands over a real network rather than a loopback.
 
 ## Verifying the whole thing
 
@@ -666,11 +789,16 @@ on `split-400.json` fell from 2,446.5 MB to 472.5 MB. Its `--expose-gc` requirem
 optional — retained-memory numbers taken without a forced collection measure garbage rather
 than retention.
 
-The TTFB and payload rows above are still *before* figures, and there are no *after* ones. The
-live trial of 2026-08-31 was a look, not a measurement — it established that regions past the
-90 s ceiling now return, which the rows cannot show, but no stage timings were captured while
-`main` was up. They are server measurements, and the server is back on `release`; nothing in
-this repository can move them until `release..main` is promoted.
+The TTFB and payload rows above are still *before* figures, and there are no *after* ones.
+Neither live window produced them: 2026-08-31 was a look rather than a measurement, and
+2026-09-02 was a look at the band route. No `[stage-timing]` lines have been read off either.
+
+**That is now a task rather than a blocker.** The server runs the current code
+continuously, so the after-column needs nobody's permission — it needs somebody to pull
+`[stage-timing]` lines for the same three regions at the same parameters and put them beside
+the rows above. Until that happens this table is a baseline with an empty right-hand side, and
+the honest statement about production latency is that it has not been measured since
+2026-08-27.
 
 Then update the rendered report **by passing its URL**
 (`https://claude.ai/code/artifact/71539dd1-fb13-44d0-8468-a3a96e726114`); publishing without it
