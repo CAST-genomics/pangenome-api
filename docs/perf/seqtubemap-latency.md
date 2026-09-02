@@ -215,7 +215,7 @@ SPINES=40,150,600 HAPS=464 ALT=0.08 node perf/cross.mjs
 Three fresh regions, all `cached=False`, plus one `cached=True` request that arrived in the
 same log and turned out to be the most informative line in it.
 
-| region | span | nodes | `subgraph_extract` | `gfa_to_vg` | `vg_to_json` | `generate_svg` | total | JSON |
+| region | span | segments | `subgraph_extract` | `gfa_to_vg` | `vg_to_json` | `generate_svg` | total | JSON |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | chr8:78900000-78900090 | 90 bp | 13 | **0.851 s** (23%) | 0.179 | 0.032 | **2.648 s** (71%) | 3.71 s | 0.43 MB |
 | chr8:78910000-78913000 | 3 kb | 118 | **7.729 s** (63%) | 0.031 | 0.174 | 4.282 s (35%) | 12.22 s | 3.64 MB |
@@ -237,15 +237,15 @@ Used 0.042 seconds
 
 **0.042 s of the 30.077 s.** Essentially the whole upstream cost is `GenerateWalksMC` — a
 pure-Python loop doing one `pysam` tabix `fetch` per `S` line and assembling coordinate
-tables across 464 haplotypes. It is cleanly linear in node count:
+tables across 464 haplotypes. It is cleanly linear in segment count:
 
-| nodes | `subgraph_extract` | per node |
+| segments | `subgraph_extract` | per segment |
 | ---: | ---: | ---: |
 | 13 | 0.851 s | 65 ms |
 | 118 | 7.729 s | 65 ms |
 | 381 | 30.077 s | 79 ms |
 
-A flat per-node constant of that size is a per-iteration fixed cost, not an algorithmic
+A flat per-segment constant of that size is a per-iteration fixed cost, not an algorithmic
 one — which makes it the most tractable win on the server, and it is in our own Python
 rather than in `gbz-base` or `vg`.
 

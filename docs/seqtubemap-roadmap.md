@@ -187,7 +187,7 @@ intermediates for the five regions `pgb` already holds golden outputs for. Both 
 2026-08-27.
 
 **It reported, and it re-ranked the roadmap.** `subgraph_extract` is **77% of a 10 kb
-request** — but the cost is `GenerateWalksMC`'s per-node tabix loop, not `gbz-base`, whose own
+request** — but the cost is `GenerateWalksMC`'s per-segment tabix loop, not `gbz-base`, whose own
 query prints 0.042 s. The `vg` round trip is **1.6%**, which demotes increment D out of
 performance entirely and adds **E** below. `generate_svg` also turned out larger than
 estimated: 8.2 s at 10 kb, and 91 s of a 93.6 s *cached* 35.9 kb request, which strengthens B
@@ -622,10 +622,11 @@ a repeated region fast, and Seam 2 depends on it to run without graph data.
 
 **No ticket yet, and no ADR behind it.** It comes from Step 0's numbers rather than from the
 grilling, and it is the largest single cost in the pipeline: `GenerateWalksMC` is a Python
-loop doing one tabix `fetch` per node across 464 strands, at a flat **65-79 ms per node**, and
+loop doing one tabix `fetch` per segment across 464 strands, at a flat **65-79 ms per
+segment**, and
 it is most of `subgraph_extract`'s 30.1 s of a 38.9 s request.
 
-The open question is whether that per-node fetch can be batched. It is the difference between
+The open question is whether that per-segment fetch can be batched. It is the difference between
 E being a half-day and a rewrite, and nothing else is blocked on the answer — A, B and C are
 correct wherever the upstream time lives.
 
@@ -724,8 +725,13 @@ shared vocabulary with the PCLAI chart and the 3D graph.
 
 - ~~**Does `subgraph_extract` dominate?**~~ **Answered 2026-08-27: yes, 77%** — and the cost
   is `GenerateWalksMC`, not `gbz-base` and not the `vg` round trip. See increment E.
-- **Can `GenerateWalksMC`'s per-node tabix fetch be batched?** The question that now most
-  changes the plan.
+- **Does batching `GenerateWalksMC`'s reads help, or is the cost the parse?** That it *can* be
+  batched is settled: the v1 path at `main.py:231-244` already groups ids into contiguous runs
+  and fetches a run at a time, and the committed fixtures show the runs are there — two of five
+  subgraphs are consecutive integers. What is unmeasured is whether the 65-79 ms is the seek or
+  the parsing of 464 haplotypes' coordinates out of each row, and that decides whether E is a
+  half-day or a rewrite. `perf/walk-lookup-split.py` is the measurement; it needs the real
+  derivative and so runs on the server.
 - **Does anything depend on the intermediate `.gfa` / `.vg` / `.json` files existing on
   disk?** They are deleted after every response, which suggests purely internal. Confirm with
   Cici before [#27](https://github.com/CAST-genomics/PangenomeAPI/issues/27).

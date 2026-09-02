@@ -508,17 +508,17 @@ SPINES=40,150,600 HAPS=464 ALT=0.08 node perf/cross.mjs</pre>
 
     <div class="stages">
       <div class="srow">
-        <div class="shead"><span class="sregion">90 bp</span><span class="snote">13 nodes</span><span class="stotal">3.71 s</span></div>
+        <div class="shead"><span class="sregion">90 bp</span><span class="snote">13 segments</span><span class="stotal">3.71 s</span></div>
         <div class="sbar"><span class="s-ex" style="width:22.9%"></span><span class="s-vg" style="width:5.7%"></span><span class="s-svg" style="width:71.4%"></span></div>
         <div class="sfoot"><b>0.85s</b> extract · <b>0.21s</b> vg · <b>2.65s</b> svg</div>
       </div>
       <div class="srow">
-        <div class="shead"><span class="sregion">3 kb</span><span class="snote">118 nodes</span><span class="stotal">12.22 s</span></div>
+        <div class="shead"><span class="sregion">3 kb</span><span class="snote">118 segments</span><span class="stotal">12.22 s</span></div>
         <div class="sbar"><span class="s-ex" style="width:63.3%"></span><span class="s-vg" style="width:1.7%"></span><span class="s-svg" style="width:35.0%"></span></div>
         <div class="sfoot"><b>7.73s</b> extract · <b>0.21s</b> vg · <b>4.28s</b> svg</div>
       </div>
       <div class="srow">
-        <div class="shead"><span class="sregion">10 kb</span><span class="snote">381 nodes</span><span class="stotal">38.89 s</span></div>
+        <div class="shead"><span class="sregion">10 kb</span><span class="snote">381 segments</span><span class="stotal">38.89 s</span></div>
         <div class="sbar"><span class="s-ex" style="width:77.3%"></span><span class="s-vg" style="width:1.6%"></span><span class="s-svg" style="width:21.0%"></span></div>
         <div class="sfoot"><b>30.08s</b> extract · <b>0.63s</b> vg · <b>8.18s</b> svg</div>
       </div>
@@ -538,7 +538,7 @@ SPINES=40,150,600 HAPS=464 ALT=0.08 node perf/cross.mjs</pre>
     <div class="findings">
       <article class="finding is-crit">
         <div class="fhead"><h3>The slow stage is one Python loop, not <code>gbz-base</code></h3><span class="chip measured">Measured</span></div>
-        <p><code>subgraph_extract</code> wraps two calls: the <code>gbz-base</code> query, and <code>GenerateWalksMC</code>, which adds W lines. The query prints its own timing on the line above — <span class="m">Used 0.042 seconds</span>. That is <strong>0.042 s of the 30.077 s</strong>. The rest is a Python loop doing one tabix <code>fetch</code> per node across 464 haplotypes, at a flat <strong>65–79 ms per node</strong> across three orders of magnitude of region size. A constant that size is per-iteration overhead, not an algorithm that grows — which makes it the most tractable win on the server, and it is in our own code rather than in a dependency.</p>
+        <p><code>subgraph_extract</code> wraps two calls: the <code>gbz-base</code> query, and <code>GenerateWalksMC</code>, which adds W lines. The query prints its own timing on the line above — <span class="m">Used 0.042 seconds</span>. That is <strong>0.042 s of the 30.077 s</strong>. The rest is a Python loop doing one tabix <code>fetch</code> per segment across 464 haplotypes, at a flat <strong>65–79 ms per segment</strong> across three orders of magnitude of region size. A constant that size is per-iteration overhead, not an algorithm that grows — which makes it the most tractable win on the server, and it is in our own code rather than in a dependency.</p>
       </article>
 
       <article class="finding is-out">

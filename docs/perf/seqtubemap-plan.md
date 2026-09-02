@@ -113,7 +113,7 @@ untouched.
 the interview, and it is entirely independent of A–D: it sits upstream of layout, touches
 no wire format, and `pgb` cannot observe it. That makes it schedulable in parallel with the
 band work rather than in sequence with it — but not startable without first establishing
-whether a single batched query can replace the per-node one. That investigation is the
+whether a single batched query can replace the per-segment one. That investigation is the
 prerequisite, not the fix.
 
 ## Step 4 — Verify
