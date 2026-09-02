@@ -301,3 +301,18 @@ five full-precision doubles are 0.06 MB of the 0.21 MB the strings were.
 So the per-strand redundancy this format set out to remove is gone, and so is
 the last string a client had to parse. What the JSON side spends its bytes on
 now is the numbers themselves.
+
+## Fixtures, and who checks them
+
+Both encodings of all five of those renders are committed under
+[`tests/fixtures/exchange/`](../tests/fixtures/exchange/README.md) — the payload
+and the document of one render each — and `pgb` commits a copy and parses it with
+a reader written from *this document*, in the repository whose parser it is
+(#25). That is the check that a wire-format break fails loudly on whichever side
+broke it, and it is not a vendored copy of this repository's parser: two copies
+that must agree is the failure mode the whole exchange exists to remove.
+
+Re-generate them with `npm run fixtures:exchange` whenever a change here moves
+what the endpoint serves, and copy them across in the same window. The fixtures
+README says when and why; `tests/node/exchange-fixtures.test.mjs` fails the moment
+the committed bytes stop being what this code writes.
