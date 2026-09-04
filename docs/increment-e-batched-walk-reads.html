@@ -1,0 +1,572 @@
+<title>Batching the Walk Reads</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+  :root {
+    --paper:     #F7F7F4;
+    --ink:       #1A1D1A;
+    --ink-soft:  #585E59;
+    --ink-faint: #8B918C;
+    --rule:      #D3D6D0;
+    --plate:     #FCFCFA;
+    --today:     #8F3222;
+    --batched:   #1D6B5B;
+    --today-wash:  #F0E0DB;
+    --batched-wash:#DDEAE5;
+
+    --measure: 64ch;
+    --s--2: clamp(.70rem, .69rem + .05vw, .74rem);
+    --s--1: clamp(.80rem, .78rem + .10vw, .86rem);
+    --s-0:  clamp(1.06rem, 1.02rem + .18vw, 1.18rem);
+    --s-1:  clamp(1.26rem, 1.16rem + .45vw, 1.5rem);
+    --s-2:  clamp(1.5rem, 1.28rem + .95vw, 2.05rem);
+    --s-3:  clamp(2.0rem, 1.55rem + 2.0vw, 3.15rem);
+
+    --grotesk: "Archivo", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --serif:   "EB Garamond", ui-serif, Georgia, Cambria, serif;
+    --mono:    "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #121513; --ink: #E9EBE6; --ink-soft: #9BA29C; --ink-faint: #6E756F;
+      --rule: #2A2E2A; --plate: #181C19;
+      --today: #CC7259; --batched: #63AE99;
+      --today-wash: #3A2620; --batched-wash: #1E322C;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #121513; --ink: #E9EBE6; --ink-soft: #9BA29C; --ink-faint: #6E756F;
+    --rule: #2A2E2A; --plate: #181C19;
+    --today: #CC7259; --batched: #63AE99;
+    --today-wash: #3A2620; --batched-wash: #1E322C;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: var(--serif); font-size: var(--s-0); line-height: 1.58;
+    margin: 0; padding: 0 1.5rem 7rem; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 78rem; margin: 0 auto; }
+
+  header { padding: 4.5rem 0 0; max-width: 62rem; }
+  .eyebrow {
+    font-family: var(--grotesk); font-size: var(--s--1); font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft);
+    margin: 0 0 1.4rem;
+  }
+  h1 {
+    font-family: var(--serif); font-weight: 500; font-size: var(--s-3);
+    line-height: 1.04; letter-spacing: -.015em; text-wrap: balance;
+    margin: 0 0 1.4rem; max-width: 16ch;
+  }
+  .lede { font-size: var(--s-1); line-height: 1.45; color: var(--ink-soft); margin: 0 0 1rem; max-width: 54ch; }
+  .dateline {
+    font-family: var(--grotesk); font-size: var(--s--1); color: var(--ink-soft);
+    margin: 2.4rem 0 0; padding-top: 1rem; border-top: 1px solid var(--rule); max-width: 56ch;
+  }
+
+  main { display: grid; grid-template-columns: minmax(0, 1fr); }
+  main > * { grid-column: 1; }
+  .full { grid-column: 1 / -1; }
+
+  h2 {
+    font-family: var(--grotesk); font-weight: 500; font-size: var(--s-2);
+    line-height: 1.14; letter-spacing: -.015em; text-wrap: balance;
+    margin: 4rem 0 1rem; padding-top: 1rem; border-top: 1px solid var(--rule);
+  }
+  h2 .num {
+    display: block; font-size: var(--s--1); font-weight: 600; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--ink-faint); margin-bottom: .5rem;
+  }
+  h3 { font-family: var(--grotesk); font-weight: 600; font-size: var(--s-0);
+    letter-spacing: -.005em; margin: 2rem 0 .45rem; }
+  p { margin: 0 0 1.05rem; max-width: var(--measure); }
+  strong { font-weight: 500; }
+  em.term { font-style: normal; font-weight: 500; }
+  code, .mono { font-family: var(--mono); font-size: .84em; }
+  a { color: inherit; text-decoration-color: var(--rule); text-underline-offset: .2em; }
+  a:hover { text-decoration-color: currentColor; }
+  a:focus-visible { outline: 2px solid var(--batched); outline-offset: 3px; }
+  ul.plain { list-style: none; padding: 0; margin: 1rem 0 1.6rem; max-width: var(--measure);
+    display: grid; gap: .7rem; }
+  ul.plain li { border-left: 2px solid var(--rule); padding-left: .9rem; }
+  ul.plain li b { font-family: var(--grotesk); font-weight: 600; font-size: var(--s--1);
+    letter-spacing: .04em; }
+
+  .side {
+    font-size: var(--s--1); line-height: 1.5; color: var(--ink-soft);
+    border-left: 2px solid var(--rule); padding-left: .9rem;
+    margin: 0 0 1.6rem; max-width: var(--measure);
+  }
+  .side b { font-family: var(--grotesk); font-weight: 600; font-size: var(--s--2);
+    letter-spacing: .1em; text-transform: uppercase; display: block;
+    color: var(--ink-faint); margin-bottom: .3rem; }
+
+  /* ── code plates ────────────────────────────────────────── */
+  .code {
+    background: var(--plate); border: 1px solid var(--rule);
+    font-family: var(--mono); font-size: var(--s--1); line-height: 1.62;
+    overflow-x: auto; margin: 0; padding: 1rem 1.1rem; white-space: pre;
+    color: var(--ink);
+  }
+  .code .cm { color: var(--ink-faint); }
+  .code .hi-today { color: var(--today); font-weight: 500; }
+  .code .hi-batched { color: var(--batched); font-weight: 500; }
+  .code .new { color: var(--batched); font-weight: 500; }
+
+  .pair { display: grid; gap: 1px; background: var(--rule);
+    border: 1px solid var(--rule); margin: 1.6rem 0 .7rem; }
+  @media (min-width: 62rem) { .pair { grid-template-columns: 1fr 1fr; } }
+  .pane { background: var(--plate); display: grid; grid-template-rows: auto 1fr; min-width: 0; }
+  .pane > h4 {
+    font-family: var(--grotesk); font-size: var(--s--1); font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase; margin: 0;
+    padding: .8rem 1.1rem .1rem;
+  }
+  .pane > .sub { font-family: var(--grotesk); font-size: var(--s--2); color: var(--ink-faint);
+    margin: 0; padding: 0 1.1rem .55rem; max-width: none; }
+  .pane.today > h4 { color: var(--today); }
+  .pane.batched > h4 { color: var(--batched); }
+  .pane .code { border: 0; border-top: 1px solid var(--rule); }
+
+  /* ── the seek strip ─────────────────────────────────────── */
+  .seeks { margin: 1.8rem 0 .8rem; max-width: 52rem; display: grid; gap: 1.1rem; }
+  .seekrow { display: grid; grid-template-columns: 9.5rem 1fr auto; gap: .9rem; align-items: center; }
+  .seekrow .who { font-family: var(--grotesk); font-size: var(--s--1); line-height: 1.25; }
+  .seekrow .who small { display: block; color: var(--ink-faint); font-size: var(--s--2); }
+  .strip { height: 2.1rem; border: 1px solid var(--rule); position: relative; overflow: hidden; }
+  .strip.dense {
+    background:
+      repeating-linear-gradient(90deg,
+        var(--today) 0 1px, transparent 1px 4px);
+  }
+  .strip.sparse { background: var(--batched-wash); }
+  .strip.sparse i {
+    position: absolute; top: 0; bottom: 0; width: 2px; background: var(--batched);
+  }
+  .seekrow .count { font-family: var(--mono); font-variant-numeric: tabular-nums;
+    font-size: var(--s--1); white-space: nowrap; }
+  .seekrow.a .count { color: var(--today); }
+  .seekrow.b .count { color: var(--batched); }
+
+  /* ── tables ─────────────────────────────────────────────── */
+  .tablewrap { overflow-x: auto; margin: 1.4rem 0 2rem; }
+  table { border-collapse: collapse; width: 100%; font-size: var(--s--1); min-width: 36rem; }
+  th, td { text-align: left; vertical-align: top; padding: .5rem .9rem .5rem 0;
+    border-bottom: 1px solid var(--rule); }
+  thead th { font-family: var(--grotesk); font-size: var(--s--2); font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint);
+    border-bottom: 1px solid var(--ink); }
+  td.num, th.num { font-family: var(--mono); font-variant-numeric: tabular-nums;
+    white-space: nowrap; text-align: right; }
+  thead th.num { text-align: right; }
+  td .win { color: var(--batched); font-weight: 500; }
+  td code, th code { font-size: .95em; }
+  caption { caption-side: bottom; text-align: left; font-family: var(--grotesk);
+    font-size: var(--s--1); color: var(--ink-soft); padding-top: .7rem; max-width: 58ch; }
+
+  figcaption, .cap { font-family: var(--grotesk); font-size: var(--s--1); color: var(--ink-soft);
+    line-height: 1.45; max-width: 60ch; margin-top: .6rem; }
+  figcaption b, .cap b { color: var(--ink); font-weight: 600; }
+  figure { margin: 0 0 2.4rem; }
+
+  /* ── the fork ───────────────────────────────────────────── */
+  .fork { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+    margin: 1.6rem 0 1rem; max-width: 62rem; }
+  @media (min-width: 48rem) { .fork { grid-template-columns: 1fr 1fr; } }
+  .fork > div { background: var(--plate); padding: 1.1rem 1.2rem; }
+  .fork h4 { font-family: var(--grotesk); font-size: var(--s--1); font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase; margin: 0 0 .6rem; }
+  .fork .lookup h4 { color: var(--batched); }
+  .fork .parse h4 { color: var(--today); }
+  .fork p { font-size: var(--s--1); line-height: 1.5; margin: 0 0 .6rem; max-width: none; }
+  .fork p:last-child { margin-bottom: 0; }
+
+  /* ── differences ────────────────────────────────────────── */
+  .diffs { list-style: none; padding: 0; margin: 1.2rem 0 2rem; max-width: 64rem; }
+  .diffs li { border-top: 1px solid var(--rule); padding: .9rem 0; display: grid;
+    gap: .2rem .9rem; }
+  @media (min-width: 54rem) { .diffs li { grid-template-columns: 12rem 1fr; } }
+  .diffs .tag { font-family: var(--grotesk); font-size: var(--s--2); font-weight: 600;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--ink-faint); padding-top: .2rem; }
+  .diffs p { margin: 0; font-size: var(--s--1); line-height: 1.5; max-width: 58ch; }
+  .diffs p + p { margin-top: .5rem; }
+
+  footer { margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--rule);
+    font-family: var(--grotesk); font-size: var(--s--1); color: var(--ink-soft); max-width: 62rem; }
+  footer ul { list-style: none; padding: 0; margin: .8rem 0 0; display: grid; gap: .35rem; }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">PangenomeAPI &middot; increment E</p>
+  <h1>Batching the Walk&nbsp;Reads</h1>
+  <p class="lede">Seven hundred and seventy tabix seeks, where two would cover the
+  same ground. What issue&nbsp;#75 changes, in pseudo-code, before and after.</p>
+  <p class="dateline">Written 4&nbsp;September&nbsp;2026, while
+  <a href="https://github.com/CAST-genomics/PangenomeAPI/issues/74">#74</a> &mdash; the
+  measurement that decides whether this is the right change at all &mdash; is still out.
+  Vocabulary is <a href="../CONTEXT.md">CONTEXT.md</a>: the coarse thing clicked in 3D is a
+  <em class="term">node</em>, the fine vertices inside a tube map are
+  <em class="term">segments</em>, and a haplotype&rsquo;s route through it is a
+  <em class="term">strand</em>. Rendered at <a href="https://claude.ai/code/artifact/14368675-f544-48e0-b245-bbc33680145c">claude.ai/code/artifact/14368675</a>.
+  Markdown twin:
+  <a href="./increment-e-batched-walk-reads.md">increment-e-batched-walk-reads.md</a>.</p>
+</header>
+
+<main>
+
+<h2 class="full"><span class="num">1</span>The file being read</h2>
+
+<p><code>GenerateWalksMC</code> is handed an extracted subgraph that has <code>S</code> and
+<code>L</code> lines and <strong>no <code>W</code> lines</strong> &mdash; segments and their
+connections, but nothing that names a haplotype. Its job is to manufacture the
+<code>W</code> lines, and the raw material is a separate file: the <strong>walk
+derivative</strong>, <code>hprc-v2.0-mc-grch38-v2.2.walk.gz</code>.</p>
+
+<p>That file is bgzip-compressed and <strong>tabix-indexed</strong>, which is where the shape
+gets unusual. Tabix is ordinarily a <em>genomic</em> index &mdash; chromosome, start, end.
+Here:</p>
+
+<div class="tablewrap">
+<table>
+  <caption>One row of the walk derivative, tab-separated, as <code>_write_walks_mc</code>
+  unpacks it (<code>main.py:340</code>).</caption>
+  <thead><tr><th class="num">Col</th><th>Holds</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td class="num">1</td><td>the chromosome column, a constant placeholder</td><td><code>.</code></td></tr>
+    <tr><td class="num">2</td><td><strong>the segment id</strong> &mdash; what tabix actually indexes on</td><td><code>181810309</code></td></tr>
+    <tr><td class="num">3</td><td>that segment&rsquo;s length in bases</td><td><code>145</code></td></tr>
+    <tr><td class="num">4</td><td><strong>every haplotype sitting at this segment</strong>, comma-separated,
+      each entry <code>assembly|contig:coord:strand</code></td>
+      <td><code>HG00544#2|CM089383.1:17162:+,&hellip;</code> &times;464</td></tr>
+    <tr><td class="num">5</td><td>repeat placements, or <code>.</code> when there are none</td><td><code>.</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>So it is a genomic index repurposed as a <strong>segment-id index</strong>.
+<code>fetch(".", id-1, id)</code> means &ldquo;the one row for this one segment&rdquo;. And
+<strong><code>fetch(".", lo-1, hi)</code> means &ldquo;every row from segment <code>lo</code>
+through segment <code>hi</code>&rdquo;</strong> &mdash; that is the whole of the batching
+idea. The index already supports it; the v2 code path just never asks.</p>
+
+<p class="side"><b>Column 4 is the payload</b>One row lists where <em>all 464 haplotypes</em>
+sit at that single segment. At roughly thirty characters an entry, a single row is on the
+order of fourteen kilobytes of text.</p>
+
+<h2 class="full"><span class="num">2</span>What the code does today</h2>
+
+<p><code>_write_walks_mc</code>, <code>main.py:325-456</code>, stripped to its skeleton:</p>
+
+<pre class="code"><span class="cm">open subgraph.gfa            # S and L lines, no W lines</span>
+open output.gfa
+coord_table = {}             <span class="cm"># {assembly: {contig: [coords, segment_ids, strands]}}</span>
+dup_table   = {}
+
+for line in subgraph.gfa:
+
+    if line is an S line:
+        segment_id = line.field(1)
+
+        <span class="hi-today">for row in walks.fetch(".", segment_id - 1, segment_id):   ◀ ONE SEEK, PER SEGMENT</span>
+            _, _, length, haplotypes, repeats = row.split(TAB)
+            for entry in haplotypes.split(","):                    <span class="cm"># ~464 of them</span>
+                asm, contig, coord, strand = tear apart entry
+                append (coord, coord+length), segment_id, strand
+                    into coord_table[asm][contig]
+            if repeats != ".":
+                <span class="cm">… the same, into dup_table …</span>
+
+        copy line to output.gfa
+
+    else if line is an L or H line:
+        copy line to output.gfa
+
+<span class="cm"># second phase, unchanged by any of this</span>
+for asm, contig in coord_table:
+    fold dup_table entries back in
+    sort by coordinate
+    split where consecutive intervals do not abut
+    emit one W line per fragment</pre>
+
+<p class="cap"><b>One <code>fetch</code> per <code>S</code> line.</b> For a 10&nbsp;kb region
+that is 381 seeks; for the largest committed fixture, 770.</p>
+
+<p>Measured cost is a flat <strong>65&ndash;79&nbsp;ms per segment</strong>, and it is most of
+<code>subgraph_extract</code>&rsquo;s 30.1&nbsp;s out of a 38.9&nbsp;s request &mdash; the
+single largest cost in the whole pipeline.</p>
+
+<p>A <em>flat</em> per-segment cost is the signature of a <strong>fixed overhead paid once per
+segment</strong>, rather than of work that scales with the data. Two candidates, and #74
+exists to tell them apart:</p>
+
+<ul class="plain">
+  <li><b>The lookup.</b> One tabix seek plus the decompression of the bgzip block the row
+  lands in. Consecutive segment ids very likely share a block, so asking one at a time may be
+  decompressing the same block over and over.</li>
+  <li><b>The parse.</b> ~464 <code>assembly|contig:coord:strand</code> entries torn apart in
+  Python, per row. Roughly <strong>177,000 field splits</strong> for 381 segments.</li>
+</ul>
+
+<p>Batching removes the first entirely and does nothing at all about the second.</p>
+
+<h2 class="full"><span class="num">3</span>What the batched version does</h2>
+
+<p>The change is confined to how the rows are <em>obtained</em>. Everything about what is done
+with a row stays byte-for-byte identical.</p>
+
+<div class="pair">
+  <div class="pane today">
+    <h4>Today</h4>
+    <p class="sub">One pass. A seek inside it, per segment.</p>
+<pre class="code">for line in subgraph.gfa:
+
+    if line is an S line:
+        id = line.field(1)
+
+        <span class="hi-today">for row in walks.fetch(
+                ".", id - 1, id):</span>
+            <span class="cm">… parse the row …</span>
+
+        copy line to output.gfa
+
+    else if L or H line:
+        copy line to output.gfa</pre>
+  </div>
+  <div class="pane batched">
+    <h4>Batched</h4>
+    <p class="sub">Two passes. A seek per run of consecutive ids.</p>
+<pre class="code"><span class="cm"># pass 1 — copy through, remember ids</span>
+<span class="new">segment_ids = []</span>
+for line in subgraph.gfa:
+    if line is an S line:
+        <span class="new">segment_ids.append(line.field(1))</span>
+        copy line to output.gfa
+    else if L or H line:
+        copy line to output.gfa
+
+<span class="cm"># pass 2 — one fetch per run</span>
+<span class="new">wanted = set(segment_ids)</span>
+<span class="new">for run in contiguous_runs(sorted(segment_ids)):</span>
+    <span class="hi-batched">for row in walks.fetch(
+            ".", run.first - 1, run.last):</span>
+        <span class="new">if row.field(1) not in wanted:</span>
+            <span class="new">continue</span>
+        <span class="cm">… the identical parse, verbatim …</span></pre>
+  </div>
+</div>
+<p class="cap">The second phase &mdash; folding in duplicates, sorting by coordinate, splitting
+where intervals do not abut, emitting the <code>W</code> lines &mdash; is
+<b>completely untouched</b> on both sides.</p>
+
+<p>with:</p>
+
+<pre class="code">contiguous_runs(sorted_ids):                    <span class="cm"># main.py:231-234, already in this file</span>
+    runs = []
+    for id in sorted_ids:
+        if runs is empty or runs.last.last + 1 != id:
+            runs.append([id])                   <span class="cm"># a gap: start a new run</span>
+        else:
+            runs.last.append(id)                <span class="cm"># consecutive: extend</span>
+    return runs</pre>
+
+<p><strong><code>contiguous_runs</code> is not new code.</strong> The <strong>v1</strong> path
+in this same file already does exactly this &mdash; it groups ids into runs at
+<code>main.py:231-234</code> and fetches a run at a time at <code>main.py:246</code>. The v2
+path simply never picked the pattern up. E is porting a technique that is already in the file,
+thirty lines above.</p>
+
+<h3>Why runs work here</h3>
+
+<p>The segments do <strong>not</strong> tile the genome. Bubbles put alternatives at the
+<em>same</em> reference coordinates &mdash; in the chr8 fixture, <code>181810310</code> and
+<code>181810311</code> are the <code>A</code> and the <code>C</code> of one SNP. What is nearly
+gapless is not the coordinates, it is the <strong>integers</strong>. And the walk table is
+indexed on the integers.</p>
+
+<figure>
+  <div class="seeks">
+    <div class="seekrow a">
+      <span class="who">Today<small>one per segment</small></span>
+      <span class="strip dense" role="img" aria-label="770 evenly spaced seeks across the id range"></span>
+      <span class="count">770 seeks</span>
+    </div>
+    <div class="seekrow b">
+      <span class="who">Batched<small>one per run</small></span>
+      <span class="strip sparse" role="img" aria-label="two seeks, at the start of each contiguous run">
+        <i style="left: 0"></i><i style="left: 61.2%"></i>
+      </span>
+      <span class="count">2 seeks</span>
+    </div>
+  </div>
+  <figcaption>The largest committed fixture, <b>chr1&nbsp;25301271&ndash;25309238</b>: 770
+  segments spanning 777 consecutive-ish ids, which fall into <b>two</b> unbroken runs. Every
+  tick is a tabix seek and the block decompression behind it.</figcaption>
+</figure>
+
+<div class="tablewrap">
+<table>
+  <caption>Measured over the five committed fixtures in
+  <code>tests/fixtures/seqtubemap/</code>. Two of the five are a single unbroken run; the
+  worst case in the set is five fetches instead of 280.</caption>
+  <thead>
+    <tr><th>Fixture</th><th class="num">Segments</th><th>Id range</th><th class="num">Runs</th><th class="num">Fetches</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>chr1 25301271&ndash;25309238</td><td class="num">770</td><td class="mono">79335081&ndash;79335857</td><td class="num">2</td><td class="num">770 &rarr; <span class="win">2</span></td></tr>
+    <tr><td>chr1 25331046&ndash;25331646</td><td class="num">75</td><td class="mono">79337767&ndash;79337921</td><td class="num">2</td><td class="num">75 &rarr; <span class="win">2</span></td></tr>
+    <tr><td>chr1 25331646&ndash;25335796</td><td class="num">280</td><td class="mono">79332638&ndash;79338206</td><td class="num">5</td><td class="num">280 &rarr; <span class="win">5</span></td></tr>
+    <tr><td>chr8 10079054&ndash;10080461</td><td class="num">92</td><td class="mono">182992415&ndash;182992506</td><td class="num">1</td><td class="num">92 &rarr; <span class="win">1</span></td></tr>
+    <tr><td>chr8 78771162&ndash;78771252</td><td class="num">9</td><td class="mono">181810309&ndash;181810317</td><td class="num">1</td><td class="num">9 &rarr; <span class="win">1</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 class="full"><span class="num">4</span>Exactly three things differ</h2>
+
+<p>Everything else is the same code executing on the same rows. It is worth being precise about
+the three, because they are the entire risk surface.</p>
+
+<ul class="diffs">
+  <li>
+    <span class="tag">a &middot; seeks</span>
+    <div><p><strong>The number of seeks.</strong> 770 &rarr; 2. This is the point of the
+    exercise.</p></div>
+  </li>
+  <li>
+    <span class="tag">b &middot; order</span>
+    <div>
+      <p><strong>The order rows are parsed in.</strong> Today it is <em><code>S</code>-line
+      order in the GFA</em>; batched it is <em>ascending segment id</em>. These are the same
+      order whenever the GFA&rsquo;s <code>S</code> lines ascend &mdash; and all five committed
+      fixtures do, with no duplicate ids.</p>
+      <p>It matters because <code>coord_table</code> is built by appending, and the second
+      phase&rsquo;s sort is stable: a tie between two coordinates is broken by insertion order.
+      A fixture whose <code>S</code> lines were <em>not</em> sorted could in principle emit a
+      differently-ordered <code>W</code> line. Cheap insurance: assert the ids ascend, and fall
+      back to the per-segment path if they do not. The five fixtures then prove the fast
+      path.</p>
+    </div>
+  </li>
+  <li>
+    <span class="tag">c &middot; a filter</span>
+    <div><p><strong>A filter that did not exist before.</strong> A range fetch can hand back
+    rows for ids the subgraph does not contain. With <em>exact</em> runs it never does &mdash;
+    by construction every id inside a run is wanted &mdash; so the
+    <code>if not in wanted: continue</code> line is dead code today. It stops being dead the
+    moment runs are coalesced across gaps (&sect;6), which is why it goes in now.</p></div>
+  </li>
+</ul>
+
+<h3>And what does not change</h3>
+
+<ul class="plain">
+  <li><b>The parse body</b>, character for character. The same splits, the same tuples, the
+  same <code>coord_table</code> and <code>dup_table</code> shapes.</li>
+  <li><b>The <code>W</code>-line emission phase.</b> Untouched.</li>
+  <li><b>The duplicate-handling quirks</b> &mdash; the
+  <code>if any(coord == t[0] …): continue</code>, the silent drops. Those are
+  <a href="https://github.com/CAST-genomics/PangenomeAPI/issues/76">#76</a>&rsquo;s business,
+  and E preserves them bug-for-bug so that &ldquo;byte-identical&rdquo; stays a usable
+  oracle.</li>
+  <li><b>Memory.</b> <code>fetch</code> returns an <em>iterator</em>; a range fetch streams
+  rows one at a time exactly as a point fetch does. Nothing is accumulated that was not
+  accumulated before. The only new allocation is the id list &mdash; 770 integers.</li>
+  <li><b>The atomic write.</b> The <code>GenerateWalksMC</code> wrapper and its
+  <code>.partial-&lt;pid&gt;-&lt;tid&gt;</code> naming are unaffected.</li>
+</ul>
+
+<h2 class="full"><span class="num">5</span>One thing to be careful about</h2>
+
+<p><code>WalkDerivative</code> keeps <strong>one tabix handle per thread</strong>, and that is
+load-bearing (<code>main.py:115-168</code>): a <code>pysam.TabixFile</code> is one htslib
+handle with <strong>one seek position</strong>, and two live iterators over the same handle
+will corrupt each other. Today&rsquo;s loop is safe by accident &mdash; the inner
+<code>for</code> over a one-row fetch always runs to completion before the next begins.</p>
+
+<p>The batched loop must keep that property deliberately: <strong>fully consume a run&rsquo;s
+iterator before starting another fetch on the same handle.</strong> The pseudo-code in
+&sect;3 does. Any later refactor that tries to interleave two runs, or hands a half-consumed
+iterator to a helper that fetches something else, breaks it &mdash; and breaks it silently, as
+wrong coordinates rather than as an exception.</p>
+
+<h2 class="full"><span class="num">6</span>The tunable we are not turning on yet</h2>
+
+<p>Runs are exact: a gap of even one id starts a new fetch. The obvious next question is
+whether to <strong>coalesce runs separated by a small gap</strong> &mdash; accept some unwanted
+rows in exchange for fewer seeks.</p>
+
+<p>The fixtures say: not yet. The worst case is already five fetches. And the arithmetic is
+unfavourable at scale &mdash; chr1&nbsp;25331646&ndash;25335796 holds 280 segments across a
+span of 5,569 ids, so coalescing its five runs into one fetch would decompress and hand back on
+the order of 5,569 rows at ~14&nbsp;KB each to use 280 of them. The filter is cheap
+(<code>split("\t", 2)[1]</code>, no full parse) but the <em>decompression</em> is not.</p>
+
+<p>If it ever earns its place it is one parameter &mdash; coalesce when the gap is
+&le;&nbsp;G&nbsp;ids &mdash; and G should come from a measurement, not a guess. Ship
+G&nbsp;=&nbsp;0.</p>
+
+<h2 class="full"><span class="num">7</span>What #74 decides</h2>
+
+<p>Everything above assumes the <em>lookup</em> dominates.
+<code>perf/walk-lookup-split.py</code> runs four arms over the same ids &mdash; point and
+range, each with and without the parse &mdash; so subtraction separates the two costs. It runs
+on the server, because it needs the real derivative.</p>
+
+<div class="fork">
+  <div class="lookup">
+    <h4>If the lookup dominates</h4>
+    <p>&sect;3 <em>is</em> increment E. Roughly a half-day, and no ADR: it adds no dependency
+    and changes no interface.</p>
+    <p>The win is most of 30 seconds.</p>
+  </div>
+  <div class="parse">
+    <h4>If the parse dominates</h4>
+    <p>&sect;3 still removes the seeks, but the 30&nbsp;s largely stays, and E becomes a
+    different ticket: <em>make the parse cheaper</em>.</p>
+    <p>That means moving ~177,000 field splits out of the interpreter &mdash;
+    <code>numpy</code>, <code>pandas</code>, or a C extension &mdash; in a project that has
+    none of the three. <strong>That wants an ADR before any code.</strong></p>
+  </div>
+</div>
+
+<p>A third possibility the arms can surface: it is neither, and the cost is the sheer volume of
+column&nbsp;4 &mdash; in which case the question becomes whether the derivative should be
+regenerated in a narrower form. That is a data-pipeline change, and not this ticket at all.</p>
+
+<h2 class="full"><span class="num">8</span>How we know it worked</h2>
+
+<p>Two numbers and one oracle.</p>
+
+<ul class="plain">
+  <li><b>Correctness &mdash; the oracle.</b> The <code>W</code> lines must be
+  <strong>byte-identical, in the same order, across all five committed fixtures</strong>. Not
+  &ldquo;equivalent&rdquo;, not &ldquo;same set&rdquo; &mdash; identical bytes. That is what
+  makes this change small enough to be safe: the duplicate quirks, the gap splitting and the
+  ordering all get pinned in place rather than reasoned about.</li>
+  <li><b>Speed.</b> <code>GenerateWalksMC</code>&rsquo;s stage time on a ~10&nbsp;kb uncached
+  region, against the published 30.1&nbsp;s of a 38.9&nbsp;s request. Reported the way
+  <code>docs/perf/increment-b.md</code> and <code>docs/perf/increment-c.md</code> report
+  theirs.</li>
+  <li><b>Fetch count.</b> Log the segment count and the run count per request. One line, and it
+  makes the win legible in production rather than only in a benchmark &mdash; it is the number
+  that says whether real regions look like the fixtures.</li>
+</ul>
+
+<footer>
+  <p>Companion documents:</p>
+  <ul>
+    <li><a href="./seqtubemap-roadmap.md">docs/seqtubemap-roadmap.md</a> &mdash; where E sits in the sequence</li>
+    <li><a href="./tube-map-pipeline.html">docs/tube-map-pipeline.html</a> &mdash; the whole pipeline this one stage lives in</li>
+    <li><a href="./seqtubemap-interaction.html">docs/seqtubemap-interaction.html</a> &mdash; the route from a click to a tube map</li>
+    <li><a href="../CONTEXT.md">CONTEXT.md</a> &mdash; segment, strand, band, node</li>
+  </ul>
+</footer>
+
+</main>
+</div>
