@@ -1,9 +1,9 @@
 # Increment E — batching the walk-table reads
 
 What [#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75) actually changes, in
-pseudo-code, before and after. Written 2026-09-04, while
-[#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) — the measurement that decides
-whether this is the right change at all — is still out.
+pseudo-code, before and after. Written 2026-09-04; §7 updated 2026-09-06, when
+[#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) — the measurement that decided
+whether this is the right change at all — reported. It is.
 
 Rendered as an illustrated page at <https://claude.ai/code/artifact/14368675-f544-48e0-b245-bbc33680145c>, and committed alongside this file as
 [`docs/increment-e-batched-walk-reads.html`](./increment-e-batched-walk-reads.html).
@@ -241,22 +241,36 @@ should be chosen from a measurement, not a guess. Ship G = 0 (exact runs).
 
 ---
 
-## 7. What #74 decides
+## 7. What #74 decided
 
-This document describes the change **assuming the lookup dominates**. `perf/walk-lookup-split.py`
-runs four arms over the same ids — point and range, each with and without the parse — so
-subtraction separates the two costs. It runs on the server, because it needs the real
-derivative.
+**The lookup dominates, and §3 is increment E.** Roughly a half-day, no new dependency, no
+interface change, no ADR.
 
-- **Lookup dominates** → §3 is increment E, it is roughly a half-day, and it needs no ADR.
-- **Parse dominates** → §3 still removes the seeks, but the 30 s largely stays, and E becomes
-  a different ticket: *make the parse cheaper*. That means moving ~177,000 field splits out of
-  the interpreter — `numpy`, `pandas`, or a C extension — in a project that currently has
-  none of the three. **That** wants an ADR before any code.
+`perf/walk-lookup-split.py` ran on the server on 2026-09-06 over chr1:25,301,271 — 770
+segments, 2 runs. Fetching them one at a time took **90.0 s**; fetching them as two ranges and
+running the identical parse took **0.31 s**. The parse itself, isolated on the range side
+where no per-fetch cost is mixed into it, is **0.12 s** — a tenth of a percent of today.
 
-A third possibility the arms can surface: the cost is neither, and it is the sheer volume of
-column 4 — in which case the question becomes whether the derivative should be regenerated in
-a narrower form, which is a data-pipeline change and not this ticket at all.
+The run is recorded in
+[`docs/perf/walk-lookup-split-2026-09-06.md`](./perf/walk-lookup-split-2026-09-06.md),
+including why the script's own printed `parse` line reads 19% and why that figure understates
+the result rather than qualifying it.
+
+So the branch this document was written under — *parse dominates, move ~177,000 field splits
+out of the interpreter into `numpy`, `pandas` or a C extension, and write an ADR first* — is
+closed. Nothing in §§1–6 changes.
+
+**One thing the measurement does not settle.** The fixture it ran on is nearly gapless: 770
+ids across a span of 777. The adversarial case is chr1:25,331,646, where 280 segments are
+spread across a span of 5,569 in 5 runs, and a range fetch decompresses on the order of 5,569
+rows at ~14 KB each to use 280 of them. Correctness is covered there by the byte-identical
+oracle in §8. Whether it is a *speed* win is not, and it is the same measurement that would
+set the coalescing parameter §6 ships at zero — so it belongs against the real implementation,
+not against the harness.
+
+The third possibility the arms could have surfaced — that the cost is neither, and is the
+sheer volume of column 4 — is not ruled out and not raised by these numbers. It would be a
+data-pipeline change and not this ticket.
 
 ---
 

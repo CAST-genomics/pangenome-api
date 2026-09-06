@@ -56,12 +56,16 @@ not. `release` has stopped being the deployed branch and is now a lagging pointe
 used to be live — see *What "live" means now*. Everything A, B and C bought is what a
 researcher gets today, which is the first time that sentence has been true.
 
-**And increment E is underway.** The largest single cost in the pipeline —
-`GenerateWalksMC`'s 30.1 s of a 38.9 s request — is ticketed for the first time, as
-[#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) and
-[#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75). #74 is the live one: it
-measures whether that cost is the tabix seek or the Python parse, which decides both the shape
-of #75 and whether E wants an ADR. Nothing has reported yet.
+**And increment E has its number.** The largest single cost in the pipeline —
+`GenerateWalksMC`'s 30.1 s of a 38.9 s request —
+[#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) measured on the server on
+2026-09-06, and the cost is the **tabix seek**, not the Python parse: 770 segments fetched one
+at a time take 90.0 s, the same rows through two range fetches take 0.31 s, and the parse
+itself is 0.12 s of that. So
+[#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75) takes the shape it was written
+in — a range fetch behind a byte-identical oracle — and E wants **no ADR**. The record is
+[`walk-lookup-split-2026-09-06.md`](./perf/walk-lookup-split-2026-09-06.md); #74 is closed and
+#75 is unblocked.
 
 **Milestones carry tags.** `increment-b` marks the state at which the browser emulation was
 gone and confirmed on the server; `increment-c` marks `f9b05f6`, the state `pgb` read band
@@ -72,7 +76,7 @@ the fullest single account of what **C** landed.
 | --- | --- |
 | Merged | [#14](https://github.com/CAST-genomics/PangenomeAPI/issues/14), [#15](https://github.com/CAST-genomics/PangenomeAPI/issues/15), [#16](https://github.com/CAST-genomics/PangenomeAPI/issues/16), [#17](https://github.com/CAST-genomics/PangenomeAPI/issues/17), [#18](https://github.com/CAST-genomics/PangenomeAPI/issues/18), [#19](https://github.com/CAST-genomics/PangenomeAPI/issues/19), [#20](https://github.com/CAST-genomics/PangenomeAPI/issues/20), [#21](https://github.com/CAST-genomics/PangenomeAPI/issues/21), [#46](https://github.com/CAST-genomics/PangenomeAPI/issues/46), [#41](https://github.com/CAST-genomics/PangenomeAPI/issues/41), [#40](https://github.com/CAST-genomics/PangenomeAPI/issues/40), [#22](https://github.com/CAST-genomics/PangenomeAPI/issues/22), [#45](https://github.com/CAST-genomics/PangenomeAPI/issues/45), [#23](https://github.com/CAST-genomics/PangenomeAPI/issues/23), [#24](https://github.com/CAST-genomics/PangenomeAPI/issues/24), [#66](https://github.com/CAST-genomics/PangenomeAPI/issues/66), [#70](https://github.com/CAST-genomics/PangenomeAPI/issues/70) |
 | Frontier | **[#25](https://github.com/CAST-genomics/PangenomeAPI/issues/25)** — the contract test, and now the only unfinished part of **C**. `pgb`'s reader exists (`pgb`#151) and has read the real thing; what is missing is the test that keeps the two sides from drifting |
-| In progress | **[#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74)** — increment **E**, and grabbable independently of #25. It measures before it changes anything; [#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75) is blocked on it and [#76](https://github.com/CAST-genomics/PangenomeAPI/issues/76) wants a count out of the same run |
+| In progress | **[#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75)** — increment **E**, unblocked 2026-09-06 by #74 and grabbable independently of #25. [#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) is closed; [#76](https://github.com/CAST-genomics/PangenomeAPI/issues/76) wanted a count out of that same run and did not get one, so it stays on `needs-info` and blocks nothing |
 | Live | **A, B and C.** The server runs `main` as of 2026-09-02 and no longer goes back. `release` is 71 commits behind and is no longer what is deployed |
 | Defects, outside the increments | [#52](https://github.com/CAST-genomics/PangenomeAPI/issues/52), [#54](https://github.com/CAST-genomics/PangenomeAPI/issues/54), [#58](https://github.com/CAST-genomics/PangenomeAPI/issues/58) — all still open, all triaged, none blocking #25. #52 is answered *on the band route* by #24, and stands on the SVG route — see below |
 
@@ -138,7 +142,7 @@ what each became.*
 #15 declare the fork ✅────── #21
 #16 timings + fixtures ✅──── #26
 #45 strip the debug logging ✅
-#74 measure the lookup/parse split ◀── HERE ── #75 stop the per-segment reads   (increment E, blocked by nothing)
+#74 measure the lookup/parse split ✅── #75 stop the per-segment reads ◀── HERE   (increment E, blocked by nothing)
 
 Sent back by pgb's reader, all merged:
 #66 a segment box as five numbers, not a path command ✅
@@ -634,8 +638,9 @@ a repeated region fast, and Seam 2 depends on it to run without graph data.
 
 **Underway.** Ticketed 2026-09-02 as
 [#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) and
-[#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75); **#74 is where the work is**,
-and no ADR yet — possibly none needed, which is itself one of the things #74 decides. It comes from Step 0's numbers rather than from the grilling, and it is the largest
+[#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75); #74 reported on 2026-09-06 and
+is closed, so **#75 is where the work is**, and **no ADR** — #74 ruled that out by finding the
+cost in the seek rather than in the parse. It comes from Step 0's numbers rather than from the grilling, and it is the largest
 single cost in the pipeline: `GenerateWalksMC` is a Python loop doing one tabix `fetch` per
 **segment** across 464 strands, at a flat **65-79 ms per segment**, and it is most of
 `subgraph_extract`'s 30.1 s of a 38.9 s request.
@@ -644,7 +649,7 @@ single cost in the pipeline: `GenerateWalksMC` is a Python loop doing one tabix 
 definition — a measurement that rules it out changes what E contains rather than closing it
 unsuccessfully. `docs/tube-map-pipeline.html` shows the mechanism in full.
 
-### [#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) — Split the cost between the lookup and the parse *(human)*
+### [#74](https://github.com/CAST-genomics/PangenomeAPI/issues/74) — Split the cost between the lookup and the parse ✅ *(human)*
 
 The flat 65-79 ms is a fixed overhead paid once per segment, and nothing yet says which one:
 the **lookup**, one tabix seek plus the decompression of a block that consecutive segments
@@ -661,9 +666,19 @@ It also decides whether E needs an ADR: a parse-dominated result makes #75 "move
 of the interpreter", and adding `numpy`, `pandas` or a C extension to a project that has none
 wants one first. A lookup-dominated result does not.
 
+**Reported 2026-09-06: the lookup, overwhelmingly.** Over chr1:25,301,271 — 770 segments in 2
+runs — point fetches take **90.0 s** and the two range fetches carrying the identical parse
+take **0.31 s**. The parse on its own is **0.12 s**, a tenth of a percent. So #75 keeps the
+shape it was written in and E needs no ADR. Two things the run did not deliver: the
+adversarial sparse fixture (chr1:25,331,646, 280 segments across a span of 5,569) was not
+measured, and #76's dup count did not come back. Neither blocks #75. Full record, including
+why the script's own printed `parse` line reads 19% and why that understates rather than
+qualifies the result, in
+[`walk-lookup-split-2026-09-06.md`](./perf/walk-lookup-split-2026-09-06.md).
+
 ### [#75](https://github.com/CAST-genomics/PangenomeAPI/issues/75) — Stop the per-segment reads
 
-Blocked by #74. The walk table is tabix-indexed on the **segment id**, not on genomic
+**Unblocked 2026-09-06.** The walk table is tabix-indexed on the **segment id**, not on genomic
 coordinates — column 1 is a constant `.` — so a range fetch addresses a range of *ids*. That
 matters, because the segments do not tile the genome: bubbles put alternatives at the same
 reference coordinates, and in the chr8 fixture `181810310` and `181810311` are the `A` and `C`
@@ -781,13 +796,17 @@ shared vocabulary with the PCLAI chart and the 3D graph.
 
 - ~~**Does `subgraph_extract` dominate?**~~ **Answered 2026-08-27: yes, 77%** — and the cost
   is `GenerateWalksMC`, not `gbz-base` and not the `vg` round trip. See increment E.
-- **Does batching `GenerateWalksMC`'s reads help, or is the cost the parse?** That it *can* be
-  batched is settled: the v1 path at `main.py:231-244` already groups ids into contiguous runs
-  and fetches a run at a time, and the committed fixtures show the runs are there — two of five
-  subgraphs are consecutive integers. What is unmeasured is whether the 65-79 ms is the seek or
-  the parsing of 464 haplotypes' coordinates out of each row, and that decides whether E is a
-  half-day or a rewrite. `perf/walk-lookup-split.py` is the measurement; it needs the real
-  derivative and so runs on the server.
+- ~~**Does batching `GenerateWalksMC`'s reads help, or is the cost the parse?**~~ **Answered
+  2026-09-06: the seek, by three orders of magnitude** — 770 point fetches take 90.0 s where
+  two range fetches carrying the same parse take 0.31 s, and the parse alone is 0.12 s. E is
+  the half-day, not the rewrite. See
+  [`walk-lookup-split-2026-09-06.md`](./perf/walk-lookup-split-2026-09-06.md).
+- **Is batching still a win on a *sparse* region?** The measured fixture was 770 ids across a
+  span of 777. chr1:25,331,646 is 280 segments across a span of 5,569 in 5 runs, where a range
+  fetch decompresses on the order of 5,569 rows at ~14 KB each to use 280 of them. Correctness
+  there is covered by #75's byte-identical oracle; speed is not. It is the same measurement
+  that would set the gap-coalescing parameter increment E ships at zero, and it is better taken
+  against #75's implementation than against `perf/walk-lookup-split.py`.
 - **Does anything depend on the intermediate `.gfa` / `.vg` / `.json` files existing on
   disk?** They are deleted after every response, which suggests purely internal. Confirm with
   Cici before [#27](https://github.com/CAST-genomics/PangenomeAPI/issues/27).

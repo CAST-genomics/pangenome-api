@@ -174,16 +174,6 @@
   figure { margin: 0 0 2.4rem; }
 
   /* ── the fork ───────────────────────────────────────────── */
-  .fork { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule);
-    margin: 1.6rem 0 1rem; max-width: 62rem; }
-  @media (min-width: 48rem) { .fork { grid-template-columns: 1fr 1fr; } }
-  .fork > div { background: var(--plate); padding: 1.1rem 1.2rem; }
-  .fork h4 { font-family: var(--grotesk); font-size: var(--s--1); font-weight: 600;
-    letter-spacing: .08em; text-transform: uppercase; margin: 0 0 .6rem; }
-  .fork .lookup h4 { color: var(--batched); }
-  .fork .parse h4 { color: var(--today); }
-  .fork p { font-size: var(--s--1); line-height: 1.5; margin: 0 0 .6rem; max-width: none; }
-  .fork p:last-child { margin-bottom: 0; }
 
   /* ── differences ────────────────────────────────────────── */
   .diffs { list-style: none; padding: 0; margin: 1.2rem 0 2rem; max-width: 64rem; }
@@ -207,9 +197,10 @@
   <h1>Batching the Walk&nbsp;Reads</h1>
   <p class="lede">Seven hundred and seventy tabix seeks, where two would cover the
   same ground. What issue&nbsp;#75 changes, in pseudo-code, before and after.</p>
-  <p class="dateline">Written 4&nbsp;September&nbsp;2026, while
+  <p class="dateline">Written 4&nbsp;September&nbsp;2026; &sect;7 updated
+  6&nbsp;September&nbsp;2026, when
   <a href="https://github.com/CAST-genomics/PangenomeAPI/issues/74">#74</a> &mdash; the
-  measurement that decides whether this is the right change at all &mdash; is still out.
+  measurement that decided whether this is the right change at all &mdash; reported. It is.
   Vocabulary is <a href="../CONTEXT.md">CONTEXT.md</a>: the coarse thing clicked in 3D is a
   <em class="term">node</em>, the fine vertices inside a tube map are
   <em class="term">segments</em>, and a haplotype&rsquo;s route through it is a
@@ -511,33 +502,36 @@ the order of 5,569 rows at ~14&nbsp;KB each to use 280 of them. The filter is ch
 &le;&nbsp;G&nbsp;ids &mdash; and G should come from a measurement, not a guess. Ship
 G&nbsp;=&nbsp;0.</p>
 
-<h2 class="full"><span class="num">7</span>What #74 decides</h2>
+<h2 class="full"><span class="num">7</span>What #74 decided</h2>
 
-<p>Everything above assumes the <em>lookup</em> dominates.
-<code>perf/walk-lookup-split.py</code> runs four arms over the same ids &mdash; point and
-range, each with and without the parse &mdash; so subtraction separates the two costs. It runs
-on the server, because it needs the real derivative.</p>
+<p><strong>The lookup dominates, and &sect;3 is increment E.</strong> Roughly a half-day, no
+new dependency, no interface change, no ADR.</p>
 
-<div class="fork">
-  <div class="lookup">
-    <h4>If the lookup dominates</h4>
-    <p>&sect;3 <em>is</em> increment E. Roughly a half-day, and no ADR: it adds no dependency
-    and changes no interface.</p>
-    <p>The win is most of 30 seconds.</p>
-  </div>
-  <div class="parse">
-    <h4>If the parse dominates</h4>
-    <p>&sect;3 still removes the seeks, but the 30&nbsp;s largely stays, and E becomes a
-    different ticket: <em>make the parse cheaper</em>.</p>
-    <p>That means moving ~177,000 field splits out of the interpreter &mdash;
-    <code>numpy</code>, <code>pandas</code>, or a C extension &mdash; in a project that has
-    none of the three. <strong>That wants an ADR before any code.</strong></p>
-  </div>
-</div>
+<p><code>perf/walk-lookup-split.py</code> ran on the server on 6&nbsp;September&nbsp;2026 over
+chr1:25,301,271 &mdash; 770 segments, 2 runs. Fetching them one at a time took
+<strong>90.0&nbsp;s</strong>; fetching them as two ranges and running the identical parse took
+<strong>0.31&nbsp;s</strong>. The parse itself, isolated on the range side where no per-fetch
+cost is mixed into it, is <strong>0.12&nbsp;s</strong> &mdash; a tenth of a percent of today.
+The run is recorded in
+<a href="./perf/walk-lookup-split-2026-09-06.md">docs/perf/walk-lookup-split-2026-09-06.md</a>,
+including why the script&rsquo;s own printed <code>parse</code> line reads 19% and why that
+figure understates the result rather than qualifying it.</p>
 
-<p>A third possibility the arms can surface: it is neither, and the cost is the sheer volume of
-column&nbsp;4 &mdash; in which case the question becomes whether the derivative should be
-regenerated in a narrower form. That is a data-pipeline change, and not this ticket at all.</p>
+<p>So the branch this document was written under &mdash; <em>parse dominates, move ~177,000
+field splits out of the interpreter into <code>numpy</code>, <code>pandas</code> or a C
+extension, and write an ADR first</em> &mdash; is closed. Nothing in &sect;&sect;1&ndash;6
+changes.</p>
+
+<p class="side"><b>Not settled by this run</b>The fixture is nearly gapless &mdash; 770 ids
+across a span of 777. chr1:25,331,646 spreads 280 segments across a span of 5,569 in 5 runs,
+where a range fetch decompresses on the order of 5,569 rows to use 280. Correctness there is
+covered by the oracle in &sect;8; <em>speed</em> is not, and it is the same measurement that
+would set the coalescing parameter &sect;6 ships at zero. It belongs against the real
+implementation, not against this harness.</p>
+
+<p>The third possibility the arms could have surfaced &mdash; that the cost is neither, and is
+the sheer volume of column&nbsp;4 &mdash; is not ruled out and is not raised by these numbers.
+It would be a data-pipeline change, and not this ticket.</p>
 
 <h2 class="full"><span class="num">8</span>How we know it worked</h2>
 
