@@ -148,8 +148,13 @@ def test_an_interrupted_extraction_leaves_no_subgraph(main_module, tmp_path):
     complete-looking segment section — and the next request read that as an
     extraction it did not have to repeat.
     """
+    # The ids are deliberately not consecutive. Walk rows are fetched one
+    # contiguous run of ids at a time, so `1,2,3` would be a single fetch and
+    # the stand-in below would never reach its second call -- there would be no
+    # midway to fail at. The gap makes two runs, and the failure lands between
+    # them, which is the state this test is about.
     no_walk = tmp_path / "subgraph_no_walk.gfa"
-    no_walk.write_text("H\tVN:Z:1.1\n" + "S\t1\tACGT\nS\t2\tGGTC\nS\t3\tTTTA\n")
+    no_walk.write_text("H\tVN:Z:1.1\n" + "S\t1\tACGT\nS\t2\tGGTC\nS\t5\tTTTA\n")
     destination = tmp_path / "subgraph_with_walk.gfa"
 
     with pytest.raises(OSError):
