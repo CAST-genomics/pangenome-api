@@ -593,15 +593,22 @@ hypothetical: the older version-1 path in this same file already groups segment 
 contiguous runs and fetches a run at a time (<code>main.py:231-234</code> builds the runs,
 <code>main.py:244</code> fetches them). The version-2 path simply never picked it up.</p>
 
-<p><strong>What is still unmeasured, and it decides the size of the win.</strong> The
-65-to-79 milliseconds per segment is not yet split between steps&nbsp;3 and&nbsp;4 above: the
-<em>lookup</em> &mdash; seeking and decompressing a block of the file, quite possibly the same
-block several times over for consecutive segments &mdash; and the <em>parsing</em> of 464
-haplotypes' coordinates out of the row it returns. If the cost is the lookup, batching is
-most of the win and it is large. If it is the parsing, batching removes the seeks and the
-work stays, and E needs a different shape. Timing the two separately over one real region is
-a short script, but it needs the real walk file and so can only be run on the server. That is
-the investigation E is waiting on, and it should happen before any number is promised.</p>
+<p><strong>It is the lookup, and it is essentially all of it.</strong> The
+65-to-79 milliseconds per segment splits between steps&nbsp;3 and&nbsp;4 above &mdash; the
+<em>lookup</em>, seeking and decompressing a block of the file, quite possibly the same block
+several times over for consecutive segments, and the <em>parsing</em> of 464 haplotypes'
+coordinates out of the row it returns. <code>perf/walk-lookup-split.py</code> ran four arms
+over one real region on the server on <strong>6&nbsp;September&nbsp;2026</strong>, and the
+parse is not where the time goes: the same 770 rows parse in <strong>0.12&nbsp;s</strong>
+when they arrive through two range fetches, against <strong>90&nbsp;s</strong> to fetch them
+one segment at a time. Batching is the win, it is large, and increment&nbsp;E is the range
+fetch described in
+<a href="./increment-e-batched-walk-reads.html">increment-e-batched-walk-reads.html</a> &mdash;
+no new dependency, no ADR. The run, and the reason its own printed <code>parse</code> line
+understates the result, are in
+<a href="./perf/walk-lookup-split-2026-09-06.md">perf/walk-lookup-split-2026-09-06.md</a>.
+The size of the win on a <em>sparse</em> region &mdash; where a run of ids spans far more rows
+than the subgraph wants &mdash; is measured when the change ships, not promised here.</p>
 
 <h2>What was in the ten megabytes</h2>
 
