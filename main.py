@@ -322,6 +322,33 @@ def GenerateWalksMC(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_w
     os.replace(partial, destination)
 
 
+def _contiguous_runs(segment_ids):
+    """Group segment ids into runs of consecutive integers, in the order given.
+
+    The same grouping the v1 path builds at `main.py:231-234`, with one
+    deliberate difference: it runs over the ids in *`S`-line order* rather than
+    over a sorted copy. A run therefore only forms where the GFA itself already
+    ascends by one.
+
+    That is what keeps the rows arriving in exactly the order the per-segment
+    loop saw them, unconditionally. It matters because `coord_table` is built by
+    appending and the second phase sorts it with a stable sort, so a tie between
+    two coordinates is broken by insertion order. Sorting the ids first would
+    batch a non-ascending GFA more aggressively and could reorder a `W` line;
+    this cannot, so there is no fast path and slow path to keep in agreement.
+
+    On the five committed fixtures the two are identical anyway -- all five
+    ascend, with no duplicate ids -- so nothing is given up.
+    """
+    runs = []
+    for segment_id in segment_ids:
+        if not runs or runs[-1][-1] + 1 != segment_id:
+            runs.append([segment_id])
+        else:
+            runs[-1].append(segment_id)
+    return runs
+
+
 def _write_walks_mc(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_walk, mc_mapped_walks_v2, log):
     """The body of `GenerateWalksMC`, writing wherever it is pointed."""
     gfa_no_walk = open(preprocess_gfa_subgraph_no_walk, "r")
@@ -332,57 +359,75 @@ def _write_walks_mc(preprocess_gfa_subgraph_no_walk, preprocess_gfa_subgraph_w_w
     coord_table = {}
     #dup_coord_table = {assembly:{contig:{nodeid:[coordinate_x, coordinate_y, strand]}}}
     dup_coord_table = {}
+    # pass 1: copy the GFA through and remember the segment ids in file order
+    segment_ids = []
     for line in gfa_no_walk:
         if line[0] == "S":
-            node_id = int(line.split("\t")[1])
-            
-            # for each node, record their walks coord in coord_table
-            for walk_line in mc_mapped_walks_v2.fetch(".", node_id-1, node_id):
-                _, _, length, asm_coord, asm_coord_dup = walk_line.strip().split("\t")
-                length = int(length)
-                for single_coord in asm_coord.split(","):
-                    asm,contig_coord_strand = single_coord.split("|")
-                    contig, coord, strand = contig_coord_strand.split(":")
-                    coord = int(coord)
-                    if asm not in coord_table:
-                        coord_table[asm] = {contig:[[(coord,coord+length)],[node_id],[strand]]}
-                    else:
-                        if contig not in coord_table[asm]:
-                            coord_table[asm][contig] = [[(coord,coord+length)],[node_id],[strand]]
-                        else:
-                            coord_table[asm][contig][0].append((coord,coord+length))
-                            coord_table[asm][contig][1].append(node_id)
-                            coord_table[asm][contig][2].append(strand)
-                
-                if asm_coord_dup != ".":
-                    for dup_coord in asm_coord_dup.split(","):
-                        part = dup_coord.split("|")
-                        asm = part[0]
-                        if asm not in dup_coord_table:
-                            dup_coord_table[asm] = {}
-                        for i in range(1, len(part)):
-                            contig, coord, strand = part[i].split(":")
-                            coord = int(coord)
-                            if contig not in dup_coord_table[asm]:
-                                dup_coord_table[asm][contig] = {node_id:[[(coord,coord+length)],[strand]]}
-                            else:
-                                if node_id not in dup_coord_table[asm][contig]:
-                                    dup_coord_table[asm][contig][node_id] = [[(coord,coord+length)],[strand]]
-                                else:
-                                    # we have duplicated dup entries, so have to filter that out
-                                    # TODO fix the walks file
-                                    if any(coord == t[0] for t in dup_coord_table[asm][contig][node_id][0]):
-                                        continue
-                                    else:
-                                        dup_coord_table[asm][contig][node_id][0].append((coord,coord+length))
-                                        dup_coord_table[asm][contig][node_id][1].append(strand)
-                        
+            segment_ids.append(int(line.split("\t")[1]))
             gfa_w_walk.write(line)
         elif line[0] == "L" or line[0] == "H":
             gfa_w_walk.write(line)
         # we don't record anything else other than the H, S and L lines
         else:
             continue
+
+    # pass 2: one fetch per run of consecutive ids, rather than one per segment.
+    # The walk table is tabix-indexed on the segment id -- column 1 is a constant
+    # "." -- so `fetch(".", lo-1, hi)` is "every row from segment lo through hi".
+    runs = _contiguous_runs(segment_ids)
+    log.info(f"walk lookup: {len(segment_ids)} segments in {len(runs)} run(s)")
+    wanted = set(segment_ids)
+    for run in runs:
+        # Consume each run's iterator completely before starting the next fetch.
+        # `WalkDerivative` hands out one tabix handle per thread and a handle has
+        # one seek position, so two live iterators over it corrupt each other --
+        # silently, as wrong coordinates rather than as an exception.
+        for walk_line in mc_mapped_walks_v2.fetch(".", run[0]-1, run[-1]):
+            _, node_id, length, asm_coord, asm_coord_dup = walk_line.strip().split("\t")
+            node_id = int(node_id)
+            # A range fetch can hand back rows for ids this subgraph does not
+            # hold. With exact runs it never does, so this is dead today; it
+            # stops being dead the moment runs are coalesced across gaps.
+            if node_id not in wanted:
+                continue
+            length = int(length)
+            for single_coord in asm_coord.split(","):
+                asm,contig_coord_strand = single_coord.split("|")
+                contig, coord, strand = contig_coord_strand.split(":")
+                coord = int(coord)
+                if asm not in coord_table:
+                    coord_table[asm] = {contig:[[(coord,coord+length)],[node_id],[strand]]}
+                else:
+                    if contig not in coord_table[asm]:
+                        coord_table[asm][contig] = [[(coord,coord+length)],[node_id],[strand]]
+                    else:
+                        coord_table[asm][contig][0].append((coord,coord+length))
+                        coord_table[asm][contig][1].append(node_id)
+                        coord_table[asm][contig][2].append(strand)
+
+            if asm_coord_dup != ".":
+                for dup_coord in asm_coord_dup.split(","):
+                    part = dup_coord.split("|")
+                    asm = part[0]
+                    if asm not in dup_coord_table:
+                        dup_coord_table[asm] = {}
+                    for i in range(1, len(part)):
+                        contig, coord, strand = part[i].split(":")
+                        coord = int(coord)
+                        if contig not in dup_coord_table[asm]:
+                            dup_coord_table[asm][contig] = {node_id:[[(coord,coord+length)],[strand]]}
+                        else:
+                            if node_id not in dup_coord_table[asm][contig]:
+                                dup_coord_table[asm][contig][node_id] = [[(coord,coord+length)],[strand]]
+                            else:
+                                # we have duplicated dup entries, so have to filter that out
+                                # TODO fix the walks file
+                                if any(coord == t[0] for t in dup_coord_table[asm][contig][node_id][0]):
+                                    continue
+                                else:
+                                    dup_coord_table[asm][contig][node_id][0].append((coord,coord+length))
+                                    dup_coord_table[asm][contig][node_id][1].append(strand)
+
     if dup_coord_table == {}:
         print("no duplicated node")
     print(dup_coord_table)
